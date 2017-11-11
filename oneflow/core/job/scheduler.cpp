@@ -60,7 +60,7 @@ void Scheduler::Process(const std::string& job_conf_filepath,
   } else {
     PrintProtoToTextFile(*plan, naive_plan_filepath);
   }
-  while (1) {}
+
   // Runtime
   std::stringstream runtime_cmd;
 #ifdef PLATFORM_WINDOWS
