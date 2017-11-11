@@ -40,7 +40,7 @@ void Scheduler::Process(const std::string& job_conf_filepath,
   if (RuntimeCtx::Singleton()->IsThisMachineMaster()) {
     std::stringstream compile_cmd;
 #ifdef PLATFORM_WINDOWS
-    compile_cmd << "./Debug/compiler.exe "
+    compile_cmd << "compiler.exe "
                 << "-job_conf_filepath=\"" << job_conf_filepath << "\" "
                 << "-plan_filepath=\"" << naive_plan_filepath << "\"";
 #else
@@ -60,10 +60,11 @@ void Scheduler::Process(const std::string& job_conf_filepath,
   } else {
     PrintProtoToTextFile(*plan, naive_plan_filepath);
   }
+
   // Runtime
   std::stringstream runtime_cmd;
 #ifdef PLATFORM_WINDOWS
-  runtime_cmd << "./Debug/runtime.exe "
+  runtime_cmd << "runtime.exe "
               << "-plan_filepath=\"" << naive_plan_filepath << "\" "
               << "-this_machine_name=\"" << this_machine_name << "\"";
 #else

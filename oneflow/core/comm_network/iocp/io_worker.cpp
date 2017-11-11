@@ -167,7 +167,7 @@ void IOWorker::InitSockets() {
     PCHECK(CreateIoCompletionPort((HANDLE)s, completion_port_, s, 0) != NULL)
         << "bind to completion port err:" << GetLastError() << "\n";
   }
-  PCHECK(close(listen_socket) == 0);
+  PCHECK(closesocket(listen_socket) == 0);
   // useful log
   FOR_RANGE(int64_t, machine_id, 0, total_machine_num_) {
     LOG(INFO) << "machine " << machine_id << " sockfd "
