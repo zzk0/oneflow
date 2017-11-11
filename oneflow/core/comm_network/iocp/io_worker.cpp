@@ -137,7 +137,7 @@ void IOWorker::InitSockets() {
       CtrlClient::Singleton()->PushPort(this_listen_port);
       break;
     } else {
-      PCHECK(errno == EACCES || errno == EADDRINUSE);
+      PCHECK(WSAGetLastError() == WSAEADDRINUSE);
     }
   }
   CHECK_LT(this_listen_port, listen_port_max);
