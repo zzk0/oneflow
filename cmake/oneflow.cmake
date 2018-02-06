@@ -1,5 +1,6 @@
 # main cpp
 list(APPEND of_main_cc ${PROJECT_SOURCE_DIR}/oneflow/core/job/oneflow.cpp)
+list(APPEND of_main_cc ${PROJECT_SOURCE_DIR}/oneflow/core/auto_placement/df_func_demo.cpp)
 
 function(oneflow_add_executable)
   if (BUILD_CUDA)
