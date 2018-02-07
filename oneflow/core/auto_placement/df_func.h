@@ -1,19 +1,43 @@
 #ifndef ONEFLOW_CORE_AUTO_PLACEMNENT_DF_FUNC_H_
 #define ONEFLOW_CORE_AUTO_PLACEMNENT_DF_FUNC_H_
 
-#include "oneflow/core/auto_placement/df_value.h"
+#include "oneflow/core/auto_placement/tensor.h"
 
 namespace oneflow {
 
-DfValue WeightVar(std::shared_ptr<Value> value, double lr);
+namespace df {
 
-inline DfValue WeightVar(std::shared_ptr<Value> value) {
-  return WeightVar(value, 0.01);
-}
+Tensor Update(Tensor var, double lr);
 
-DfValue Square(DfValue input);
+std::vector<Tensor> Clone(const Tensor& input, size_t n);
 
-DfValue Backward(DfValue loss);
+Tensor Minus(const Tensor& input);
+
+Tensor Add(const Tensor& a, const Tensor& b);
+
+Tensor Sub(const Tensor& a, const Tensor& b);
+
+Tensor ElemWiseMul(const Tensor& a, const Tensor& b);
+
+Tensor Reciprocal(const Tensor& input);
+
+Tensor Max(const Tensor& a, const Tensor& b);
+
+Tensor Max(const Tensor& a);
+
+Tensor Square(const Tensor& input);
+
+Tensor MatrixRowSum(const Tensor& input);
+
+Tensor MatrixColSum(const Tensor& input);
+
+Tensor TensorProduct(const Tensor& a, const Tensor& b);
+
+Tensor FixedExpectation(const Tensor& a, double e);
+
+Tensor Backward(const Tensor& loss);
+
+}  // namespace df
 
 }  // namespace oneflow
 
