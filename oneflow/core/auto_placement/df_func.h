@@ -29,11 +29,21 @@ Tensor Max(const Tensor& a, const Tensor& b);
 
 Tensor Max(const Tensor& a);
 
+Tensor Sum(const Tensor& a);
+
+Tensor Avg(const Tensor& a);
+
+Tensor Variance(const Tensor& a);
+
+Tensor AvgAbsDeviation(const Tensor& a);
+
 Tensor Square(const Tensor& input);
 
 Tensor MatrixRowSum(const Tensor& input);
 
 Tensor MatrixColSum(const Tensor& input);
+
+Tensor MatrixColMax(const Tensor& input);
 
 Tensor TensorProduct(const Tensor& a, const Tensor& b);
 

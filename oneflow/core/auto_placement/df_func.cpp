@@ -153,6 +153,35 @@ Tensor Max(const Tensor& input) {
   });
 }
 
+Tensor Variance(const Tensor& input) {
+  auto copies = Clone(input, 2);
+  return Avg(Square(Sub(copies.at(0), Avg(copies.at(1)))));
+}
+
+Tensor AvgAbsDeviation(const Tensor& input) {
+  auto copies = Clone(input, 2);
+  return Avg(Abs(Sub(copies.at(0), Avg(copies.at(1)))));
+}
+
+Tensor Sum(const Tensor& input) {
+  double sum = 0;
+  FOR_RANGE(int, i, 0, input.Size()) { sum += input.At(i); }
+  std::shared_ptr<Buffer> out(new Buffer(Shape({1}), sum));
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer input_diff(input.shape(), 0);
+    double diff = out_diff.data().at(0);
+    FOR_RANGE(int, i, 0, input_diff.Size()) { input_diff.At(i) = diff; }
+    input.HandleDiff(input_diff);
+  });
+}
+
+Tensor Avg(const Tensor& input) {
+  Tensor sum = Sum(input);
+  double avg = sum.At(0) / input.Size();
+  std::shared_ptr<Buffer> out(new Buffer(Shape({1}), avg));
+  return Tensor(out, [=](const Buffer& out_diff) { sum.HandleDiff(out_diff); });
+}
+
 Tensor ElemWiseMul(const Tensor& a, const Tensor& b) {
   CHECK(a.Size() == b.Size());
   std::shared_ptr<Buffer> out(new Buffer(a.buffer()));
@@ -240,6 +269,31 @@ Tensor MatrixColSum(const Tensor& input) {
       FOR_RANGE(int, j, 0, input_diff.shape().At(1)) {
         input_diff.At(i, j) = out_diff.At(j);
       }
+    }
+    input.HandleDiff(input_diff);
+  });
+}
+
+Tensor MatrixColMax(const Tensor& input) {
+  CHECK(input.shape().dim_vec().size() == 2);
+  int64_t out_size = input.shape().At(1);
+  std::shared_ptr<Buffer> out(
+      new Buffer(Shape({out_size}), std::numeric_limits<double>::min()));
+  std::shared_ptr<std::vector<size_t>> max_index(
+      new std::vector<size_t>(out_size));
+  FOR_RANGE(int, j, 0, input.shape().At(1)) {
+    FOR_RANGE(int, i, 0, input.shape().At(0)) {
+      if (input.At(i, j) > out->At(j)) {
+        out->At(j) = input.At(i, j);
+        max_index->at(j) = i;
+      }
+    }
+  }
+  return Tensor(out, [=](const Buffer& out_diff) {
+    CHECK(out_diff.Size() == input.shape().At(1));
+    Buffer input_diff(input.shape(), 0);
+    FOR_RANGE(int, j, 0, out_diff.Size()) {
+      input_diff.At(max_index->at(j), j) = out_diff.At(j);
     }
     input.HandleDiff(input_diff);
   });
