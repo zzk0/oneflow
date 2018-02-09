@@ -4,6 +4,26 @@ namespace oneflow {
 
 namespace df {
 
+Tensor IndexReduce(const Tensor& input,
+                   const std::vector<std::vector<int64_t>>& reduce_indexes) {
+  int64_t size = reduce_indexes.size();
+  std::shared_ptr<Buffer> out(new Buffer(Shape({size}), 0));
+  FOR_RANGE(int, i, 0, out->Size()) {
+    for (int64_t index : reduce_indexes.at(i)) {
+      out->At(i) += input.At(index);
+    }
+  }
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer input_diff(input.shape(), 0);
+    FOR_RANGE(int, i, 0, out_diff.Size()) {
+      for (int64_t index : reduce_indexes.at(i)) {
+        input_diff.At(index) += out_diff.At(i);
+      }
+    }
+    input.HandleDiff(input_diff);
+  });
+}
+
 Tensor Update(Tensor* var, double lr) {
   auto buffer = var->mut_buffer_ptr();
   return Tensor(*var, [=](const Buffer& diff) {
@@ -68,14 +88,31 @@ Tensor Tee(const Tensor& input, Tensor* out) {
 Tensor Exp(const Tensor& input) {
   std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
   FOR_RANGE(int, i, 0, out->Size()) {
-    double& x = out->mut_data()->at(i);
-    x = exp(x);
+    double& x = out->At(i);
+    x = std::exp(x);
   }
   return Tensor(out, [=](const Buffer& out_diff) {
     Buffer input_diff(out_diff);
     FOR_RANGE(int, i, 0, input_diff.Size()) {
-      double& diff = input_diff.mut_data()->at(i);
-      diff *= out->data().at(i);
+      double& diff = input_diff.At(i);
+      diff *= out->At(i);
+    }
+    input.HandleDiff(input_diff);
+  });
+}
+
+Tensor Tanh(const Tensor& input) {
+  std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
+  FOR_RANGE(int, i, 0, out->Size()) {
+    double& x = out->At(i);
+    x = std::tanh(x);
+  }
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer input_diff(out_diff);
+    FOR_RANGE(int, i, 0, input_diff.Size()) {
+      double& diff = input_diff.At(i);
+      double o = out->At(i);
+      diff *= 1 - o * o;
     }
     input.HandleDiff(input_diff);
   });

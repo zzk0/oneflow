@@ -7,13 +7,20 @@ namespace oneflow {
 
 namespace df {
 
+Tensor IndexReduce(const Tensor& input,
+                   const std::vector<std::vector<int64_t>>& reduce_indexes);
+
 Tensor Update(Tensor* var, double lr);
 
 std::vector<Tensor> Clone(const Tensor& input, size_t n);
 
 Tensor Minus(const Tensor& input);
+
 Tensor Abs(const Tensor& input);
+
 Tensor Exp(const Tensor& input);
+
+Tensor Tanh(const Tensor& input);
 
 Tensor Tee(const Tensor& input, Tensor* out);
 
