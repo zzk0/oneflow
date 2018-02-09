@@ -28,25 +28,28 @@ class Buffer final {
   const Shape& shape() const { return shape_; }
 
   double At(size_t index) const {
-    CHECK(shape_.NumAxes() == 1);
+    CHECK(shape_.NumAxes() >= 1);
     return data_.at(index);
   }
   double At(size_t x, size_t y) const {
-    CHECK(shape_.NumAxes() == 2);
+    CHECK(shape_.NumAxes() >= 2);
     return data_.at(x * shape_.Count(1) + y);
   }
   double At(size_t x, size_t y, size_t z) const {
-    CHECK(shape_.NumAxes() == 3);
+    CHECK(shape_.NumAxes() >= 3);
     return data_.at(x * shape_.Count(1) + y * shape_.Count(2) + z);
   }
 
-  double& At(size_t index) { return data_.at(index); }
+  double& At(size_t index) {
+    CHECK(shape_.NumAxes() >= 1);
+    return data_.at(index);
+  }
   double& At(size_t x, size_t y) {
-    CHECK(shape_.NumAxes() == 2);
+    CHECK(shape_.NumAxes() >= 2);
     return data_.at(x * shape_.Count(1) + y);
   }
   double& At(size_t x, size_t y, size_t z) {
-    CHECK(shape_.NumAxes() == 2);
+    CHECK(shape_.NumAxes() >= 3);
     return data_.at(x * shape_.Count(1) + y * shape_.Count(2) + z);
   }
 

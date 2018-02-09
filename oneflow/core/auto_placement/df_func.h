@@ -7,11 +7,15 @@ namespace oneflow {
 
 namespace df {
 
-Tensor Update(Tensor var, double lr);
+Tensor Update(Tensor* var, double lr);
 
 std::vector<Tensor> Clone(const Tensor& input, size_t n);
 
 Tensor Minus(const Tensor& input);
+Tensor Abs(const Tensor& input);
+Tensor Exp(const Tensor& input);
+
+Tensor Tee(const Tensor& input, Tensor* out);
 
 Tensor Add(const Tensor& a, const Tensor& b);
 

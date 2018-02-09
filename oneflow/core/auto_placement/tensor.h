@@ -8,16 +8,19 @@ namespace df {
 
 class Tensor final {
  public:
+  Tensor() = default;
   Tensor(const Tensor&) = default;
-  explicit Tensor(const Shape& shape, double init)
-      : buffer_(std::shared_ptr<Buffer>(new Buffer(shape, init))),
-        diff_handler_([](const Buffer&) {}) {}
-  explicit Tensor(const Shape& shape,
-                  const std::function<double(size_t)>& Getter)
-      : buffer_(std::shared_ptr<Buffer>(new Buffer(shape, Getter))),
-        diff_handler_([](const Buffer&) {}) {}
   explicit Tensor(std::shared_ptr<Buffer> buffer)
       : buffer_(buffer), diff_handler_([](const Buffer&) {}) {}
+  Tensor(const Shape& shape, double init)
+      : buffer_(std::shared_ptr<Buffer>(new Buffer(shape, init))),
+        diff_handler_([](const Buffer&) {}) {}
+  Tensor(double init)
+      : buffer_(std::shared_ptr<Buffer>(new Buffer(Shape({1}), init))),
+        diff_handler_([](const Buffer&) {}) {}
+  Tensor(const Shape& shape, const std::function<double(size_t)>& Getter)
+      : buffer_(std::shared_ptr<Buffer>(new Buffer(shape, Getter))),
+        diff_handler_([](const Buffer&) {}) {}
   Tensor(std::shared_ptr<Buffer> buffer,
          const std::function<void(const Buffer&)>& diff_handler)
       : buffer_(buffer), diff_handler_(diff_handler) {}
@@ -42,7 +45,7 @@ class Tensor final {
 
   const Buffer& buffer() const { return *buffer_; }
   const std::shared_ptr<Buffer>& buffer_ptr() const { return buffer_; }
-  
+
   std::shared_ptr<Buffer> mut_buffer_ptr() { return buffer_; }
 
   void HandleDiff(const Buffer& diff) const { diff_handler_(diff); }

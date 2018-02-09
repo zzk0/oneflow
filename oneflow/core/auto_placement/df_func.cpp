@@ -4,9 +4,9 @@ namespace oneflow {
 
 namespace df {
 
-Tensor Update(Tensor var, double lr) {
-  auto buffer = var.mut_buffer_ptr();
-  return Tensor(var, [buffer, lr](const Buffer& diff) {
+Tensor Update(Tensor* var, double lr) {
+  auto buffer = var->mut_buffer_ptr();
+  return Tensor(*var, [=](const Buffer& diff) {
     CHECK(buffer->data().size() == diff.data().size());
     FOR_RANGE(int, i, 0, buffer->data().size()) {
       double& w = buffer->mut_data()->at(i);
@@ -44,13 +44,68 @@ Tensor Minus(const Tensor& input) {
   });
 }
 
-Tensor Add(const Tensor& a, const Tensor& b) {
-  CHECK(a.buffer().Size() == b.buffer().Size());
-  std::shared_ptr<Buffer> out(new Buffer(a.buffer()));
-  FOR_RANGE(int, i, 0, out->Size()) { out->At(i) += b.At(i); }
+Tensor Abs(const Tensor& input) {
+  std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
+  FOR_RANGE(int, i, 0, out->Size()) {
+    double& x = out->mut_data()->at(i);
+    x = (x > 0) ? x : -x;
+  }
   return Tensor(out, [=](const Buffer& out_diff) {
-    a.HandleDiff(out_diff);
-    b.HandleDiff(out_diff);
+    Buffer input_diff(out_diff);
+    FOR_RANGE(int, i, 0, input_diff.Size()) {
+      double& diff = input_diff.mut_data()->at(i);
+      diff *= (input.buffer().data().at(i) > 0) ? 1 : -1;
+    }
+    input.HandleDiff(input_diff);
+  });
+}
+
+Tensor Tee(const Tensor& input, Tensor* out) {
+  *out = input;
+  return Tensor(input);
+}
+
+Tensor Exp(const Tensor& input) {
+  std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
+  FOR_RANGE(int, i, 0, out->Size()) {
+    double& x = out->mut_data()->at(i);
+    x = exp(x);
+  }
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer input_diff(out_diff);
+    FOR_RANGE(int, i, 0, input_diff.Size()) {
+      double& diff = input_diff.mut_data()->at(i);
+      diff *= out->data().at(i);
+    }
+    input.HandleDiff(input_diff);
+  });
+}
+
+Tensor Add(const Tensor& a, const Tensor& b) {
+  Tensor big = a;
+  Tensor small = b;
+  if (a.Size() < b.Size()) {
+    big = b;
+    small = a;
+  }
+  CHECK(big.Size() % small.Size() == 0);
+  std::shared_ptr<Buffer> out(new Buffer(big.buffer()));
+  size_t small_size = small.Size();
+  size_t group_size = big.Size() / small_size;
+  FOR_RANGE(int, i, 0, small_size) {
+    FOR_RANGE(int, j, 0, group_size) {
+      out->At(i * group_size + j) += small.At(i);
+    }
+  }
+  return Tensor(out, [=](const Buffer& out_diff) {
+    big.HandleDiff(out_diff);
+    Buffer small_diff(small.shape(), 0);
+    FOR_RANGE(int, i, 0, small_size) {
+      FOR_RANGE(int, j, 0, group_size) {
+        small_diff.At(i) += out_diff.At(i * group_size + j);
+      }
+    }
+    small.HandleDiff(small_diff);
   });
 }
 
