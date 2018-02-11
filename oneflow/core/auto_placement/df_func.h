@@ -30,17 +30,25 @@ Tensor Sub(const Tensor& a, const Tensor& b);
 
 Tensor ElemWiseMul(const Tensor& a, const Tensor& b);
 
+Tensor Mul(const Tensor& a, const Tensor& b);
+
 Tensor Reciprocal(const Tensor& input);
 
 Tensor Max(const Tensor& a, const Tensor& b);
 
 Tensor Max(const Tensor& a);
 
+Tensor Relu(const Tensor& input);
+
+Tensor Min(const Tensor& a);
+
 Tensor Sum(const Tensor& a);
 
 Tensor Avg(const Tensor& a);
 
 Tensor Variance(const Tensor& a);
+
+Tensor MaxDeviation(const Tensor& a);
 
 Tensor AvgAbsDeviation(const Tensor& a);
 

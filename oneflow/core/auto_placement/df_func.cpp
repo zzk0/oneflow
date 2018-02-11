@@ -64,6 +64,20 @@ Tensor Minus(const Tensor& input) {
   });
 }
 
+Tensor Relu(const Tensor& input) {
+  std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
+  FOR_RANGE(int, i, 0, out->Size()) {
+    if (input.At(i) < 0) { out->At(i) = 0; }
+  }
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer input_diff(out_diff);
+    FOR_RANGE(int, i, 0, input_diff.Size()) {
+      if (input.At(i) < 0) { input_diff.At(i) = 0; }
+    }
+    input.HandleDiff(input_diff);
+  });
+}
+
 Tensor Abs(const Tensor& input) {
   std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
   FOR_RANGE(int, i, 0, out->Size()) {
@@ -147,19 +161,28 @@ Tensor Add(const Tensor& a, const Tensor& b) {
 }
 
 Tensor Max(const Tensor& a, const Tensor& b) {
-  CHECK(a.Size() == 1 && b.Size() == 1);
-  bool is_b_gt_a = (b.At(0) > a.At(0));
-  std::shared_ptr<Buffer> out(new Buffer(is_b_gt_a ? b.buffer() : a.buffer()));
+  CHECK(a.shape().dim_vec().size() == b.shape().dim_vec().size());
+  FOR_RANGE(int, i, 0, a.shape().dim_vec().size()) {
+    CHECK(a.shape().dim_vec().at(i) == b.shape().dim_vec().at(i));
+  }
+  std::shared_ptr<Buffer> out(new Buffer(a.buffer()));
+  FOR_RANGE(size_t, i, 0, out->Size()) {
+    out->At(i) = std::max(a.At(i), b.At(i));
+  }
   return Tensor(out, [=](const Buffer& out_diff) {
-    Buffer zero_diff(out_diff);
-    zero_diff.At(0) = 0;
-    if (is_b_gt_a) {
-      a.HandleDiff(zero_diff);
-      b.HandleDiff(out_diff);
-    } else {
-      a.HandleDiff(out_diff);
-      b.HandleDiff(zero_diff);
+    Buffer a_diff(out_diff.shape(), 0);
+    Buffer b_diff(out_diff.shape(), 0);
+    FOR_RANGE(size_t, i, 0, out_diff.Size()) {
+      if (a.At(i) > b.At(i)) {
+        a_diff.At(i) = out_diff.At(i);
+        b_diff.At(i) = 0;
+      } else {
+        b_diff.At(i) = out_diff.At(i);
+        a_diff.At(i) = 0;
+      }
     }
+    a.HandleDiff(a_diff);
+    b.HandleDiff(b_diff);
   });
 }
 
@@ -190,6 +213,23 @@ Tensor Max(const Tensor& input) {
   });
 }
 
+Tensor Min(const Tensor& input) {
+  double min_value = std::numeric_limits<double>::max();
+  size_t min_index = 0;
+  FOR_RANGE(int, i, 0, input.Size()) {
+    if (input.At(i) < min_value) {
+      min_value = input.buffer().At(i);
+      min_index = i;
+    }
+  }
+  std::shared_ptr<Buffer> out(new Buffer(Shape({1}), min_value));
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer input_diff(input.shape(), 0);
+    input_diff.At(min_index) = out_diff.At(0);
+    input.HandleDiff(input_diff);
+  });
+}
+
 Tensor Variance(const Tensor& input) {
   auto copies = Clone(input, 2);
   return Avg(Square(Sub(copies.at(0), Avg(copies.at(1)))));
@@ -198,6 +238,11 @@ Tensor Variance(const Tensor& input) {
 Tensor AvgAbsDeviation(const Tensor& input) {
   auto copies = Clone(input, 2);
   return Avg(Abs(Sub(copies.at(0), Avg(copies.at(1)))));
+}
+
+Tensor MaxDeviation(const Tensor& input) {
+  auto copies = Clone(input, 2);
+  return Sub(Max(copies.at(0)), Min(copies.at(1)));
 }
 
 Tensor Sum(const Tensor& input) {
@@ -217,6 +262,41 @@ Tensor Avg(const Tensor& input) {
   double avg = sum.At(0) / input.Size();
   std::shared_ptr<Buffer> out(new Buffer(Shape({1}), avg));
   return Tensor(out, [=](const Buffer& out_diff) { sum.HandleDiff(out_diff); });
+}
+
+Tensor Mul(const Tensor& a, const Tensor& b) {
+  Tensor big = a;
+  Tensor small = b;
+  if (a.Size() < b.Size()) {
+    big = b;
+    small = a;
+  }
+  CHECK(big.Size() % small.Size() == 0);
+  std::shared_ptr<Buffer> out(new Buffer(big.buffer()));
+  size_t small_size = small.Size();
+  size_t group_size = big.Size() / small_size;
+  FOR_RANGE(int, i, 0, small_size) {
+    FOR_RANGE(int, j, 0, group_size) {
+      out->At(i * group_size + j) *= small.At(i);
+    }
+  }
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer big_diff(out_diff);
+    FOR_RANGE(int, i, 0, small_size) {
+      FOR_RANGE(int, j, 0, group_size) {
+        big_diff.At(i * group_size + j) *= small.At(i);
+      }
+    }
+    big.HandleDiff(big_diff);
+    Buffer small_diff(small.shape(), 0);
+    FOR_RANGE(int, i, 0, small_size) {
+      FOR_RANGE(int, j, 0, group_size) {
+        size_t index = i * group_size + j;
+        small_diff.At(i) += out_diff.At(index) * big.At(index);
+      }
+    }
+    small.HandleDiff(small_diff);
+  });
 }
 
 Tensor ElemWiseMul(const Tensor& a, const Tensor& b) {
