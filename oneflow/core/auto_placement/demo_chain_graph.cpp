@@ -6,12 +6,12 @@ namespace df {
 DemoChainRegst* DemoChainGraph::Op(const std::string& name,
                                    std::vector<DemoChainRegst*> inputs) {
   DemoChainNode* fw_node = NewForwardNode(name);
-  fw_node->set_chain_node_id(NewChainNodeId());
+  fw_node->set_fw_chain_node_id(fw_node->chain_node_id());
   for (auto input : inputs) { Consume(fw_node, input); }
   DemoChainRegst* out = NewRegst(fw_node);
   out->set_diff_handler([=](DemoChainRegst* out_diff) {
     DemoChainNode* bw_node = NewBackwardNode(name);
-    bw_node->set_chain_node_id(NewChainNodeId());
+    bw_node->set_fw_chain_node_id(fw_node->chain_node_id());
     Consume(bw_node, out);
     Consume(bw_node, out_diff);
     for (auto input : inputs) {
@@ -27,11 +27,13 @@ DemoChainRegst* DemoChainGraph::Model(const std::string& name) {
   DemoChainRegst* model = NewRegst(md_node);
   model->set_diff_handler([=](DemoChainRegst* model_diff) {
     DemoChainNode* acc_node = NewDiffAccNode(name);
-    acc_node->set_chain_node_id(NewChainNodeId());
     Consume(acc_node, model_diff);
     DemoChainRegst* diff_acc_regst = NewRegst(acc_node);
     Consume(md_node, diff_acc_regst);
+    int64_t fw_chain_node_id = model_diff->producer()->fw_chain_node_id();
+    acc_node->set_fw_chain_node_id(fw_chain_node_id);
     md_node->set_chain_node_id(NewChainNodeId());
+    md_node->set_fw_chain_node_id(fw_chain_node_id);
   });
   return model;
 }
@@ -42,27 +44,34 @@ DemoChainRegst* DemoChainGraph::NewRegst(DemoChainNode* producer) {
   return regsts_.back().get();
 }
 
-DemoChainNode* DemoChainGraph::NewChainNode(const std::string& name) {
-  auto* node = new DemoChainNode(name);
+DemoChainNode* DemoChainGraph::NewChainNode(const std::string& name,
+                                            TaskType task_type) {
+  auto* node = new DemoChainNode(name, task_type);
   AddAllocatedNode(node);
   node->set_name(name);
   return node;
 }
 
 DemoChainNode* DemoChainGraph::NewForwardNode(const std::string& name) {
-  return NewChainNode("fw_" + name);
+  auto* node = NewChainNode("fw_" + name, TaskType::kNormalForward);
+  node->set_chain_node_id(NewChainNodeId());
+  return node;
 }
 
 DemoChainNode* DemoChainGraph::NewBackwardNode(const std::string& name) {
-  return NewChainNode("bw_" + name);
+  auto* node = NewChainNode("bw_" + name, TaskType::kNormalBackward);
+  node->set_chain_node_id(NewChainNodeId());
+  return node;
 }
 
 DemoChainNode* DemoChainGraph::NewDiffAccNode(const std::string& name) {
-  return NewChainNode("diff_acc_" + name);
+  auto* node = NewChainNode("diff_acc_" + name, TaskType::kMdDiffAcc);
+  node->set_chain_node_id(NewChainNodeId());
+  return node;
 }
 
 DemoChainNode* DemoChainGraph::NewMdUpdtNode(const std::string& name) {
-  return NewChainNode("md_updt_" + name);
+  return NewChainNode("md_updt_" + name, TaskType::kMdUpdt);
 }
 
 void DemoChainGraph::Consume(DemoChainNode* node, DemoChainRegst* regst) {

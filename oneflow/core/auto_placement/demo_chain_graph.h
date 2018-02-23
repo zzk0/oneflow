@@ -1,6 +1,7 @@
 #ifndef ONEFLOW_CORE_AUTO_PLACEMENT_DEMO_CHAIN_GRAPH_H_
 #define ONEFLOW_CORE_AUTO_PLACEMENT_DEMO_CHAIN_GRAPH_H_
 #include "oneflow/core/graph/graph.h"
+#include "oneflow/core/job/task.pb.h"
 
 namespace oneflow {
 
@@ -40,20 +41,27 @@ class DemoChainEdge;
 class DemoChainNode final : public Node<DemoChainNode, DemoChainEdge> {
  public:
   OF_DISALLOW_COPY_AND_MOVE(DemoChainNode);
-  DemoChainNode(const std::string& name) : name_(name) {}
+  DemoChainNode(const std::string& name, TaskType task_type)
+      : name_(name), task_type_(task_type) {}
   ~DemoChainNode() = default;
 
   const std::string& name() const { return name_; }
   int64_t chain_node_id() const { return chain_node_id_; }
+  int64_t fw_chain_node_id() const { return fw_chain_node_id_; }
 
   void set_name(const std::string& name) { name_ = name; }
   void set_chain_node_id(int64_t chain_node_id) {
     chain_node_id_ = chain_node_id;
   }
+  void set_fw_chain_node_id(int64_t fw_chain_node_id) {
+    fw_chain_node_id_ = fw_chain_node_id;
+  }
 
  private:
   std::string name_;
+  TaskType task_type_;
   int64_t chain_node_id_;
+  int64_t fw_chain_node_id_;
 };
 
 class DemoChainEdge final : public Edge<DemoChainNode, DemoChainEdge> {
@@ -82,7 +90,7 @@ class DemoChainGraph : public Graph<DemoChainNode, DemoChainEdge> {
   int64_t NewChainNodeId() { return ++chain_node_id_; }
   int64_t NewChainRegstId() { return ++chain_node_id_; }
   DemoChainRegst* NewRegst(DemoChainNode* producer);
-  DemoChainNode* NewChainNode(const std::string& name);
+  DemoChainNode* NewChainNode(const std::string& name, TaskType task_type);
   DemoChainNode* NewForwardNode(const std::string& name);
   DemoChainNode* NewBackwardNode(const std::string& name);
   DemoChainNode* NewDiffAccNode(const std::string& name);
