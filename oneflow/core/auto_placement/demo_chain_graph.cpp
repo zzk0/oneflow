@@ -1,10 +1,11 @@
 #include "oneflow/core/auto_placement/demo_chain_graph.h"
 
 namespace oneflow {
+
 namespace df {
 
-DemoChainRegst* DemoChainGraph::Op(const std::string& name,
-                                   std::vector<DemoChainRegst*> inputs) {
+DemoChainRegst* DemoChainGraphBuilder::Op(const std::string& name,
+                                          std::vector<DemoChainRegst*> inputs) {
   DemoChainNode* fw_node = NewForwardNode(name);
   fw_node->set_fw_chain_node_id(fw_node->chain_node_id());
   for (auto input : inputs) { Consume(fw_node, input); }
@@ -22,7 +23,7 @@ DemoChainRegst* DemoChainGraph::Op(const std::string& name,
   return out;
 }
 
-DemoChainRegst* DemoChainGraph::Model(const std::string& name) {
+DemoChainRegst* DemoChainGraphBuilder::Model(const std::string& name) {
   DemoChainNode* md_node = NewMdUpdtNode(name);
   DemoChainRegst* model = NewRegst(md_node);
   model->set_diff_handler([=](DemoChainRegst* model_diff) {
@@ -38,53 +39,50 @@ DemoChainRegst* DemoChainGraph::Model(const std::string& name) {
   return model;
 }
 
-DemoChainRegst* DemoChainGraph::NewRegst(DemoChainNode* producer) {
-  auto regst = of_make_unique<DemoChainRegst>(producer, NewChainRegstId());
-  regsts_.emplace_back(std::move(regst));
-  return regsts_.back().get();
+void DemoChainGraphBuilder::Backward(DemoChainRegst* regst) {
+  regst->HandleDiff(NewRegst(regst->mut_producer()));
 }
 
-DemoChainNode* DemoChainGraph::NewChainNode(const std::string& name,
-                                            TaskType task_type) {
+DemoChainRegst* DemoChainGraphBuilder::NewRegst(DemoChainNode* producer) {
+  auto regst = of_make_unique<DemoChainRegst>(producer, NewChainRegstId());
+  graph_->regsts_.emplace_back(std::move(regst));
+  return graph_->regsts_.back().get();
+}
+
+DemoChainNode* DemoChainGraphBuilder::NewChainNode(const std::string& name,
+                                                   TaskType task_type) {
   auto* node = new DemoChainNode(name, task_type);
-  AddAllocatedNode(node);
+  graph_->AddAllocatedNode(node);
   node->set_name(name);
   return node;
 }
 
-DemoChainNode* DemoChainGraph::NewForwardNode(const std::string& name) {
+DemoChainNode* DemoChainGraphBuilder::NewForwardNode(const std::string& name) {
   auto* node = NewChainNode("fw_" + name, TaskType::kNormalForward);
   node->set_chain_node_id(NewChainNodeId());
   return node;
 }
 
-DemoChainNode* DemoChainGraph::NewBackwardNode(const std::string& name) {
+DemoChainNode* DemoChainGraphBuilder::NewBackwardNode(const std::string& name) {
   auto* node = NewChainNode("bw_" + name, TaskType::kNormalBackward);
   node->set_chain_node_id(NewChainNodeId());
   return node;
 }
 
-DemoChainNode* DemoChainGraph::NewDiffAccNode(const std::string& name) {
+DemoChainNode* DemoChainGraphBuilder::NewDiffAccNode(const std::string& name) {
   auto* node = NewChainNode("diff_acc_" + name, TaskType::kMdDiffAcc);
   node->set_chain_node_id(NewChainNodeId());
   return node;
 }
 
-DemoChainNode* DemoChainGraph::NewMdUpdtNode(const std::string& name) {
+DemoChainNode* DemoChainGraphBuilder::NewMdUpdtNode(const std::string& name) {
   return NewChainNode("md_updt_" + name, TaskType::kMdUpdt);
 }
 
-void DemoChainGraph::Consume(DemoChainNode* node, DemoChainRegst* regst) {
+void DemoChainGraphBuilder::Consume(DemoChainNode* node,
+                                    DemoChainRegst* regst) {
   regst->AddConsumer(node);
-  Connect(regst->mut_producer(), NewEdge(), node);
-}
-
-void DemoChainGraph::Loss(DemoChainRegst* regst) {
-  regst->HandleDiff(NewRegst(regst->mut_producer()));
-}
-
-void DemoChainGraph::LogicalGraph() {
-  Loss(Op("soft_max", {Op("fc", {Op("feature")}), Op("label")}));
+  Connect(regst->mut_producer(), graph_->NewEdge(), node);
 }
 
 size_t DemoChainGraph::FwChainNodeNum() const {
@@ -101,8 +99,11 @@ size_t DemoChainGraph::ChainNodeNum() const {
   return num;
 }
 
-DemoChainGraph::DemoChainGraph() : chain_node_id_(-1), chain_regst_id_(-1) {
-  LogicalGraph();
+DemoChainGraph::DemoChainGraph(
+    const std::function<void(DemoChainGraphBuilder*)>& Build)
+    : chain_node_id_(-1), chain_regst_id_(-1) {
+  DemoChainGraphBuilder builder(this);
+  Build(&builder);
   InitIsReachable();
   InitRegst2ChainNodeSubGraphs();
 }

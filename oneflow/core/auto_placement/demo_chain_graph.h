@@ -119,12 +119,13 @@ class DemoChainEdge final : public Edge<DemoChainNode, DemoChainEdge> {
   ~DemoChainEdge() = default;
 };
 
-class DemoChainGraph : public Graph<DemoChainNode, DemoChainEdge> {
+class DemoChainGraphBuilder;
+
+class DemoChainGraph final : public Graph<DemoChainNode, DemoChainEdge> {
  public:
   OF_DISALLOW_COPY_AND_MOVE(DemoChainGraph);
-  DemoChainGraph();
+  DemoChainGraph(const std::function<void(DemoChainGraphBuilder*)>& Build);
   virtual ~DemoChainGraph() = default;
-  virtual void LogicalGraph();
 
   size_t FwChainNodeNum() const;
   size_t ChainNodeNum() const;
@@ -142,17 +143,8 @@ class DemoChainGraph : public Graph<DemoChainNode, DemoChainEdge> {
         [](int64_t) -> double { return 1; });
   }
 
- protected:
-  DemoChainRegst* Op(const std::string& name,
-                     std::vector<DemoChainRegst*> inputs);
-
-  DemoChainRegst* Op(const std::string& name) { return Op(name, {}); }
-  DemoChainRegst* Model(const std::string& name);
-  void Loss(DemoChainRegst* regst);
-
  private:
-  int64_t NewChainNodeId() { return ++chain_node_id_; }
-  int64_t NewChainRegstId() { return ++chain_node_id_; }
+  friend class DemoChainGraphBuilder;
   void InitIsReachable();
   void InitRegst2ChainNodeSubGraphs();
   IsReachablePredicator MakeIsReachablePredicator() const;
@@ -164,6 +156,31 @@ class DemoChainGraph : public Graph<DemoChainNode, DemoChainEdge> {
   void ForEachOutNode(
       const DemoChainNode* node,
       const std::function<void(const DemoChainNode*)>& Handler) const;
+
+  int64_t chain_node_id_;
+  int64_t chain_regst_id_;
+  std::list<std::unique_ptr<DemoChainRegst>> regsts_;
+  IsReachablePredicator is_reachable_;
+  HashMap<const DemoChainRegst*, std::unique_ptr<DemoChainNodeSubGraph>>
+      regst2chain_node_sub_graph_;
+};
+
+class DemoChainGraphBuilder final {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(DemoChainGraphBuilder);
+  DemoChainGraphBuilder(DemoChainGraph* graph) : graph_(graph) {}
+  ~DemoChainGraphBuilder() = default;
+
+  DemoChainRegst* Op(const std::string& name,
+                     std::vector<DemoChainRegst*> inputs);
+  DemoChainRegst* Model(const std::string& name);
+  void Backward(DemoChainRegst* regst);
+
+  DemoChainRegst* Op(const std::string& name) { return Op(name, {}); }
+
+ private:
+  int64_t NewChainNodeId() { return ++graph_->chain_node_id_; }
+  int64_t NewChainRegstId() { return ++graph_->chain_node_id_; }
   DemoChainRegst* NewRegst(DemoChainNode* producer);
   DemoChainNode* NewChainNode(const std::string& name, TaskType task_type);
   DemoChainNode* NewForwardNode(const std::string& name);
@@ -172,12 +189,7 @@ class DemoChainGraph : public Graph<DemoChainNode, DemoChainEdge> {
   DemoChainNode* NewMdUpdtNode(const std::string& name);
   void Consume(DemoChainNode* node, DemoChainRegst* regst);
 
-  int64_t chain_node_id_;
-  int64_t chain_regst_id_;
-  std::list<std::unique_ptr<DemoChainRegst>> regsts_;
-  IsReachablePredicator is_reachable_;
-  HashMap<const DemoChainRegst*, std::unique_ptr<DemoChainNodeSubGraph>>
-      regst2chain_node_sub_graph_;
+  DemoChainGraph* graph_;
 };
 
 }  // namespace df
