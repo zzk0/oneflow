@@ -4,8 +4,8 @@ namespace oneflow {
 
 namespace df {
 
-DemoChainRegst* DemoChainGraphBuilder::Op(const std::string& name,
-                                          std::vector<DemoChainRegst*> inputs) {
+DemoChainRegst* DemoChainGraphBuilder::Op(
+    const std::string& name, const std::vector<DemoChainRegst*>& inputs) {
   DemoChainNode* fw_node = NewForwardNode(name);
   fw_node->set_fw_chain_node_id(fw_node->chain_node_id());
   for (auto input : inputs) { Consume(fw_node, input); }
@@ -15,9 +15,9 @@ DemoChainRegst* DemoChainGraphBuilder::Op(const std::string& name,
     bw_node->set_fw_chain_node_id(fw_node->chain_node_id());
     Consume(bw_node, out);
     Consume(bw_node, out_diff);
-    for (auto input : inputs) {
-      Consume(bw_node, input);
-      input->HandleDiff(NewRegst(bw_node));
+    for (auto it = inputs.rbegin(); it != inputs.rend(); ++it) {
+      Consume(bw_node, *it);
+      (*it)->HandleDiff(NewRegst(bw_node));
     }
   });
   return out;
@@ -174,7 +174,9 @@ void DemoChainGraph::InitRegst2ChainNodeSubGraphs() {
 std::vector<std::vector<int64_t>>
 DemoChainGraph::CalcChainNodeId2FwChainNodeId() const {
   std::vector<std::vector<int64_t>> ret(ChainNodeNum());
+
   ForEachNode([&](const DemoChainNode* node) {
+    CHECK_LT(node->chain_node_id(), ret.size());
     ret.at(node->chain_node_id()).push_back(node->fw_chain_node_id());
   });
   return ret;
@@ -185,6 +187,7 @@ DemoChainGraph::CalcChainRegstId2ProducerChainNodeId() const {
   std::vector<std::vector<int64_t>> ret(regsts_.size());
   for (const auto& regst : regsts_) {
     int64_t chain_node_id = regst->producer()->chain_node_id();
+    CHECK_LT(regst->chain_regst_id(), ret.size());
     ret.at(regst->chain_regst_id()).push_back(chain_node_id);
   }
   return ret;

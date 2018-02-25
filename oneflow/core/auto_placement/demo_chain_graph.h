@@ -172,7 +172,7 @@ class DemoChainGraphBuilder final {
   ~DemoChainGraphBuilder() = default;
 
   DemoChainRegst* Op(const std::string& name,
-                     std::vector<DemoChainRegst*> inputs);
+                     const std::vector<DemoChainRegst*>& inputs);
   DemoChainRegst* Model(const std::string& name);
   void Backward(DemoChainRegst* regst);
 
@@ -180,7 +180,7 @@ class DemoChainGraphBuilder final {
 
  private:
   int64_t NewChainNodeId() { return ++graph_->chain_node_id_; }
-  int64_t NewChainRegstId() { return ++graph_->chain_node_id_; }
+  int64_t NewChainRegstId() { return ++graph_->chain_regst_id_; }
   DemoChainRegst* NewRegst(DemoChainNode* producer);
   DemoChainNode* NewChainNode(const std::string& name, TaskType task_type);
   DemoChainNode* NewForwardNode(const std::string& name);
