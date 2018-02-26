@@ -283,5 +283,32 @@ DemoChainGraph::CalcChainRegstId2PathChainNodeIds(
   return ret;
 }
 
+std::vector<std::vector<int64_t>> DemoChainGraph::SplitedRegstIds() const {
+  std::vector<std::vector<int64_t>> ret;
+  for (const auto& regst : regsts_) {
+    if (!regst->IsRegstCloned()) {
+      ret.push_back(std::vector<int64_t>{regst->chain_regst_id()});
+    }
+  }
+  return ret;
+}
+
+std::vector<std::vector<int64_t>> DemoChainGraph::ClonedRegstIds() const {
+  std::vector<std::vector<int64_t>> ret;
+  for (const auto& regst : regsts_) {
+    if (regst->IsRegstCloned()) {
+      ret.push_back(std::vector<int64_t>{regst->chain_regst_id()});
+    }
+  }
+  return ret;
+}
+
+bool DemoChainRegst::IsRegstCloned() const {
+  return producer()->task_type() == TaskType::kMdDiffAcc
+         || producer()->task_type() == TaskType::kMdUpdt
+         || (consumers().size() == 1
+             && consumers().front()->task_type() == TaskType::kMdDiffAcc);
+}
+
 }  // namespace df
 }  // namespace oneflow

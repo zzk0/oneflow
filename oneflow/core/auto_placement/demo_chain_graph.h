@@ -24,10 +24,12 @@ class DemoChainRegst final {
 
   void HandleDiff(DemoChainRegst* regst) const { diff_handler_(regst); }
 
+  bool IsRegstCloned() const;
+
   // Getters
   int64_t chain_regst_id() const { return chain_regst_id_; }
   const DemoChainNode* producer() const { return producer_; }
-  const std::unordered_set<const DemoChainNode*>& consumers() const {
+  const std::list<const DemoChainNode*>& consumers() const {
     return consumers_;
   }
 
@@ -38,14 +40,14 @@ class DemoChainRegst final {
     diff_handler_ = diff_handler;
   }
   void AddConsumer(const DemoChainNode* consumer) {
-    consumers_.insert(consumer);
+    consumers_.push_back(consumer);
   }
 
  private:
   DemoChainNode* producer_;
   int64_t chain_regst_id_;
   std::function<void(DemoChainRegst*)> diff_handler_;
-  std::unordered_set<const DemoChainNode*> consumers_;
+  std::list<const DemoChainNode*> consumers_;
 };
 
 class DemoChainEdge;
@@ -80,10 +82,9 @@ class DemoChainNode final : public Node<DemoChainNode, DemoChainEdge> {
 class DemoChainNodeSubGraph final {
  public:
   OF_DISALLOW_COPY_AND_MOVE(DemoChainNodeSubGraph);
-  DemoChainNodeSubGraph(
-      const DemoChainNode* start_node,
-      const std::unordered_set<const DemoChainNode*>& end_nodes,
-      const IsReachablePredicator& is_reachable)
+  DemoChainNodeSubGraph(const DemoChainNode* start_node,
+                        const std::list<const DemoChainNode*>& end_nodes,
+                        const IsReachablePredicator& is_reachable)
       : start_node_(start_node),
         end_nodes_(end_nodes),
         is_reachable_(&is_reachable) {}
@@ -108,7 +109,7 @@ class DemoChainNodeSubGraph final {
   bool IsReachableToEndNode(const DemoChainNode* node) const;
 
   const DemoChainNode* start_node_;
-  std::unordered_set<const DemoChainNode*> end_nodes_;
+  std::list<const DemoChainNode*> end_nodes_;
   const IsReachablePredicator* is_reachable_;
 };
 
@@ -142,6 +143,9 @@ class DemoChainGraph final : public Graph<DemoChainNode, DemoChainEdge> {
     return CalcChainRegstId2PathChainNodeIds(
         [](int64_t) -> double { return 1; });
   }
+
+  std::vector<std::vector<int64_t>> SplitedRegstIds() const;
+  std::vector<std::vector<int64_t>> ClonedRegstIds() const;
 
  private:
   friend class DemoChainGraphBuilder;
