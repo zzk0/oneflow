@@ -283,22 +283,23 @@ DemoChainGraph::CalcChainRegstId2PathChainNodeIds(
   return ret;
 }
 
-std::vector<std::vector<int64_t>> DemoChainGraph::SplitedRegstIds() const {
-  std::vector<std::vector<int64_t>> ret;
+std::vector<double> DemoChainGraph::RegstId2IsCloned() const {
+  std::vector<double> ret(regsts_.size());
   for (const auto& regst : regsts_) {
-    if (!regst->IsRegstCloned()) {
-      ret.push_back(std::vector<int64_t>{regst->chain_regst_id()});
-    }
+    ret.at(regst->chain_regst_id()) = (regst->IsRegstCloned() ? 1 : 0);
   }
   return ret;
 }
 
-std::vector<std::vector<int64_t>> DemoChainGraph::ClonedRegstIds() const {
-  std::vector<std::vector<int64_t>> ret;
+std::vector<double> DemoChainGraph::RegstIIRatio(int piece_num_in_batch) const {
+  std::vector<double> ret(regsts_.size());
   for (const auto& regst : regsts_) {
-    if (regst->IsRegstCloned()) {
-      ret.push_back(std::vector<int64_t>{regst->chain_regst_id()});
+    double ii_ratio = 1;
+    if (regst->producer()->task_type() == TaskType::kMdDiffAcc
+        || regst->producer()->task_type() == TaskType::kMdUpdt) {
+      ii_ratio = piece_num_in_batch;
     }
+    ret.at(regst->chain_regst_id()) = ii_ratio;
   }
   return ret;
 }

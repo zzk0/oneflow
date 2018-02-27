@@ -144,8 +144,9 @@ class DemoChainGraph final : public Graph<DemoChainNode, DemoChainEdge> {
         [](int64_t) -> double { return 1; });
   }
 
-  std::vector<std::vector<int64_t>> SplitedRegstIds() const;
-  std::vector<std::vector<int64_t>> ClonedRegstIds() const;
+  std::vector<double> RegstId2IsCloned() const;
+
+  std::vector<double> RegstIIRatio(int piece_num_in_batch) const;
 
  private:
   friend class DemoChainGraphBuilder;

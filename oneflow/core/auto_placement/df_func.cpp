@@ -4,20 +4,26 @@ namespace oneflow {
 
 namespace df {
 
-Tensor IndexReduce(const Tensor& input,
-                   const std::vector<std::vector<int64_t>>& reduce_indexes) {
-  int64_t size = reduce_indexes.size();
-  std::shared_ptr<Buffer> out(new Buffer(Shape({size}), 0));
-  FOR_RANGE(int, i, 0, out->Size()) {
-    for (int64_t index : reduce_indexes.at(i)) {
-      out->At(i) += input.At(index);
+Tensor ColIndexReduce(const Tensor& input,
+                      const std::vector<std::vector<int64_t>>& reduce_indexes) {
+  CHECK(input.shape().dim_vec().size() == 2);
+  auto shape =
+      Shape({input.shape().At(0), static_cast<int64_t>(reduce_indexes.size())});
+  std::shared_ptr<Buffer> out(new Buffer(shape, 0));
+  FOR_RANGE(int, i, 0, out->shape().At(0)) {
+    FOR_RANGE(int, j, 0, out->shape().At(1)) {
+      for (int64_t index : reduce_indexes.at(j)) {
+        out->At(i, j) += input.At(i, index);
+      }
     }
   }
   return Tensor(out, [=](const Buffer& out_diff) {
     Buffer input_diff(input.shape(), 0);
-    FOR_RANGE(int, i, 0, out_diff.Size()) {
-      for (int64_t index : reduce_indexes.at(i)) {
-        input_diff.At(index) += out_diff.At(i);
+    FOR_RANGE(int, i, 0, out_diff.shape().At(0)) {
+      FOR_RANGE(int, j, 0, out_diff.shape().At(1)) {
+        for (int64_t index : reduce_indexes.at(j)) {
+          input_diff.At(i, index) += out_diff.At(i, j);
+        }
       }
     }
     input.HandleDiff(input_diff);

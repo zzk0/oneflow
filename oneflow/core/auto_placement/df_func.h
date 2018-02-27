@@ -7,8 +7,8 @@ namespace oneflow {
 
 namespace df {
 
-Tensor IndexReduce(const Tensor& input,
-                   const std::vector<std::vector<int64_t>>& reduce_indexes);
+Tensor ColIndexReduce(const Tensor& input,
+                      const std::vector<std::vector<int64_t>>& reduce_indexes);
 
 Tensor Update(Tensor* var, double lr);
 

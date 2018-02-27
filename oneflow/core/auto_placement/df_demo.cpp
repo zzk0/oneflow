@@ -1,4 +1,5 @@
 #include "oneflow/core/auto_placement/df_func.h"
+#include "oneflow/core/auto_placement/demo_chain_graph.h"
 
 namespace oneflow {
 
@@ -6,8 +7,25 @@ namespace df {
 
 namespace {
 
+Tensor CalcTaskNodeTime(const Tensor& chain_node_placement) {
+  Tensor row_ones(Shape({chain_node_placement.shape().At(0)}), 1);
+  Tensor col_ones(Shape({chain_node_placement.shape().At(1)}), 1);
+  auto placement_copies = Clone(chain_node_placement, 3);
+  Tensor col_sum =
+      TensorProduct(row_ones, MatrixColSum(placement_copies.at(0)));
+  Tensor workload = ElemWiseMul(placement_copies.at(1), Reciprocal(col_sum));
+  Tensor row_sum = TensorProduct(MatrixRowSum(workload), col_ones);
+  return ElemWiseMul(Tanh(placement_copies.at(2)), row_sum);
+}
+
+Tensor CalcMemoryII(const Tensor& chain_node_placement,
+                    const DemoChainGraph& chain_graph) {
+  TODO();
+  return Tensor(0);
+}
+
 void AutoPlacementMemoryDemo() {
-  Tensor var(Shape({4, 4}), [](size_t index) { return index % 2 ? 0 : 100; });
+  Tensor var(Shape({4, 4}), [](size_t index) { return index % 2 ? 0 : 1; });
   Tensor row_ones(Shape({var.shape().At(0)}), 1);
   Tensor col_ones(Shape({var.shape().At(1)}), 1);
   Tensor epsilon(0.000000001);
@@ -24,23 +42,13 @@ void AutoPlacementMemoryDemo() {
     }
 
     Tensor x = Add(Square((FixedExpectation(Update(&var, lr), 1))), epsilon);
-    const auto& x_copies = Clone(x, 4);
-    Tensor row = MatrixRowSum(x_copies.at(0));
-    Tensor col = MatrixColSum(x_copies.at(1));
-    Tensor load =
-        ElemWiseMul(x_copies.at(2), TensorProduct(row_ones, Reciprocal(col)));
-    Tensor time = ElemWiseMul(TensorProduct(row, col_ones), load);
+    const auto& x_copies = Clone(x, 2);
+    Tensor time = CalcTaskNodeTime(x_copies.at(0));
     Tensor ii = Max(time);
-    Backward(Add(ii, AvgAbsDeviation(MatrixColMax(x_copies.at(3)))));
+    Backward(Add(ii, AvgAbsDeviation(MatrixColMax(x_copies.at(1)))));
 
     std::cout << "x: ";
     for (double i : x.buffer().data()) { std::cout << i << " "; }
-    std::cout << std::endl;
-    std::cout << "row: ";
-    for (double i : row.buffer().data()) { std::cout << i << " "; }
-    std::cout << std::endl;
-    std::cout << "col: ";
-    for (double i : col.buffer().data()) { std::cout << i << " "; }
     std::cout << std::endl;
     std::cout << "time: ";
     for (double i : time.buffer().data()) { std::cout << i << " "; }

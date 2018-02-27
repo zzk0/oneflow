@@ -25,12 +25,8 @@ TEST(DemoChainGraph, simple_without_model) {
       {0, 2, 3, 5}, {1, 2, 3, 4}, {2, 3}, {2, 3}, {3, 4}, {3, 5}};
   ASSERT_TRUE(graph.CalcChainRegstId2PathChainNodeIds() == expected_path);
 
-  std::vector<std::vector<int64_t>> expected_splited_regst_ids{{0}, {1}, {2},
-                                                               {3}, {4}, {5}};
-  ASSERT_TRUE(graph.SplitedRegstIds() == expected_splited_regst_ids);
-
-  std::vector<std::vector<int64_t>> expected_cloned_regst_ids{};
-  ASSERT_TRUE(graph.ClonedRegstIds() == expected_cloned_regst_ids);
+  std::vector<double> expected_regst_id2is_cloned{0, 0, 0, 0, 0, 0};
+  ASSERT_TRUE(graph.RegstId2IsCloned() == expected_regst_id2is_cloned);
 }
 
 TEST(DemoChainGraph, simple_with_model) {
@@ -53,13 +49,8 @@ TEST(DemoChainGraph, simple_with_model) {
       {0, 1, 2, 5}, {4, 1, 2}, {1, 2}, {1, 2}, {2, 3}, {3, 4}, {2, 5}};
   ASSERT_TRUE(graph.CalcChainRegstId2PathChainNodeIds() == expected_path);
 
-  std::vector<std::vector<int64_t>> expected_splited_regst_ids{
-      {0}, {2}, {3}, {6}};
-
-  ASSERT_TRUE(graph.SplitedRegstIds() == expected_splited_regst_ids);
-
-  std::vector<std::vector<int64_t>> expected_cloned_regst_ids{{1}, {4}, {5}};
-  ASSERT_TRUE(graph.ClonedRegstIds() == expected_cloned_regst_ids);
+  std::vector<double> expected_regst_id2is_cloned{0, 1, 0, 0, 1, 1, 0};
+  ASSERT_TRUE(graph.RegstId2IsCloned() == expected_regst_id2is_cloned);
 }
 
 }  // namespace test
