@@ -183,6 +183,11 @@ class DemoChainGraphBuilder final {
 
   DemoChainRegst* Op(const std::string& name) { return Op(name, {}); }
 
+  DemoChainRegst* ModelOp(const std::string& name,
+                          const std::vector<DemoChainRegst*>& inputs);
+
+  DemoChainRegst* ModelOp(const std::string& name) { return ModelOp(name, {}); }
+
  private:
   int64_t NewChainNodeId() { return ++graph_->chain_node_id_; }
   int64_t NewChainRegstId() { return ++graph_->chain_regst_id_; }

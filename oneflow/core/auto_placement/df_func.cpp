@@ -202,7 +202,7 @@ Tensor FixedExpectation(const Tensor& input, double e) {
                 [=](const Buffer& out_diff) { input.HandleDiff(out_diff); });
 }
 
-Tensor Max(const Tensor& input) {
+Tensor MaxElem(const Tensor& input) {
   double max_value = std::numeric_limits<double>::min();
   size_t max_index = 0;
   FOR_RANGE(int, i, 0, input.Size()) {
@@ -244,11 +244,6 @@ Tensor Variance(const Tensor& input) {
 Tensor AvgAbsDeviation(const Tensor& input) {
   auto copies = Clone(input, 2);
   return Avg(Abs(Sub(copies.at(0), Avg(copies.at(1)))));
-}
-
-Tensor MaxDeviation(const Tensor& input) {
-  auto copies = Clone(input, 2);
-  return Sub(Max(copies.at(0)), Min(copies.at(1)));
 }
 
 Tensor Sum(const Tensor& input) {
@@ -330,6 +325,10 @@ Tensor Reciprocal(const Tensor& input) {
     }
     input.HandleDiff(input_diff);
   });
+}
+
+Tensor ElemWiseDiv(const Tensor& a, const Tensor& b) {
+  return ElemWiseMul(a, Reciprocal(b));
 }
 
 Tensor MatrixRowSum(const Tensor& input) {

@@ -4,6 +4,13 @@ namespace oneflow {
 
 namespace df {
 
+DemoChainRegst* DemoChainGraphBuilder::ModelOp(
+    const std::string& name, const std::vector<DemoChainRegst*>& inputs) {
+  std::vector<DemoChainRegst*> all_inputs(inputs);
+  all_inputs.push_back(Model("model_" + name));
+  return Op(name, all_inputs);
+}
+
 DemoChainRegst* DemoChainGraphBuilder::Op(
     const std::string& name, const std::vector<DemoChainRegst*>& inputs) {
   DemoChainNode* fw_node = NewForwardNode(name);

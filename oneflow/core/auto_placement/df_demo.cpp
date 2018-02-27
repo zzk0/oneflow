@@ -13,45 +13,107 @@ Tensor CalcTaskNodeTime(const Tensor& chain_node_placement) {
   auto placement_copies = Clone(chain_node_placement, 3);
   Tensor col_sum =
       TensorProduct(row_ones, MatrixColSum(placement_copies.at(0)));
-  Tensor workload = ElemWiseMul(placement_copies.at(1), Reciprocal(col_sum));
+  Tensor workload = ElemWiseDiv(placement_copies.at(1), col_sum);
   Tensor row_sum = TensorProduct(MatrixRowSum(workload), col_ones);
   return ElemWiseMul(Tanh(placement_copies.at(2)), row_sum);
 }
 
-Tensor CalcMemoryII(const Tensor& chain_node_placement,
-                    const DemoChainGraph& chain_graph) {
-  TODO();
-  return Tensor(0);
+Tensor CalcRegstDuration(const Tensor& chain_node_placement,
+                         const DemoChainGraph& chain_graph) {
+  Tensor task_node_time = CalcTaskNodeTime(chain_node_placement);
+  Tensor chain_node_time = MatrixColMax(task_node_time);
+  auto GetTime = [chain_node_time](int64_t chain_node_id) -> double {
+    return chain_node_time.At(chain_node_id);
+  };
+  auto regst2path = chain_graph.CalcChainRegstId2PathChainNodeIds(GetTime);
+  return ColIndexReduce(task_node_time, regst2path);
+}
+
+Tensor CalcRegstMemory(const Tensor& chain_node_placement,
+                       const DemoChainGraph& chain_graph) {
+  auto regst2producer = chain_graph.CalcChainRegstId2ProducerChainNodeId();
+  int64_t regst_num = regst2producer.size();
+  Tensor regst_placement = ColIndexReduce(chain_node_placement, regst2producer);
+  Tensor row_ones(Shape({regst_placement.shape().At(0)}), 1);
+  auto copies = Clone(regst_placement, 3);
+  Tensor col_sum = TensorProduct(row_ones, MatrixColSum(copies.at(0)));
+  Tensor split_workload_ratio = ElemWiseDiv(copies.at(1), col_sum);
+  Tensor clone_workload_ratio = Tanh(copies.at(2));
+  Tensor clone_weight = TensorProduct(
+      row_ones, Tensor(Shape({regst_num}), chain_graph.RegstId2IsCloned()));
+  return Add(ElemWiseMul(clone_workload_ratio, clone_weight),
+             ElemWiseMul(split_workload_ratio, Sub(Tensor(1), clone_weight)));
+}
+
+Tensor CalcIIRatio(const Tensor& chain_node_placement,
+                   const DemoChainGraph& chain_graph, int piece_num_in_batch) {
+  auto ii_ratios = chain_graph.RegstIIRatio(piece_num_in_batch);
+  int64_t regst_num = ii_ratios.size();
+  Tensor ii_ratio_tensor(Shape({regst_num}), ii_ratios);
+  Tensor row_ones(Shape({chain_node_placement.shape().At(0)}), 1);
+  return Reciprocal(TensorProduct(row_ones, ii_ratio_tensor));
+}
+
+Tensor CalcDeviceMemII(const Tensor& chain_node_placement,
+                       const DemoChainGraph& chain_graph,
+                       int piece_num_in_batch, double mem_size_per_device) {
+  Tensor regst_mem = CalcRegstMemory(chain_node_placement, chain_graph);
+  Tensor regst_duration = CalcRegstDuration(chain_node_placement, chain_graph);
+  Tensor ii_ratio =
+      CalcIIRatio(chain_node_placement, chain_graph, piece_num_in_batch);
+  auto regst_mem_copies = Clone(regst_mem, 2);
+  Tensor weighted_mem_time = ElemWiseMul(ElemWiseMul(ii_ratio, regst_duration),
+                                         regst_mem_copies.at(0));
+  Tensor weighted_mem_ceil_diff =
+      ElemWiseMul(Sub(Tensor(1.5), ii_ratio), regst_mem_copies.at(1));
+  Tensor device_mem_time = MatrixRowSum(weighted_mem_time);
+  Tensor device_mem =
+      Sub(Tensor(mem_size_per_device), MatrixRowSum(weighted_mem_ceil_diff));
+  Tensor epsilon(0.000000000001);
+  Tensor row_ones(Shape({chain_node_placement.shape().At(0)}), 1);
+  Tensor cliped_device_mem = Max(device_mem, TensorProduct(row_ones, epsilon));
+  return ElemWiseDiv(device_mem_time, cliped_device_mem);
 }
 
 void AutoPlacementMemoryDemo() {
-  Tensor var(Shape({4, 4}), [](size_t index) { return index % 2 ? 0 : 1; });
-  Tensor row_ones(Shape({var.shape().At(0)}), 1);
-  Tensor col_ones(Shape({var.shape().At(1)}), 1);
-  Tensor epsilon(0.000000001);
-  FOR_RANGE(int, i, 0, 1000) {
+  DemoChainGraph chain_graph([](DemoChainGraphBuilder* builder) {
+    builder->Backward(builder->Op(
+        "loss",
+        {builder->ModelOp(
+            "op3", {builder->ModelOp(
+                       "op2", {builder->ModelOp(
+                                  "op1", {builder->ModelOp("op0")})})})}));
+  });
+  int64_t fw_node_num = chain_graph.FwChainNodeNum();
+  Tensor fw_var(Shape({4, fw_node_num}),
+                [](size_t index) { return index % 2 ? 0 : 1; });
+  Tensor epsilon(0.000000000001);
+  FOR_RANGE(int, i, 0, 10000) {
     double lr = 1;
-    if (i < 400) {
+    if (i < 4000) {
       lr = 0.1;
-    } else if (i < 600) {
+    } else if (i < 6000) {
       lr = 0.01;
-    } else if (i < 800) {
+    } else if (i < 8000) {
       lr = 0.001;
     } else {
       lr = 0.0001;
     }
-
-    Tensor x = Add(Square((FixedExpectation(Update(&var, lr), 1))), epsilon);
-    const auto& x_copies = Clone(x, 2);
-    Tensor time = CalcTaskNodeTime(x_copies.at(0));
-    Tensor ii = Max(time);
-    Backward(Add(ii, AvgAbsDeviation(MatrixColMax(x_copies.at(1)))));
+    Tensor x = Add(Square((FixedExpectation(Update(&fw_var, lr), 1))), epsilon);
+    Tensor chain_node_placement =
+        ColIndexReduce(x, chain_graph.CalcChainNodeId2FwChainNodeId());
+    const auto& placement_copies = Clone(x, 2);
+    Tensor computation_ii = CalcTaskNodeTime(placement_copies.at(0));
+    //   Tensor memory_ii =
+    //    CalcDeviceMemII(placement_copies.at(1), chain_graph, 10, 100);
+    Tensor ii = MaxElem(computation_ii);
+    Backward(Add(ii, AvgAbsDeviation(MatrixColMax(placement_copies.at(1)))));
 
     std::cout << "x: ";
     for (double i : x.buffer().data()) { std::cout << i << " "; }
     std::cout << std::endl;
-    std::cout << "time: ";
-    for (double i : time.buffer().data()) { std::cout << i << " "; }
+    std::cout << "computation_ii: ";
+    for (double i : computation_ii.buffer().data()) { std::cout << i << " "; }
     std::cout << std::endl << std::endl;
 
     //    Backward(Variance(MatrixColMax(Update(&var, lr))));
@@ -85,7 +147,7 @@ void AutoPlacementComputationDemo() {
     Tensor load =
         ElemWiseMul(x_copies.at(2), TensorProduct(row_ones, Reciprocal(col)));
     Tensor table = ElemWiseMul(TensorProduct(row, col_ones), load);
-    Tensor ii = Max(table);
+    Tensor ii = MaxElem(table);
     Backward(Add(ii, AvgAbsDeviation(MatrixColMax(x_copies.at(3)))));
 
     std::cout << "x: ";
