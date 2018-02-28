@@ -10,9 +10,14 @@ namespace df {
 Tensor ColIndexReduce(const Tensor& input,
                       const std::vector<std::vector<int64_t>>& reduce_indexes);
 
+Tensor IndexReduce(const Tensor& input,
+                   const std::vector<std::vector<int64_t>>& reduce_indexes);
+
 Tensor Update(Tensor* var, double lr);
 
 std::vector<Tensor> Clone(const Tensor& input, size_t n);
+
+Tensor Reshape(const Tensor& input, const Shape& shape);
 
 Tensor Minus(const Tensor& input);
 
@@ -38,11 +43,13 @@ Tensor Reciprocal(const Tensor& input);
 
 Tensor Max(const Tensor& a, const Tensor& b);
 
+Tensor Min(const Tensor& a, const Tensor& b);
+
 Tensor MaxElem(const Tensor& a);
 
 Tensor Relu(const Tensor& input);
 
-Tensor Min(const Tensor& a);
+Tensor MinElem(const Tensor& a);
 
 Tensor Sum(const Tensor& a);
 
@@ -50,9 +57,19 @@ Tensor Avg(const Tensor& a);
 
 Tensor Variance(const Tensor& a);
 
+Tensor StandardDeviation(const Tensor& a);
+
 Tensor AvgAbsDeviation(const Tensor& a);
 
+Tensor GeAvg(const Tensor& input);
+
+Tensor LeAvg(const Tensor& input);
+
+Tensor DoubleVariance(const Tensor& input);
+
 Tensor Square(const Tensor& input);
+
+Tensor Sqrt(const Tensor& input);
 
 Tensor MatrixRowSum(const Tensor& input);
 

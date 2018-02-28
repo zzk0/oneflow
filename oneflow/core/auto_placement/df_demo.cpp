@@ -7,15 +7,25 @@ namespace df {
 
 namespace {
 
-Tensor CalcTaskNodeTime(const Tensor& chain_node_placement) {
+Tensor CalcTaskNodeComputeTime(const Tensor& chain_node_placement) {
   Tensor row_ones(Shape({chain_node_placement.shape().At(0)}), 1);
+  auto placement_copies = Clone(chain_node_placement, 2);
+  Tensor col = MatrixColSum(placement_copies.at(0));
+  Tensor col_sum = TensorProduct(row_ones, col);
+  return ElemWiseDiv(placement_copies.at(1), col_sum);
+}
+
+Tensor CalcDeviceComputeTime(const Tensor& chain_node_placement) {
+  return MatrixRowSum(CalcTaskNodeComputeTime(chain_node_placement));
+}
+
+Tensor CalcTaskNodeTime(const Tensor& chain_node_placement) {
+  Tensor compute_time = CalcTaskNodeComputeTime(chain_node_placement);
   Tensor col_ones(Shape({chain_node_placement.shape().At(1)}), 1);
-  auto placement_copies = Clone(chain_node_placement, 3);
-  Tensor col_sum =
-      TensorProduct(row_ones, MatrixColSum(placement_copies.at(0)));
-  Tensor workload = ElemWiseDiv(placement_copies.at(1), col_sum);
-  Tensor row_sum = TensorProduct(MatrixRowSum(workload), col_ones);
-  return ElemWiseMul(Tanh(placement_copies.at(2)), row_sum);
+  auto compute_time_copies = Clone(compute_time, 2);
+  Tensor row_sum =
+      TensorProduct(MatrixRowSum(compute_time_copies.at(0)), col_ones);
+  return Mul(Tensor(0.5), Add(row_sum, compute_time_copies.at(1)));
 }
 
 Tensor CalcRegstDuration(const Tensor& chain_node_placement,
@@ -85,29 +95,22 @@ void AutoPlacementMemoryDemo() {
                                   "op1", {builder->ModelOp("op0")})})})}));
   });
   int64_t fw_node_num = chain_graph.FwChainNodeNum();
-  Tensor fw_var(Shape({4, fw_node_num}),
-                [](size_t index) { return index % 2 ? 0 : 1; });
+  // std::cout << fw_node_num << std::endl;
+  // return;
+  Shape shape({4, 5});
+  Tensor fw_var(shape, [](size_t index) { return index % 2 ? 1 : 0; });
   Tensor epsilon(0.000000000001);
+  Tensor ceil_tensor(shape, 1);
+  Tensor floor_tensor(shape, 0.000000000001);
   FOR_RANGE(int, i, 0, 10000) {
-    double lr = 1;
-    if (i < 4000) {
-      lr = 0.1;
-    } else if (i < 6000) {
-      lr = 0.01;
-    } else if (i < 8000) {
-      lr = 0.001;
-    } else {
-      lr = 0.0001;
-    }
+    double lr = 0.01;
     Tensor x = Add(Square((FixedExpectation(Update(&fw_var, lr), 1))), epsilon);
-    Tensor chain_node_placement =
-        ColIndexReduce(x, chain_graph.CalcChainNodeId2FwChainNodeId());
-    const auto& placement_copies = Clone(x, 2);
-    Tensor computation_ii = CalcTaskNodeTime(placement_copies.at(0));
-    //   Tensor memory_ii =
-    //    CalcDeviceMemII(placement_copies.at(1), chain_graph, 10, 100);
+    const auto& placement_copies = Clone(x, 3);
+    Tensor computation_ii = CalcDeviceComputeTime(placement_copies.at(0));
     Tensor ii = MaxElem(computation_ii);
-    Backward(Add(ii, AvgAbsDeviation(MatrixColMax(placement_copies.at(1)))));
+    Tensor penalty = Add(Variance(MatrixColMax(placement_copies.at(1))),
+                         DoubleVariance(placement_copies.at(2)));
+    Backward(Add(ii, penalty));
 
     std::cout << "x: ";
     for (double i : x.buffer().data()) { std::cout << i << " "; }
@@ -124,31 +127,21 @@ void AutoPlacementMemoryDemo() {
 }
 
 void AutoPlacementComputationDemo() {
-  Tensor var(Shape({4, 4}), [](size_t index) { return index % 2 ? 0 : 1000; });
+  Tensor var(Shape({4, 5}), [](size_t index) { return index % 2 ? 0 : 1; });
   Tensor row_ones(Shape({var.shape().At(0)}), 1);
   Tensor col_ones(Shape({var.shape().At(1)}), 1);
   Tensor epsilon(0.000000001);
-  FOR_RANGE(int, i, 0, 2000) {
-    double lr = 1;
-    if (i < 400) {
-      lr = 0.1;
-    } else if (i < 800) {
-      lr = 0.01;
-    } else if (i < 1200) {
-      lr = 0.001;
-    } else {
-      lr = 0.0001;
-    }
+  FOR_RANGE(int, i, 0, 10000) {
+    double lr = 0.001;
 
     Tensor x = Add(Square(FixedExpectation(Update(&var, lr), 1)), epsilon);
     const auto& x_copies = Clone(x, 4);
     Tensor row = MatrixRowSum(x_copies.at(0));
     Tensor col = MatrixColSum(x_copies.at(1));
-    Tensor load =
-        ElemWiseMul(x_copies.at(2), TensorProduct(row_ones, Reciprocal(col)));
+    Tensor load = ElemWiseDiv(x_copies.at(2), TensorProduct(row_ones, col));
     Tensor table = ElemWiseMul(TensorProduct(row, col_ones), load);
     Tensor ii = MaxElem(table);
-    Backward(Add(ii, AvgAbsDeviation(MatrixColMax(x_copies.at(3)))));
+    Backward(Add(ii, Variance(MatrixColMax(x_copies.at(3)))));
 
     std::cout << "x: ";
     for (double i : x.buffer().data()) { std::cout << i << " "; }
@@ -171,7 +164,7 @@ void AutoPlacementComputationDemo() {
 }
 
 void DifferentialDemo() {
-  //  AutoPlacementComputationDemo();
+  // AutoPlacementComputationDemo();
   AutoPlacementMemoryDemo();
 }
 

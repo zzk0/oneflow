@@ -53,7 +53,7 @@ class Buffer final {
     return data_.at(x * shape_.Count(1) + y * shape_.Count(2) + z);
   }
 
-  const std::vector<double> data() const { return data_; }
+  const std::vector<double>& data() const { return data_; }
   std::vector<double>* mut_data() { return &data_; }
 
  private:

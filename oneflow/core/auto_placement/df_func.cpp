@@ -4,6 +4,12 @@ namespace oneflow {
 
 namespace df {
 
+Tensor IndexReduce(const Tensor& input,
+                   const std::vector<std::vector<int64_t>>& reduce_indexes) {
+  Tensor new_shape_tensor = Reshape(input, Shape({1, input.shape().Count(0)}));
+  return ColIndexReduce(new_shape_tensor, reduce_indexes);
+}
+
 Tensor ColIndexReduce(const Tensor& input,
                       const std::vector<std::vector<int64_t>>& reduce_indexes) {
   CHECK(input.shape().dim_vec().size() == 2);
@@ -32,13 +38,32 @@ Tensor ColIndexReduce(const Tensor& input,
 
 Tensor Update(Tensor* var, double lr) {
   auto buffer = var->mut_buffer_ptr();
+  CHECK(lr > 0);
+  double fixed_avg = 1;
   return Tensor(*var, [=](const Buffer& diff) {
-    CHECK(buffer->data().size() == diff.data().size());
-    FOR_RANGE(int, i, 0, buffer->data().size()) {
-      double& w = buffer->mut_data()->at(i);
-      double d = diff.data().at(i);
-      w = w - lr * d;
+    CHECK(buffer->Size() == diff.Size());
+    double sum = 0;
+    FOR_RANGE(int, i, 0, buffer->Size()) {
+      double& w = buffer->At(i);
+      double d = diff.At(i);
+      w -= lr * d;
+      sum += w;
     }
+    double avg = sum / diff.Size();
+    FOR_RANGE(int, i, 0, buffer->Size()) {
+      double& w = buffer->At(i);
+      w += fixed_avg - avg;
+      if (w < 0) { w *= -0.5; }
+    }
+  });
+}
+
+Tensor Reshape(const Tensor& input, const Shape& shape) {
+  CHECK(input.shape().Count(0) == shape.Count(0));
+  std::shared_ptr<Buffer> out(new Buffer(shape, input.buffer().data()));
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer input_diff(shape, out_diff.data());
+    input.HandleDiff(input_diff);
   });
 }
 
@@ -123,16 +148,12 @@ Tensor Exp(const Tensor& input) {
 
 Tensor Tanh(const Tensor& input) {
   std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
-  FOR_RANGE(int, i, 0, out->Size()) {
-    double& x = out->At(i);
-    x = std::tanh(x);
-  }
+  FOR_RANGE(int, i, 0, out->Size()) { out->At(i) = std::tanh(input.At(i)); }
   return Tensor(out, [=](const Buffer& out_diff) {
     Buffer input_diff(out_diff);
     FOR_RANGE(int, i, 0, input_diff.Size()) {
-      double& diff = input_diff.At(i);
       double o = out->At(i);
-      diff *= 1 - o * o;
+      input_diff.At(i) *= 1 - o * o;
     }
     input.HandleDiff(input_diff);
   });
@@ -179,10 +200,38 @@ Tensor Max(const Tensor& a, const Tensor& b) {
     Buffer a_diff(out_diff.shape(), 0);
     Buffer b_diff(out_diff.shape(), 0);
     FOR_RANGE(size_t, i, 0, out_diff.Size()) {
-      if (a.At(i) > b.At(i)) {
+      if (a.At(i) >= b.At(i)) {
         a_diff.At(i) = out_diff.At(i);
         b_diff.At(i) = 0;
-      } else {
+      }
+      if (b.At(i) >= a.At(i)) {
+        b_diff.At(i) = out_diff.At(i);
+        a_diff.At(i) = 0;
+      }
+    }
+    a.HandleDiff(a_diff);
+    b.HandleDiff(b_diff);
+  });
+}
+
+Tensor Min(const Tensor& a, const Tensor& b) {
+  CHECK(a.shape().dim_vec().size() == b.shape().dim_vec().size());
+  FOR_RANGE(int, i, 0, a.shape().dim_vec().size()) {
+    CHECK(a.shape().dim_vec().at(i) == b.shape().dim_vec().at(i));
+  }
+  std::shared_ptr<Buffer> out(new Buffer(a.buffer()));
+  FOR_RANGE(size_t, i, 0, out->Size()) {
+    out->At(i) = std::min(a.At(i), b.At(i));
+  }
+  return Tensor(out, [=](const Buffer& out_diff) {
+    Buffer a_diff(out_diff.shape(), 0);
+    Buffer b_diff(out_diff.shape(), 0);
+    FOR_RANGE(size_t, i, 0, out_diff.Size()) {
+      if (a.At(i) <= b.At(i)) {
+        a_diff.At(i) = out_diff.At(i);
+        b_diff.At(i) = 0;
+      }
+      if (b.At(i) <= a.At(i)) {
         b_diff.At(i) = out_diff.At(i);
         a_diff.At(i) = 0;
       }
@@ -219,7 +268,7 @@ Tensor MaxElem(const Tensor& input) {
   });
 }
 
-Tensor Min(const Tensor& input) {
+Tensor MinElem(const Tensor& input) {
   double min_value = std::numeric_limits<double>::max();
   size_t min_index = 0;
   FOR_RANGE(int, i, 0, input.Size()) {
@@ -241,6 +290,54 @@ Tensor Variance(const Tensor& input) {
   return Avg(Square(Sub(copies.at(0), Avg(copies.at(1)))));
 }
 
+Tensor GeAvg(const Tensor& input) {
+  std::vector<std::vector<int64_t>> ge_avg;
+  double sum = 0;
+  FOR_RANGE(int64_t, i, 0, input.Size()) { sum += input.At(i); }
+  double epsilon = 0.000000001;
+  double avg = sum / input.Size() - epsilon;
+  FOR_RANGE(int64_t, i, 0, input.Size()) {
+    if (input.At(i) > avg) { ge_avg.push_back(std::vector<int64_t>{i}); }
+  }
+  CHECK_GT(ge_avg.size(), 0);
+  return IndexReduce(input, ge_avg);
+}
+
+Tensor LeAvg(const Tensor& input) {
+  std::vector<std::vector<int64_t>> le_avg;
+  double sum = 0;
+  FOR_RANGE(int64_t, i, 0, input.Size()) { sum += input.At(i); }
+  double epsilon = 0.000000001;
+  double avg = sum / input.Size() + epsilon;
+  FOR_RANGE(int64_t, i, 0, input.Size()) {
+    if (input.At(i) < avg) { le_avg.push_back(std::vector<int64_t>{i}); }
+  }
+  CHECK_GT(le_avg.size(), 0);
+  return IndexReduce(input, le_avg);
+}
+
+Tensor DoubleVariance(const Tensor& input) {
+  std::vector<std::vector<int64_t>> ge_avg;
+  std::vector<std::vector<int64_t>> le_avg;
+  double sum = 0;
+  FOR_RANGE(int64_t, i, 0, input.Size()) { sum += input.At(i); }
+  double avg = sum / input.Size();
+  double epsilon = 0.000000009;
+  FOR_RANGE(int64_t, i, 0, input.Size()) {
+    if (input.At(i) >= (avg - epsilon)) {
+      ge_avg.push_back(std::vector<int64_t>{i});
+    }
+    if (input.At(i) <= (avg + epsilon)) {
+      le_avg.push_back(std::vector<int64_t>{i});
+    }
+  }
+  CHECK_GT(ge_avg.size(), 0);
+  CHECK_GT(le_avg.size(), 0);
+  auto input_copies = Clone(input, 2);
+  return Add(Variance(IndexReduce(input_copies.at(0), ge_avg)),
+             Variance(IndexReduce(input_copies.at(1), le_avg)));
+}
+
 Tensor AvgAbsDeviation(const Tensor& input) {
   auto copies = Clone(input, 2);
   return Avg(Abs(Sub(copies.at(0), Avg(copies.at(1)))));
@@ -259,6 +356,7 @@ Tensor Sum(const Tensor& input) {
 }
 
 Tensor Avg(const Tensor& input) {
+  CHECK(input.Size() > 0);
   Tensor sum = Sum(input);
   double avg = sum.At(0) / input.Size();
   std::shared_ptr<Buffer> out(new Buffer(Shape({1}), avg));
@@ -354,16 +452,14 @@ Tensor TensorProduct(const Tensor& a, const Tensor& b) {
   std::shared_ptr<Buffer> out(new Buffer(Shape(dim_vec), 1));
   FOR_RANGE(int, i, 0, a.Size()) {
     FOR_RANGE(int, j, 0, b.Size()) {
-      out->mut_data()->at(i * a.Size() + j) =
-          a.buffer().data().at(i) * b.buffer().data().at(j);
+      out->At(i * b.Size() + j) = a.At(i) * b.At(j);
     }
   }
   return Tensor(out, [=](const Buffer& out_diff) {
     Buffer a_diff(a.shape(), 0);
     FOR_RANGE(int, i, 0, a.Size()) {
       FOR_RANGE(int, j, 0, b.Size()) {
-        a_diff.mut_data()->at(i) +=
-            out_diff.data().at(i * a.Size() + j) * b.buffer().data().at(j);
+        a_diff.At(i) += out_diff.At(i * b.Size() + j) * b.At(j);
       }
     }
     a.HandleDiff(a_diff);
@@ -371,8 +467,7 @@ Tensor TensorProduct(const Tensor& a, const Tensor& b) {
     Buffer b_diff(b.shape(), 0);
     FOR_RANGE(int, i, 0, a.Size()) {
       FOR_RANGE(int, j, 0, b.Size()) {
-        b_diff.mut_data()->at(j) +=
-            out_diff.data().at(i * a.Size() + j) * a.buffer().data().at(i);
+        b_diff.At(j) += out_diff.At(i * b.Size() + j) * a.At(i);
       }
     }
     b.HandleDiff(b_diff);
@@ -436,6 +531,22 @@ Tensor Square(const Tensor& input) {
     input.HandleDiff(input_diff);
   });
 }
+
+Tensor Sqrt(const Tensor& input) {
+  std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
+  for (double& x : *out->mut_data()) { x = std::sqrt(x); }
+  return Tensor(out, [input](const Buffer& out_diff) {
+    Buffer input_diff(input.buffer());
+    FOR_RANGE(int, i, 0, input_diff.Size()) {
+      double& id = input_diff.At(i);
+      double od = out_diff.At(i);
+      id *= 0.5 / od;
+    }
+    input.HandleDiff(input_diff);
+  });
+}
+
+Tensor StandardDeviation(const Tensor& a) { return Sqrt(Variance(a)); }
 
 Tensor Backward(const Tensor& loss) {
   CHECK(loss.buffer().data().size() == 1);
