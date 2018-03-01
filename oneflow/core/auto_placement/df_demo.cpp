@@ -97,12 +97,12 @@ void AutoPlacementMemoryDemo() {
   int64_t fw_node_num = chain_graph.FwChainNodeNum();
   // std::cout << fw_node_num << std::endl;
   // return;
-  Shape shape({4, 5});
+  Shape shape({7, fw_node_num});
   Tensor fw_var(shape, [](size_t index) { return index % 2 ? 1 : 0; });
   Tensor epsilon(0.000000000001);
   Tensor ceil_tensor(shape, 1);
   Tensor floor_tensor(shape, 0.000000000001);
-  FOR_RANGE(int, i, 0, 10000) {
+  FOR_RANGE(int, i, 0, 50000) {
     double lr = 0.01;
     Tensor x = Add(Square((FixedExpectation(Update(&fw_var, lr), 1))), epsilon);
     const auto& placement_copies = Clone(x, 3);
