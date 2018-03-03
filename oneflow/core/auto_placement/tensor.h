@@ -25,7 +25,7 @@ class Tensor final {
   Tensor(const Shape& shape, const std::vector<double>& data)
       : buffer_(std::shared_ptr<Buffer>(new Buffer(shape, data))),
         diff_handler_([](const Buffer&) {}) {}
-  Tensor(std::shared_ptr<Buffer> buffer,
+  Tensor(const std::shared_ptr<Buffer>& buffer,
          const std::function<void(const Buffer&)>& diff_handler)
       : buffer_(buffer), diff_handler_(diff_handler) {}
   Tensor(Tensor tensor, const std::function<void(const Buffer&)>& diff_handler)

@@ -2,86 +2,134 @@
 #define ONEFLOW_CORE_AUTO_PLACEMNENT_DF_FUNC_H_
 
 #include "oneflow/core/auto_placement/tensor.h"
+#include "oneflow/core/common/preprocessor.h"
 
 namespace oneflow {
 
 namespace df {
 
-Tensor ColIndexReduce(const Tensor& input,
-                      const std::vector<std::vector<int64_t>>& reduce_indexes);
+Tensor _Update(const std::string& caller, Tensor* var, double lr);
+#define Update(...) _Update(__LOC__, __VA_ARGS__)
 
-Tensor IndexReduce(const Tensor& input,
-                   const std::vector<std::vector<int64_t>>& reduce_indexes);
+Tensor _DiffWatch(const std::string& caller, const Tensor& input,
+                  const std::function<void(const Buffer& out_diff)>& Handler);
+#define DiffWatch(...) _DiffWatch(__LOC__, __VA_ARGS__)
 
-Tensor Update(Tensor* var, double lr);
+#define __LOC__ __FILE__ ":" OF_PP_STRINGIZE(__LINE__)
 
-std::vector<Tensor> Clone(const Tensor& input, size_t n);
+Tensor _ColIndexReduce(const std::string& caller, const Tensor& input,
+                       const std::vector<std::vector<int64_t>>& reduce_indexes);
+#define ColIndexReduce(...) _ColIndexReduce(__LOC__, __VA_ARGS__)
 
-Tensor Reshape(const Tensor& input, const Shape& shape);
+Tensor _IndexReduce(const std::string& caller, const Tensor& input,
+                    const std::vector<std::vector<int64_t>>& reduce_indexes);
+#define IndexReduce(...) _IndexReduce(__LOC__, __VA_ARGS__)
 
-Tensor Minus(const Tensor& input);
+std::vector<Tensor> _Clone(const std::string& caller, const Tensor& input,
+                           size_t n);
+#define Clone(...) _Clone(__LOC__, __VA_ARGS__)
 
-Tensor Abs(const Tensor& input);
+Tensor _Reshape(const std::string& caller, const Tensor& input,
+                const Shape& shape);
+#define Reshape(...) _Reshape(__LOC__, __VA_ARGS__)
 
-Tensor Exp(const Tensor& input);
+Tensor _Minus(const std::string& caller, const Tensor& input);
+#define Minus(...) _Minus(__LOC__, __VA_ARGS__)
 
-Tensor Tanh(const Tensor& input);
+Tensor _Abs(const std::string& caller, const Tensor& input);
+#define Abs(...) _Abs(__LOC__, __VA_ARGS__)
+
+Tensor _Exp(const std::string& caller, const Tensor& input);
+#define Exp(...) _Exp(__LOC__, __VA_ARGS__)
+
+Tensor _Tanh(const std::string& caller, const Tensor& input);
+#define Tanh(...) _Tanh(__LOC__, __VA_ARGS__)
 
 Tensor Tee(const Tensor& input, Tensor* out);
 
-Tensor Add(const Tensor& a, const Tensor& b);
+Tensor _Add(const std::string& caller, const Tensor& a, const Tensor& b);
+#define ADD(...) _Add(__LOC__, __VA_ARGS__)
 
-Tensor Sub(const Tensor& a, const Tensor& b);
+Tensor _Sub(const std::string& caller, const Tensor& a, const Tensor& b);
+#define Sub(...) _Sub(__LOC__, __VA_ARGS__)
 
-Tensor ElemWiseMul(const Tensor& a, const Tensor& b);
+Tensor _ElemWiseMul(const std::string& caller, const Tensor& a,
+                    const Tensor& b);
+#define ElemWiseMul(...) _ElemWiseMul(__LOC__, __VA_ARGS__)
 
-Tensor ElemWiseDiv(const Tensor& a, const Tensor& b);
+Tensor _ElemWiseDiv(const std::string& caller, const Tensor& a,
+                    const Tensor& b);
+#define ElemWiseDiv(...) _ElemWiseDiv(__LOC__, __VA_ARGS__)
 
-Tensor Mul(const Tensor& a, const Tensor& b);
+Tensor _Mul(const std::string& caller, const Tensor& a, const Tensor& b);
+#define Mul(...) _Mul(__LOC__, __VA_ARGS__)
 
-Tensor Reciprocal(const Tensor& input);
+Tensor _Reciprocal(const std::string& caller, const Tensor& input);
+#define Reciprocal(...) _Reciprocal(__LOC__, __VA_ARGS__)
 
-Tensor Max(const Tensor& a, const Tensor& b);
+Tensor _Max(const std::string& caller, const Tensor& a, const Tensor& b);
+#define Max(...) _Max(__LOC__, __VA_ARGS__)
 
-Tensor Min(const Tensor& a, const Tensor& b);
+Tensor _Min(const std::string& caller, const Tensor& a, const Tensor& b);
+#define Min(...) _Min(__LOC__, __VA_ARGS__)
 
-Tensor MaxElem(const Tensor& a);
+Tensor _MaxElem(const std::string& caller, const Tensor& a);
+#define MaxElem(...) _MaxElem(__LOC__, __VA_ARGS__)
 
-Tensor Relu(const Tensor& input);
+Tensor _Relu(const std::string& caller, const Tensor& input);
+#define Relu(...) _Relu(__LOC__, __VA_ARGS__)
 
-Tensor MinElem(const Tensor& a);
+Tensor _MinElem(const std::string& caller, const Tensor& a);
+#define MinElem(...) _MinElem(__LOC__, __VA_ARGS__)
 
-Tensor Sum(const Tensor& a);
+Tensor _Sum(const std::string& caller, const Tensor& a);
+#define Sum(...) _Sum(__LOC__, __VA_ARGS__)
 
-Tensor Avg(const Tensor& a);
+Tensor _Avg(const std::string& caller, const Tensor& a);
+#define Avg(...) _Avg(__LOC__, __VA_ARGS__)
 
-Tensor Variance(const Tensor& a);
+Tensor _Variance(const std::string& caller, const Tensor& a);
+#define Variance(...) _Variance(__LOC__, __VA_ARGS__)
 
-Tensor StandardDeviation(const Tensor& a);
+Tensor _StandardDeviation(const std::string& caller, const Tensor& a);
+#define StandardDeviation(...) _StandardDeviation(__LOC__, __VA_ARGS__)
 
-Tensor AvgAbsDeviation(const Tensor& a);
+Tensor _AvgAbsDeviation(const std::string& caller, const Tensor& a);
+#define AvgAbsDeviation(...) _AvgAbsDeviation(__LOC__, __VA_ARGS__)
 
-Tensor GeAvg(const Tensor& input);
+Tensor _DoubleVariance(const std::string& caller, const Tensor& input);
+#define DoubleVariance(...) _DoubleVariance(__LOC__, __VA_ARGS__)
 
-Tensor LeAvg(const Tensor& input);
+Tensor _DoubleAvgAbsDeviation(const std::string& caller, const Tensor& input);
+#define DoubleAvgAbsDeviation(...) _DoubleAvgAbsDeviation(__LOC__, __VA_ARGS__)
 
-Tensor DoubleVariance(const Tensor& input);
+Tensor _Square(const std::string& caller, const Tensor& input);
+#define Square(...) _Square(__LOC__, __VA_ARGS__)
 
-Tensor Square(const Tensor& input);
+Tensor _Sqrt(const std::string& caller, const Tensor& input);
+#define Sqrt(...) _Sqrt(__LOC__, __VA_ARGS__)
 
-Tensor Sqrt(const Tensor& input);
+Tensor _MatrixRowSum(const std::string& caller, const Tensor& input);
+#define MatrixRowSum(...) _MatrixRowSum(__LOC__, __VA_ARGS__)
 
-Tensor MatrixRowSum(const Tensor& input);
+Tensor _MatrixColSum(const std::string& caller, const Tensor& input);
+#define MatrixColSum(...) _MatrixColSum(__LOC__, __VA_ARGS__)
 
-Tensor MatrixColSum(const Tensor& input);
+Tensor _MatrixColMax(const std::string& caller, const Tensor& input);
+#define MatrixColMax(...) _MatrixColMax(__LOC__, __VA_ARGS__)
 
-Tensor MatrixColMax(const Tensor& input);
+Tensor _TensorProduct(const std::string& caller, const Tensor& a,
+                      const Tensor& b);
+#define TensorProduct(...) _TensorProduct(__LOC__, __VA_ARGS__)
 
-Tensor TensorProduct(const Tensor& a, const Tensor& b);
+Tensor _FixedExpectation(const std::string& caller, const Tensor& a, double e);
+#define FixedExpectation(...) _FixedExpectation(__LOC__, __VA_ARGS__)
 
-Tensor FixedExpectation(const Tensor& a, double e);
+Tensor _FixedMaxVal(const std::string& caller, const Tensor& a, double e);
+#define FixedMaxVal(...) _FixedMaxVal(__LOC__, __VA_ARGS__)
 
-Tensor Backward(const Tensor& loss);
+Tensor _Backward(const std::string& caller, const Tensor& loss);
+#define BackwardRun(...) _Backward(__LOC__, __VA_ARGS__)
 
 }  // namespace df
 
