@@ -207,12 +207,27 @@ void AutoPlacementMemoryDemo() {
       for (double i : dev_mem.buffer().data()) { std::cout << i << " "; }
       std::cout << std::endl;
 
-      FOR_RANGE(int, i, 0, fw_prob.shape().At(0)) {
-        std::cout << "device " << i << ": ";
-        FOR_RANGE(int, j, 0, fw_prob.shape().At(1)) {
-          if (fw_prob.At(i, j) >= 0.5) {
-            std::cout << chain_node_id2name.at(j) << " ";
+      std::vector<int64_t> fw_id2dev_id(fw_prob.shape().At(1));
+      FOR_RANGE(int, j, 0, fw_prob.shape().At(1)) {
+        double max_val = 0;
+        int max_index = 0;
+        FOR_RANGE(int, i, 0, fw_prob.shape().At(0)) {
+          if (max_val < fw_prob.At(i, j)) {
+            max_val = fw_prob.At(i, j);
+            max_index = i;
           }
+        }
+        fw_id2dev_id.at(j) = max_index;
+      }
+      std::vector<std::list<int64_t>> dev_id2fw_ids(fw_prob.shape().At(0));
+      FOR_RANGE(int, fw_id, 0, fw_id2dev_id.size()) {
+        dev_id2fw_ids.at(fw_id2dev_id.at(fw_id)).push_back(fw_id);
+      }
+
+      FOR_RANGE(int, dev_id, 0, dev_id2fw_ids.size()) {
+        std::cout << "device " << dev_id << ": ";
+        for (int64_t fw_id : dev_id2fw_ids.at(dev_id)) {
+          std::cout << chain_node_id2name.at(fw_id) << " ";
         }
         std::cout << std::endl;
       }
