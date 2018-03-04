@@ -116,8 +116,16 @@ class DemoChainNodeSubGraph final {
 class DemoChainEdge final : public Edge<DemoChainNode, DemoChainEdge> {
  public:
   OF_DISALLOW_COPY_AND_MOVE(DemoChainEdge);
-  DemoChainEdge() = default;
+  explicit DemoChainEdge(const DemoChainRegst* regst) : regst_(regst) {}
   ~DemoChainEdge() = default;
+
+  const DemoChainRegst& regst() const { return *regst_; }
+
+  int64_t src_chain_node_id() const { return src_node()->chain_node_id(); }
+  int64_t dst_chain_node_id() const { return dst_node()->chain_node_id(); }
+
+ private:
+  const DemoChainRegst* regst_;
 };
 
 class DemoChainGraphBuilder;
@@ -143,6 +151,11 @@ class DemoChainGraph final : public Graph<DemoChainNode, DemoChainEdge> {
     return CalcChainRegstId2PathChainNodeIds(
         [](int64_t) -> double { return 1; });
   }
+
+  std::vector<std::vector<int64_t>> CalcEdgeId2SrcChainNodeId() const;
+  std::vector<std::vector<int64_t>> CalcEdgeId2DstChainNodeId() const;
+
+  std::vector<std::string> CalcChainNodeId2ChainNodeName() const;
 
   std::vector<double> RegstId2IsCloned() const;
 

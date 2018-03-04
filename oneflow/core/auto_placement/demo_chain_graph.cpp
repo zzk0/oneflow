@@ -89,7 +89,9 @@ DemoChainNode* DemoChainGraphBuilder::NewMdUpdtNode(const std::string& name) {
 void DemoChainGraphBuilder::Consume(DemoChainNode* node,
                                     DemoChainRegst* regst) {
   regst->AddConsumer(node);
-  Connect(regst->mut_producer(), graph_->NewEdge(), node);
+  auto edge = new DemoChainEdge(regst);
+  graph_->AddAllocatedEdge(edge);
+  Connect(regst->mut_producer(), edge, node);
 }
 
 size_t DemoChainGraph::FwChainNodeNum() const {
@@ -199,6 +201,13 @@ DemoChainGraph::CalcChainRegstId2ProducerChainNodeId() const {
   }
   return ret;
 }
+std::vector<std::string> DemoChainGraph::CalcChainNodeId2ChainNodeName() const {
+  std::vector<std::string> ret(node_num());
+  ForEachNode([&](const DemoChainNode* node) {
+    ret.at(node->chain_node_id()) = node->name();
+  });
+  return ret;
+}
 
 void DemoChainNodeSubGraph::TopoForEachChainNode(
     const std::function<void(const DemoChainNode*)>& Handler) const {
@@ -287,6 +296,26 @@ DemoChainGraph::CalcChainRegstId2PathChainNodeIds(
     int64_t chain_regst_id = pair.first->chain_regst_id();
     pair.second->CalcLongestPath(&ret.at(chain_regst_id), Time4ChainNodeId);
   }
+  return ret;
+}
+
+std::vector<std::vector<int64_t>> DemoChainGraph::CalcEdgeId2SrcChainNodeId()
+    const {
+  std::vector<std::vector<int64_t>> ret(edge_num());
+  int index = -1;
+  ForEachEdge([&](DemoChainEdge* edge) {
+    ret.at(++index) = std::vector<int64_t>{edge->src_chain_node_id()};
+  });
+  return ret;
+}
+
+std::vector<std::vector<int64_t>> DemoChainGraph::CalcEdgeId2DstChainNodeId()
+    const {
+  std::vector<std::vector<int64_t>> ret(edge_num());
+  int index = -1;
+  ForEachEdge([&](DemoChainEdge* edge) {
+    ret.at(++index) = std::vector<int64_t>{edge->dst_chain_node_id()};
+  });
   return ret;
 }
 

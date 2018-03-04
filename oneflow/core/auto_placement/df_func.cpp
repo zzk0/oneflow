@@ -379,6 +379,22 @@ Tensor _Variance(const std::string& caller, const Tensor& input) {
   return Avg(Square(Sub(copies.at(0), Avg(copies.at(1)))));
 }
 
+Tensor _GeMean(const std::string& caller, const Tensor& input) {
+  std::vector<std::vector<int64_t>> ge_avg;
+  double sum = 0;
+  FOR_RANGE(int64_t, i, 0, input.Size()) { sum += input.At(i); }
+  double avg = sum / input.Size();
+  double epsilon = 0.000000009;
+  FOR_RANGE(int64_t, i, 0, input.Size()) {
+    if (input.At(i) >= (avg - epsilon)) {
+      ge_avg.push_back(std::vector<int64_t>{i});
+    }
+  }
+  CHECK_GT(ge_avg.size(), 0);
+  auto input_copies = Clone(input, 2);
+  return IndexReduce(input_copies.at(0), ge_avg);
+}
+
 Tensor _DoubleAvgAbsDeviation(const std::string& caller, const Tensor& input) {
   std::vector<std::vector<int64_t>> ge_avg;
   std::vector<std::vector<int64_t>> le_avg;

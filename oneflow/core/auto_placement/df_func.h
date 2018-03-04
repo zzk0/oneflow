@@ -103,6 +103,9 @@ Tensor _DoubleVariance(const std::string& caller, const Tensor& input);
 Tensor _DoubleAvgAbsDeviation(const std::string& caller, const Tensor& input);
 #define DoubleAvgAbsDeviation(...) _DoubleAvgAbsDeviation(__LOC__, __VA_ARGS__)
 
+Tensor _GeMean(const std::string& caller, const Tensor& input);
+#define GeMean(...) _GeMean(__LOC__, __VA_ARGS__)
+
 Tensor _Square(const std::string& caller, const Tensor& input);
 #define Square(...) _Square(__LOC__, __VA_ARGS__)
 
