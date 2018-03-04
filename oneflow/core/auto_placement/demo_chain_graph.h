@@ -119,7 +119,7 @@ class DemoChainEdge final : public Edge<DemoChainNode, DemoChainEdge> {
   explicit DemoChainEdge(const DemoChainRegst* regst) : regst_(regst) {}
   ~DemoChainEdge() = default;
 
-  const DemoChainRegst& regst() const { return *regst_; }
+  int64_t chain_regst_id() const { return regst_->chain_regst_id(); }
 
   int64_t src_chain_node_id() const { return src_node()->chain_node_id(); }
   int64_t dst_chain_node_id() const { return dst_node()->chain_node_id(); }
@@ -154,6 +154,7 @@ class DemoChainGraph final : public Graph<DemoChainNode, DemoChainEdge> {
 
   std::vector<std::vector<int64_t>> CalcEdgeId2SrcChainNodeId() const;
   std::vector<std::vector<int64_t>> CalcEdgeId2DstChainNodeId() const;
+  std::vector<std::vector<int64_t>> CalcEdgeId2RegstId() const;
 
   std::vector<std::string> CalcChainNodeId2ChainNodeName() const;
 

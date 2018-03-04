@@ -319,6 +319,15 @@ std::vector<std::vector<int64_t>> DemoChainGraph::CalcEdgeId2DstChainNodeId()
   return ret;
 }
 
+std::vector<std::vector<int64_t>> DemoChainGraph::CalcEdgeId2RegstId() const {
+  std::vector<std::vector<int64_t>> ret(edge_num());
+  int index = -1;
+  ForEachEdge([&](DemoChainEdge* edge) {
+    ret.at(++index) = std::vector<int64_t>{edge->chain_regst_id()};
+  });
+  return ret;
+}
+
 std::vector<double> DemoChainGraph::RegstId2IsCloned() const {
   std::vector<double> ret(regsts_.size());
   for (const auto& regst : regsts_) {
