@@ -157,10 +157,10 @@ Tensor ProbabilityMatrix(Tensor* var, double lr) {
 void AutoPlacementMemoryDemo() {
   std::random_device rd{};
   std::mt19937 gen{rd()};
-  std::normal_distribution<double> distr(1, 0.1);
+  std::normal_distribution<double> distr(1, 0.01);
   DemoChainGraph chain_graph([](DemoChainGraphBuilder* builder) {
     auto regst = builder->ModelOp("op0");
-    FOR_RANGE(int, i, 1, 23) {
+    FOR_RANGE(int, i, 1, 63) {
       regst = builder->ModelOp("op" + std::to_string(i), {regst});
     }
     builder->Backward(builder->ModelOp("loss", {regst}));
@@ -171,24 +171,21 @@ void AutoPlacementMemoryDemo() {
   Tensor fw_var(shape, [&](size_t index) { return distr(gen); });
   Tensor fw_prob;
   auto chain_node_id2name = chain_graph.CalcChainNodeId2ChainNodeName();
-  double bugo = 2;
-  FOR_RANGE(int, step, 0, 5000) {
+  double bugo = 1;
+  FOR_RANGE(int, step, 0, 10000) {
     double lr = 0.01;
-    fw_prob = ProbabilityMatrix(&fw_var, lr);
-    Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node2fw_id);
     if (step % (static_cast<int>(bugo += 0.05))) {
+      fw_prob = ProbabilityMatrix(&fw_var, lr);
+      Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node2fw_id);
       auto chain_prob_copies = Clone(chain_node_prob, 3);
       Tensor computation_ii = MatrixRowSum(chain_prob_copies.at(0));
-      auto compo_ii_copies = Clone(computation_ii, 2);
       Tensor dev_mem =
           CalcDeviceMemConsumed(chain_prob_copies.at(2), chain_graph, 4);
-      Tensor ii = MaxElem(compo_ii_copies.at(1));
       Tensor indecision = Sub(Sum(Sqrt(chain_prob_copies.at(1))),
                               Tensor(chain_node_prob.shape().At(1)));
-      Tensor penalty =
-          ADD(indecision, ADD(AvgAbsDeviation(dev_mem),
-                              AvgAbsDeviation(compo_ii_copies.at(0))));
-      BackwardRun(ADD(ii, penalty));
+      Tensor balance = ADD(indecision, ADD(AvgAbsDeviation(dev_mem),
+                                           AvgAbsDeviation(computation_ii)));
+      BackwardRun(balance);
       std::cout << "fw_prob: " << std::endl;
       FOR_RANGE(int, j, 0, fw_prob.shape().At(1)) {
         FOR_RANGE(int, i, 0, fw_prob.shape().At(0)) {
@@ -233,7 +230,15 @@ void AutoPlacementMemoryDemo() {
       }
       std::cout << std::endl;
     } else {
-      BackwardRun(Sum(CalcDeviceCopiedRegstMem(chain_node_prob, chain_graph)));
+      FOR_RANGE(int, x, 0, 3) {
+        fw_prob = ProbabilityMatrix(&fw_var, lr);
+        Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node2fw_id);
+        Tensor copied_mem =
+            Sum(CalcDeviceCopiedRegstMem(chain_node_prob, chain_graph));
+        std::cout << "copied_mem: " << copied_mem.At(0) << std::endl
+                  << std::endl;
+        BackwardRun(copied_mem);
+      }
     }
   }
 }
