@@ -110,12 +110,13 @@ Tensor CalcDeviceMemConsumed(const Tensor& chain_node_prob,
   Tensor regst_duration =
       CalcRegstDuration(chain_node_prob_copies.at(2), chain_graph);
   auto regst_duration_copies = Clone(regst_duration, 2);
-  return ADD(
-      CalcDeviceMemBasicConsumed(chain_node_prob_copies.at(0),
-                                 regst_duration_copies.at(0), chain_graph,
-                                 piece_num_in_batch),
-      CalcDeviceCopiedRegstMem(chain_node_prob_copies.at(1),
-                               regst_duration_copies.at(1), chain_graph));
+  return Sqrt(Mul(
+      Tensor(6),
+      ADD(CalcDeviceMemBasicConsumed(chain_node_prob_copies.at(0),
+                                     regst_duration_copies.at(0), chain_graph,
+                                     piece_num_in_batch),
+          CalcDeviceCopiedRegstMem(chain_node_prob_copies.at(1),
+                                   regst_duration_copies.at(1), chain_graph))));
 }
 
 Tensor CalcDeviceMemII(const Tensor& chain_node_placement,
@@ -165,18 +166,21 @@ void AutoPlacementMemoryDemo() {
     }
     builder->Backward(builder->ModelOp("loss", {regst}));
   });
-  auto chain_node2fw_id = chain_graph.CalcChainNodeId2FwChainNodeId();
+  auto chain_node_id2fw_id = chain_graph.CalcChainNodeId2FwChainNodeId();
   int64_t fw_node_num = chain_graph.FwChainNodeNum();
   Shape shape({2, fw_node_num});
   Tensor fw_var(shape, [&](size_t index) { return distr(gen); });
   Tensor fw_prob;
   auto chain_node_id2name = chain_graph.CalcChainNodeId2ChainNodeName();
-  double bugo = 1;
+  double bugo = 3;
+  int rethink_threshold = 17;
+  int rethink_cnt = -1;
+  int deep_think = 1;
   FOR_RANGE(int, step, 0, 10000) {
     double lr = 0.01;
     if (step % (static_cast<int>(bugo += 0.05))) {
       fw_prob = ProbabilityMatrix(&fw_var, lr);
-      Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node2fw_id);
+      Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node_id2fw_id);
       auto chain_prob_copies = Clone(chain_node_prob, 3);
       Tensor computation_ii = MatrixRowSum(chain_prob_copies.at(0));
       Tensor dev_mem =
@@ -203,6 +207,39 @@ void AutoPlacementMemoryDemo() {
       std::cout << "dev_mem: ";
       for (double i : dev_mem.buffer().data()) { std::cout << i << " "; }
       std::cout << std::endl;
+      if ((indecision.At(0) < rethink_threshold)
+          && (rethink_threshold > 4 || !((++rethink_cnt) % deep_think))) {
+        if (rethink_threshold > 4) {
+          --rethink_threshold;
+        } else {
+          deep_think += 5;
+        }
+        auto edge_id2src_id = chain_graph.CalcEdgeId2SrcChainNodeId();
+        Tensor edge_src_prob = ColIndexReduce(chain_node_prob, edge_id2src_id);
+        auto edge_id2dst_id = chain_graph.CalcEdgeId2DstChainNodeId();
+        Tensor edge_dst_prob = ColIndexReduce(chain_node_prob, edge_id2dst_id);
+        Tensor edge_prob =
+            Mul(Tensor(0.5), Abs(Sub(edge_src_prob, edge_dst_prob)));
+        FOR_RANGE(int, i, 0, fw_var.shape().At(0)) {
+          FOR_RANGE(int, j, 0, fw_var.shape().At(1)) {
+            fw_var.At(i, j) = fw_var.At(i, j) > 1 ? 2 : 0;
+          }
+        }
+        FOR_RANGE(int, i, 0, edge_prob.shape().At(0)) {
+          FOR_RANGE(int, j, 0, edge_prob.shape().At(1)) {
+            double x = edge_prob.At(i, j);
+            if (x > 0.2) {
+              fw_var.At(
+                  i, chain_node_id2fw_id.at(edge_id2src_id.at(j).at(0)).at(0)) =
+                  1;
+              fw_var.At(
+                  i, chain_node_id2fw_id.at(edge_id2dst_id.at(j).at(0)).at(0)) =
+                  1;
+            }
+          }
+        }
+        bugo = 15;
+      }
 
       std::vector<int64_t> fw_id2dev_id(fw_prob.shape().At(1));
       FOR_RANGE(int, j, 0, fw_prob.shape().At(1)) {
@@ -232,7 +269,7 @@ void AutoPlacementMemoryDemo() {
     } else {
       FOR_RANGE(int, x, 0, 3) {
         fw_prob = ProbabilityMatrix(&fw_var, lr);
-        Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node2fw_id);
+        Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node_id2fw_id);
         Tensor copied_mem =
             Sum(CalcDeviceCopiedRegstMem(chain_node_prob, chain_graph));
         std::cout << "copied_mem: " << copied_mem.At(0) << std::endl
