@@ -683,7 +683,6 @@ Tensor _Sqrt(const std::string& caller, const Tensor& input) {
       double o = out->At(i);
       id *= 0.5 / o;
     }
-    std::cout << std::endl;
     input.HandleDiff(input_diff);
   });
 }

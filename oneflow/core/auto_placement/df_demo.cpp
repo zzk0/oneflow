@@ -110,13 +110,12 @@ Tensor CalcDeviceMemConsumed(const Tensor& chain_node_prob,
   Tensor regst_duration =
       CalcRegstDuration(chain_node_prob_copies.at(2), chain_graph);
   auto regst_duration_copies = Clone(regst_duration, 2);
-  return Sqrt(Mul(
-      Tensor(6),
-      ADD(CalcDeviceMemBasicConsumed(chain_node_prob_copies.at(0),
-                                     regst_duration_copies.at(0), chain_graph,
-                                     piece_num_in_batch),
-          CalcDeviceCopiedRegstMem(chain_node_prob_copies.at(1),
-                                   regst_duration_copies.at(1), chain_graph))));
+  return ADD(
+      CalcDeviceMemBasicConsumed(chain_node_prob_copies.at(0),
+                                 regst_duration_copies.at(0), chain_graph,
+                                 piece_num_in_batch),
+      CalcDeviceCopiedRegstMem(chain_node_prob_copies.at(1),
+                               regst_duration_copies.at(1), chain_graph));
 }
 
 Tensor CalcDeviceMemII(const Tensor& chain_node_placement,
@@ -168,112 +167,126 @@ void AutoPlacementMemoryDemo() {
   });
   auto chain_node_id2fw_id = chain_graph.CalcChainNodeId2FwChainNodeId();
   int64_t fw_node_num = chain_graph.FwChainNodeNum();
-  Shape shape({2, fw_node_num});
+  Shape shape({4, fw_node_num});
   Tensor fw_var(shape, [&](size_t index) { return distr(gen); });
   Tensor fw_prob;
   auto chain_node_id2name = chain_graph.CalcChainNodeId2ChainNodeName();
-  double bugo = 3;
-  int rethink_threshold = 17;
+  double bugo = 2;
+  double rethink_threshold = 60;
   int rethink_cnt = -1;
   int deep_think = 1;
-  FOR_RANGE(int, step, 0, 10000) {
+  Tensor decision_ratio(Shape({fw_node_num}),
+                        [&](int64_t index) { return 1 + 10.0 / (index + 1); });
+  double mem_importance_flation = 0;
+  FOR_RANGE(int, step, 0, 100000) {
     double lr = 0.01;
     if (step % (static_cast<int>(bugo += 0.05))) {
+      double mem_importance = 1 / (1 + (mem_importance_flation += 0.005));
       fw_prob = ProbabilityMatrix(&fw_var, lr);
-      Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node_id2fw_id);
-      auto chain_prob_copies = Clone(chain_node_prob, 3);
+      auto fw_prob_copies = Clone(fw_prob, 2);
+      Tensor chain_node_prob =
+          ColIndexReduce(fw_prob_copies.at(0), chain_node_id2fw_id);
+      auto chain_prob_copies = Clone(chain_node_prob, 2);
       Tensor computation_ii = MatrixRowSum(chain_prob_copies.at(0));
       Tensor dev_mem =
-          CalcDeviceMemConsumed(chain_prob_copies.at(2), chain_graph, 4);
-      Tensor indecision = Sub(Sum(Sqrt(chain_prob_copies.at(1))),
-                              Tensor(chain_node_prob.shape().At(1)));
-      Tensor balance = ADD(indecision, ADD(AvgAbsDeviation(dev_mem),
+          CalcDeviceMemConsumed(chain_prob_copies.at(1), chain_graph, 4);
+      Tensor normalized_dev_mem =
+          Mul(Tensor(1.65 * mem_importance), Sqrt(dev_mem));
+      Tensor fw_indecision =
+          Mul(Sub(MatrixColSum(Sqrt(fw_prob_copies.at(1))), Tensor(1)),
+              decision_ratio);
+      Tensor indecision = Sum(fw_indecision);
+      Tensor balance = ADD(indecision, ADD(AvgAbsDeviation(normalized_dev_mem),
                                            AvgAbsDeviation(computation_ii)));
       BackwardRun(balance);
-      std::cout << "fw_prob: " << std::endl;
-      FOR_RANGE(int, j, 0, fw_prob.shape().At(1)) {
-        FOR_RANGE(int, i, 0, fw_prob.shape().At(0)) {
-          double x = fw_prob.At(i, j);
-          if (x < 0.01) { x = 0; }
-          if (x > 0.99) { x = 1; }
-          std::cout << x << "\t";
+
+      if (step % 10 == 0) {
+        std::cout << "fw_prob: " << std::endl;
+        FOR_RANGE(int, j, 0, fw_prob.shape().At(1)) {
+          FOR_RANGE(int, i, 0, fw_prob.shape().At(0)) {
+            double x = fw_prob.At(i, j);
+            if (x < 0.01) { x = 0; }
+            if (x > 0.99) { x = 1; }
+            std::cout << x << "\t";
+          }
+          std::cout << std::endl;
+        }
+        std::cout << "indecision: " << indecision.At(0) << std::endl;
+        std::cout << "computation_ii: ";
+        for (double i : computation_ii.buffer().data()) {
+          std::cout << i << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "normalized_dev_mem: ";
+        for (double i : normalized_dev_mem.buffer().data()) {
+          std::cout << i << " ";
+        }
+        std::cout << std::endl;
+
+        std::vector<int64_t> fw_id2dev_id(fw_prob.shape().At(1));
+        FOR_RANGE(int, j, 0, fw_prob.shape().At(1)) {
+          double max_val = 0;
+          int max_index = 0;
+          FOR_RANGE(int, i, 0, fw_prob.shape().At(0)) {
+            if (max_val < fw_prob.At(i, j)) {
+              max_val = fw_prob.At(i, j);
+              max_index = i;
+            }
+          }
+          fw_id2dev_id.at(j) = max_index;
+        }
+        std::vector<std::list<int64_t>> dev_id2fw_ids(fw_prob.shape().At(0));
+        FOR_RANGE(int, fw_id, 0, fw_id2dev_id.size()) {
+          dev_id2fw_ids.at(fw_id2dev_id.at(fw_id)).push_back(fw_id);
+        }
+
+        FOR_RANGE(int, dev_id, 0, dev_id2fw_ids.size()) {
+          std::cout << "device " << dev_id << ": ";
+          for (int64_t fw_id : dev_id2fw_ids.at(dev_id)) {
+            std::cout << chain_node_id2name.at(fw_id) << " ";
+          }
+          std::cout << std::endl;
         }
         std::cout << std::endl;
       }
-      std::cout << "indecision: " << indecision.At(0) << std::endl;
-      std::cout << "computation_ii: ";
-      for (double i : computation_ii.buffer().data()) { std::cout << i << " "; }
-      std::cout << std::endl;
-      std::cout << "dev_mem: ";
-      for (double i : dev_mem.buffer().data()) { std::cout << i << " "; }
-      std::cout << std::endl;
       if ((indecision.At(0) < rethink_threshold)
           && (rethink_threshold > 4 || !((++rethink_cnt) % deep_think))) {
+        mem_importance_flation = 0;
         if (rethink_threshold > 4) {
-          --rethink_threshold;
+          rethink_threshold -= 1;
         } else {
           deep_think += 5;
         }
         auto edge_id2src_id = chain_graph.CalcEdgeId2SrcChainNodeId();
-        Tensor edge_src_prob = ColIndexReduce(chain_node_prob, edge_id2src_id);
         auto edge_id2dst_id = chain_graph.CalcEdgeId2DstChainNodeId();
-        Tensor edge_dst_prob = ColIndexReduce(chain_node_prob, edge_id2dst_id);
-        Tensor edge_prob =
-            Mul(Tensor(0.5), Abs(Sub(edge_src_prob, edge_dst_prob)));
-        FOR_RANGE(int, i, 0, fw_var.shape().At(0)) {
-          FOR_RANGE(int, j, 0, fw_var.shape().At(1)) {
-            fw_var.At(i, j) = fw_var.At(i, j) > 1 ? 2 : 0;
-          }
-        }
-        FOR_RANGE(int, i, 0, edge_prob.shape().At(0)) {
-          FOR_RANGE(int, j, 0, edge_prob.shape().At(1)) {
-            double x = edge_prob.At(i, j);
-            if (x > 0.2) {
-              fw_var.At(
-                  i, chain_node_id2fw_id.at(edge_id2src_id.at(j).at(0)).at(0)) =
-                  1;
-              fw_var.At(
-                  i, chain_node_id2fw_id.at(edge_id2dst_id.at(j).at(0)).at(0)) =
-                  1;
+        FOR_RANGE(int, conv_iter, 0, 3) {
+          chain_node_prob = ColIndexReduce(fw_prob, chain_node_id2fw_id);
+          Tensor edge_src_prob =
+              ColIndexReduce(chain_node_prob, edge_id2src_id);
+          Tensor edge_dst_prob =
+              ColIndexReduce(chain_node_prob, edge_id2dst_id);
+          Tensor edge_prob =
+              Mul(Tensor(0.5), Abs(Sub(edge_src_prob, edge_dst_prob)));
+          FOR_RANGE(int, i, 0, edge_prob.shape().At(0)) {
+            FOR_RANGE(int, j, 0, edge_prob.shape().At(1)) {
+              int64_t src_fw_id =
+                  chain_node_id2fw_id.at(edge_id2src_id.at(j).at(0)).at(0);
+              int64_t dst_fw_id =
+                  chain_node_id2fw_id.at(edge_id2dst_id.at(j).at(0)).at(0);
+              fw_var.At(i, src_fw_id) += fw_var.At(i, dst_fw_id);
+              fw_var.At(i, src_fw_id) /= 2;
+              fw_var.At(i, dst_fw_id) = fw_var.At(i, src_fw_id);
             }
           }
         }
-        bugo = 15;
+        bugo = 20;
       }
-
-      std::vector<int64_t> fw_id2dev_id(fw_prob.shape().At(1));
-      FOR_RANGE(int, j, 0, fw_prob.shape().At(1)) {
-        double max_val = 0;
-        int max_index = 0;
-        FOR_RANGE(int, i, 0, fw_prob.shape().At(0)) {
-          if (max_val < fw_prob.At(i, j)) {
-            max_val = fw_prob.At(i, j);
-            max_index = i;
-          }
-        }
-        fw_id2dev_id.at(j) = max_index;
-      }
-      std::vector<std::list<int64_t>> dev_id2fw_ids(fw_prob.shape().At(0));
-      FOR_RANGE(int, fw_id, 0, fw_id2dev_id.size()) {
-        dev_id2fw_ids.at(fw_id2dev_id.at(fw_id)).push_back(fw_id);
-      }
-
-      FOR_RANGE(int, dev_id, 0, dev_id2fw_ids.size()) {
-        std::cout << "device " << dev_id << ": ";
-        for (int64_t fw_id : dev_id2fw_ids.at(dev_id)) {
-          std::cout << chain_node_id2name.at(fw_id) << " ";
-        }
-        std::cout << std::endl;
-      }
-      std::cout << std::endl;
     } else {
-      FOR_RANGE(int, x, 0, 3) {
+      FOR_RANGE(int, i, 0, 3) {
         fw_prob = ProbabilityMatrix(&fw_var, lr);
         Tensor chain_node_prob = ColIndexReduce(fw_prob, chain_node_id2fw_id);
         Tensor copied_mem =
             Sum(CalcDeviceCopiedRegstMem(chain_node_prob, chain_graph));
-        std::cout << "copied_mem: " << copied_mem.At(0) << std::endl
-                  << std::endl;
         BackwardRun(copied_mem);
       }
     }
