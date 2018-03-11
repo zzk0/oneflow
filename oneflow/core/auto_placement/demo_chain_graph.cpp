@@ -109,12 +109,24 @@ size_t DemoChainGraph::ChainNodeNum() const {
 }
 
 DemoChainGraph::DemoChainGraph(
+    int piece_num_in_batch,
     const std::function<void(DemoChainGraphBuilder*)>& Build)
-    : chain_node_id_(-1), chain_regst_id_(-1) {
+    : chain_node_id_(-1),
+      chain_regst_id_(-1),
+      piece_num_in_batch_(piece_num_in_batch) {
   DemoChainGraphBuilder builder(this);
   Build(&builder);
   InitIsReachable();
   InitRegst2ChainNodeSubGraphs();
+  InitChainNodeId2FwChainNodeId();
+  InitChainRegstId2ProducerChainNodeId();
+  InitChainRegstId2PathChainNodeIds();
+  InitEdgeId2SrcChainNodeId();
+  InitEdgeId2DstChainNodeId();
+  InitEdgeId2ChainRegstId();
+  InitChainNodeId2ChainNodeName();
+  InitChainRegstId2IsCloned();
+  InitChainRegstId2IIScale();
 }
 
 IsReachablePredicator DemoChainGraph::MakeIsReachablePredicator() const {
@@ -180,33 +192,31 @@ void DemoChainGraph::InitRegst2ChainNodeSubGraphs() {
   }
 }
 
-std::vector<std::vector<int64_t>>
-DemoChainGraph::CalcChainNodeId2FwChainNodeId() const {
+void DemoChainGraph::InitChainNodeId2FwChainNodeId() {
   std::vector<std::vector<int64_t>> ret(ChainNodeNum());
 
   ForEachNode([&](const DemoChainNode* node) {
     CHECK_LT(node->chain_node_id(), ret.size());
     ret.at(node->chain_node_id()).push_back(node->fw_chain_node_id());
   });
-  return ret;
+  chain_node_id2fw_chain_node_id_ = ret;
 }
 
-std::vector<std::vector<int64_t>>
-DemoChainGraph::CalcChainRegstId2ProducerChainNodeId() const {
+void DemoChainGraph::InitChainRegstId2ProducerChainNodeId() {
   std::vector<std::vector<int64_t>> ret(regsts_.size());
   for (const auto& regst : regsts_) {
     int64_t chain_node_id = regst->producer()->chain_node_id();
     CHECK_LT(regst->chain_regst_id(), ret.size());
     ret.at(regst->chain_regst_id()).push_back(chain_node_id);
   }
-  return ret;
+  chain_regst_id2producer_chain_node_id_ = ret;
 }
-std::vector<std::string> DemoChainGraph::CalcChainNodeId2ChainNodeName() const {
+void DemoChainGraph::InitChainNodeId2ChainNodeName() {
   std::vector<std::string> ret(node_num());
   ForEachNode([&](const DemoChainNode* node) {
     ret.at(node->chain_node_id()) = node->name();
   });
-  return ret;
+  chain_node_id2chain_node_name_ = ret;
 }
 
 void DemoChainNodeSubGraph::TopoForEachChainNode(
@@ -299,54 +309,52 @@ DemoChainGraph::CalcChainRegstId2PathChainNodeIds(
   return ret;
 }
 
-std::vector<std::vector<int64_t>> DemoChainGraph::CalcEdgeId2SrcChainNodeId()
-    const {
+void DemoChainGraph::InitEdgeId2SrcChainNodeId() {
   std::vector<std::vector<int64_t>> ret(edge_num());
   int index = -1;
   ForEachEdge([&](DemoChainEdge* edge) {
     ret.at(++index) = std::vector<int64_t>{edge->src_chain_node_id()};
   });
-  return ret;
+  edge_id2src_chain_node_id_ = ret;
 }
 
-std::vector<std::vector<int64_t>> DemoChainGraph::CalcEdgeId2DstChainNodeId()
-    const {
+void DemoChainGraph::InitEdgeId2DstChainNodeId() {
   std::vector<std::vector<int64_t>> ret(edge_num());
   int index = -1;
   ForEachEdge([&](DemoChainEdge* edge) {
     ret.at(++index) = std::vector<int64_t>{edge->dst_chain_node_id()};
   });
-  return ret;
+  edge_id2dst_chain_node_id_ = ret;
 }
 
-std::vector<std::vector<int64_t>> DemoChainGraph::CalcEdgeId2RegstId() const {
+void DemoChainGraph::InitEdgeId2ChainRegstId() {
   std::vector<std::vector<int64_t>> ret(edge_num());
   int index = -1;
   ForEachEdge([&](DemoChainEdge* edge) {
     ret.at(++index) = std::vector<int64_t>{edge->chain_regst_id()};
   });
-  return ret;
+  edge_id2chain_regst_id_ = ret;
 }
 
-std::vector<double> DemoChainGraph::RegstId2IsCloned() const {
+void DemoChainGraph::InitChainRegstId2IsCloned() {
   std::vector<double> ret(regsts_.size());
   for (const auto& regst : regsts_) {
     ret.at(regst->chain_regst_id()) = (regst->IsRegstCloned() ? 1 : 0);
   }
-  return ret;
+  chain_regst_id2is_cloned_ = ret;
 }
 
-std::vector<double> DemoChainGraph::RegstIIRatio(int piece_num_in_batch) const {
+void DemoChainGraph::InitChainRegstId2IIScale() {
   std::vector<double> ret(regsts_.size());
   for (const auto& regst : regsts_) {
-    double ii_ratio = 1;
+    double ii_scale = 1;
     if (regst->producer()->task_type() == TaskType::kMdDiffAcc
         || regst->producer()->task_type() == TaskType::kMdUpdt) {
-      ii_ratio = piece_num_in_batch;
+      ii_scale = piece_num_in_batch_;
     }
-    ret.at(regst->chain_regst_id()) = ii_ratio;
+    ret.at(regst->chain_regst_id()) = ii_scale;
   }
-  return ret;
+  chain_regst_id2ii_scale_ = ret;
 }
 
 bool DemoChainRegst::IsRegstCloned() const {

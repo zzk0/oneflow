@@ -133,34 +133,48 @@ class DemoChainGraphBuilder;
 class DemoChainGraph final : public Graph<DemoChainNode, DemoChainEdge> {
  public:
   OF_DISALLOW_COPY_AND_MOVE(DemoChainGraph);
-  DemoChainGraph(const std::function<void(DemoChainGraphBuilder*)>& Build);
+  DemoChainGraph(int piece_num_in_batch,
+                 const std::function<void(DemoChainGraphBuilder*)>& Build);
   virtual ~DemoChainGraph() = default;
 
   size_t FwChainNodeNum() const;
   size_t ChainNodeNum() const;
 
-  std::vector<std::vector<int64_t>> CalcChainNodeId2FwChainNodeId() const;
-
-  std::vector<std::vector<int64_t>> CalcChainRegstId2ProducerChainNodeId()
-      const;
-
-  std::vector<std::vector<int64_t>> CalcChainRegstId2PathChainNodeIds(
-      const std::function<double(int64_t)>& GetTime) const;
-
-  std::vector<std::vector<int64_t>> CalcChainRegstId2PathChainNodeIds() const {
-    return CalcChainRegstId2PathChainNodeIds(
-        [](int64_t) -> double { return 1; });
+  const std::vector<std::vector<int64_t>>& chain_node_id2fw_chain_node_id()
+      const {
+    return chain_node_id2fw_chain_node_id_;
   }
 
-  std::vector<std::vector<int64_t>> CalcEdgeId2SrcChainNodeId() const;
-  std::vector<std::vector<int64_t>> CalcEdgeId2DstChainNodeId() const;
-  std::vector<std::vector<int64_t>> CalcEdgeId2RegstId() const;
+  const std::vector<std::vector<int64_t>>&
+  chain_regst_id2producer_chain_node_id() const {
+    return chain_regst_id2producer_chain_node_id_;
+  }
 
-  std::vector<std::string> CalcChainNodeId2ChainNodeName() const;
+  const std::vector<std::vector<int64_t>>& chain_regst_id2path_chain_node_ids()
+      const {
+    return chain_regst_id2path_chain_node_ids_;
+  }
 
-  std::vector<double> RegstId2IsCloned() const;
+  const std::vector<std::vector<int64_t>>& edge_id2src_chain_node_id() const {
+    return edge_id2src_chain_node_id_;
+  }
+  const std::vector<std::vector<int64_t>>& edge_id2dst_chain_node_id() const {
+    return edge_id2dst_chain_node_id_;
+  }
+  const std::vector<std::vector<int64_t>>& edge_id2chain_regst_id() const {
+    return edge_id2chain_regst_id_;
+  }
+  const std::vector<std::string>& chain_node_id2chain_node_name() const {
+    return chain_node_id2chain_node_name_;
+  }
 
-  std::vector<double> RegstIIRatio(int piece_num_in_batch) const;
+  const std::vector<double>& chain_regst_id2is_cloned() const {
+    return chain_regst_id2is_cloned_;
+  }
+
+  const std::vector<double>& chain_regst_id2ii_scale() const {
+    return chain_regst_id2ii_scale_;
+  }
 
  private:
   friend class DemoChainGraphBuilder;
@@ -176,12 +190,44 @@ class DemoChainGraph final : public Graph<DemoChainNode, DemoChainEdge> {
       const DemoChainNode* node,
       const std::function<void(const DemoChainNode*)>& Handler) const;
 
+  void InitChainNodeId2FwChainNodeId();
+
+  void InitChainRegstId2ProducerChainNodeId();
+
+  std::vector<std::vector<int64_t>> CalcChainRegstId2PathChainNodeIds(
+      const std::function<double(int64_t)>& GetTime) const;
+
+  void InitChainRegstId2PathChainNodeIds() {
+    chain_regst_id2path_chain_node_ids_ =
+        CalcChainRegstId2PathChainNodeIds([](int64_t) -> double { return 1; });
+  }
+
+  void InitEdgeId2SrcChainNodeId();
+  void InitEdgeId2DstChainNodeId();
+  void InitEdgeId2ChainRegstId();
+
+  void InitChainNodeId2ChainNodeName();
+
+  void InitChainRegstId2IsCloned();
+
+  void InitChainRegstId2IIScale();
+
   int64_t chain_node_id_;
   int64_t chain_regst_id_;
+  int64_t piece_num_in_batch_;
   std::list<std::unique_ptr<DemoChainRegst>> regsts_;
   IsReachablePredicator is_reachable_;
   HashMap<const DemoChainRegst*, std::unique_ptr<DemoChainNodeSubGraph>>
       regst2chain_node_sub_graph_;
+  std::vector<std::vector<int64_t>> chain_node_id2fw_chain_node_id_;
+  std::vector<std::vector<int64_t>> chain_regst_id2producer_chain_node_id_;
+  std::vector<std::vector<int64_t>> chain_regst_id2path_chain_node_ids_;
+  std::vector<std::vector<int64_t>> edge_id2src_chain_node_id_;
+  std::vector<std::vector<int64_t>> edge_id2dst_chain_node_id_;
+  std::vector<std::vector<int64_t>> edge_id2chain_regst_id_;
+  std::vector<std::string> chain_node_id2chain_node_name_;
+  std::vector<double> chain_regst_id2is_cloned_;
+  std::vector<double> chain_regst_id2ii_scale_;
 };
 
 class DemoChainGraphBuilder final {
