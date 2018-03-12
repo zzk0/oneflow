@@ -197,6 +197,25 @@ Tensor _Exp(const std::string& caller, const Tensor& input) {
   });
 }
 
+Tensor _Log(const std::string& caller, const Tensor& input) {
+  std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
+  FOR_RANGE(int, i, 0, out->Size()) {
+    double& x = out->At(i);
+    x = std::log(x);
+  }
+  DEFINE_RUN_TIME_CNT_BOX();
+  return Tensor(out, [=](const Buffer& out_diff) {
+    SET_FW_CALLER();
+    RUN_ONLY_ONE_TIME();
+    Buffer input_diff(out_diff);
+    FOR_RANGE(int, i, 0, input_diff.Size()) {
+      double& diff = input_diff.At(i);
+      diff /= input.At(i);
+    }
+    input.HandleDiff(input_diff);
+  });
+}
+
 Tensor _Tanh(const std::string& caller, const Tensor& input) {
   std::shared_ptr<Buffer> out(new Buffer(input.buffer()));
   FOR_RANGE(int, i, 0, out->Size()) { out->At(i) = std::tanh(input.At(i)); }

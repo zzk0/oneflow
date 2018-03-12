@@ -106,6 +106,17 @@ Tensor CalcDeviceMemConsumed(const Tensor& chain_node_prob,
                                regst_duration_copies.at(1), chain_graph));
 }
 
+Tensor CalcTransportation(const Tensor& chain_node_prob,
+                          const DemoChainGraph& chain_graph) {
+  auto chain_node_prob_copies = Clone(chain_node_prob, 2);
+  Tensor edge_src_prob = ColIndexReduce(
+      chain_node_prob_copies.at(0), chain_graph.edge_id2src_chain_node_id());
+  Tensor edge_dst_prob = ColIndexReduce(
+      chain_node_prob_copies.at(1), chain_graph.edge_id2dst_chain_node_id());
+  Tensor edge_prob = Mul(Tensor(0.5), Abs(Sub(edge_src_prob, edge_dst_prob)));
+  return MatrixRowSum(edge_prob);
+}
+
 Tensor CalcDeviceMemII(const Tensor& chain_node_placement,
                        const DemoChainGraph& chain_graph,
                        double mem_size_per_device) {
@@ -153,6 +164,21 @@ std::function<double()> MakeFlation(int keep) {
   return MakeFlation(keep, 0.005);
 }
 
+Tensor SqrtIndecision(const Tensor& input) {
+  return Sub(MatrixColSum(Sqrt(input)), Tensor(1));
+}
+
+Tensor EntropyIndecision(const Tensor& input) {
+  const auto& input_copies = Clone(input, 2);
+  return MatrixColSum(Minus(Mul(input_copies.at(0), Log(input_copies.at(1)))));
+}
+
+Tensor SquareIndecision(const Tensor& input) {
+  const auto& input_copies = Clone(input, 2);
+  return MatrixColSum(
+      Mul(input_copies.at(0), Sub(Tensor(1), input_copies.at(1))));
+}
+
 void AutoPlacementMemoryDemo() {
   std::random_device rd{};
   std::mt19937 gen{rd()};
@@ -172,11 +198,12 @@ void AutoPlacementMemoryDemo() {
   Tensor fw_prob;
   const auto& chain_node_id2name = chain_graph.chain_node_id2chain_node_name();
   double bugo = 2;
-  double rethink_threshold = 20;
+  double rethink_threshold = 10;
   Tensor decision_ratio(Shape({fw_node_num}), [&](int64_t index) {
     return 1 + fw_node_num * 0.5 / (index + 1);
   });
-  std::function<double()> MemFlation = MakeFlation(100);
+  int64_t mem_keep = 100;
+  std::function<double()> MemFlation = MakeFlation(mem_keep);
   FOR_RANGE(int, step, 0, 100000) {
     double lr = 0.01;
     if (step % (static_cast<int>(bugo += 0.05))) {
@@ -191,8 +218,7 @@ void AutoPlacementMemoryDemo() {
       Tensor normalized_dev_mem =
           Mul(Tensor(2.5 * MemFlation()), Sqrt(dev_mem));
       Tensor fw_indecision =
-          Mul(Sub(MatrixColSum(Sqrt(fw_prob_copies.at(1))), Tensor(1)),
-              decision_ratio);
+          Mul(SqrtIndecision(fw_prob_copies.at(1)), decision_ratio);
       Tensor indecision = Sum(fw_indecision);
       Tensor balance = ADD(indecision, ADD(AvgAbsDeviation(normalized_dev_mem),
                                            AvgAbsDeviation(computation_ii)));
@@ -248,8 +274,8 @@ void AutoPlacementMemoryDemo() {
         std::cout << std::endl;
       }
       if (indecision.At(0) < rethink_threshold) {
-        MemFlation = MakeFlation(100);
-        rethink_threshold -= 1;
+        MemFlation = MakeFlation(mem_keep);
+        rethink_threshold -= (rethink_threshold > 2) ? 1 : 0.01;
         const auto& edge_id2src_id = chain_graph.edge_id2src_chain_node_id();
         const auto& edge_id2dst_id = chain_graph.edge_id2dst_chain_node_id();
         auto old_fw_var = fw_var.buffer();

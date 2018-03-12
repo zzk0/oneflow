@@ -42,6 +42,9 @@ Tensor _Abs(const std::string& caller, const Tensor& input);
 Tensor _Exp(const std::string& caller, const Tensor& input);
 #define Exp(...) _Exp(__LOC__, __VA_ARGS__)
 
+Tensor _Log(const std::string& caller, const Tensor& input);
+#define Log(...) _Log(__LOC__, __VA_ARGS__)
+
 Tensor _Tanh(const std::string& caller, const Tensor& input);
 #define Tanh(...) _Tanh(__LOC__, __VA_ARGS__)
 
