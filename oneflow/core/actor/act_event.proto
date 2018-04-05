@@ -13,4 +13,5 @@ message ActEvent {
   required double start_time = 4;
   required double stop_time = 5;
   repeated ReadableRegstInfo readable_regst_infos = 6;
+  required double push_time = 7;
 }

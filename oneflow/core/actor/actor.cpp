@@ -127,6 +127,7 @@ void Actor::ActUntilFail() {
       act_event->set_actor_id(actor_id_);
       act_event->set_act_id(act_id_);
       act_event->set_work_stream_id(device_ctx_->work_stream_id());
+      act_event->set_push_time(GetCurTime());
       ForEachCurReadableRegst([&](const Regst* readable_regst) {
         ReadableRegstInfo* info = act_event->add_readable_regst_infos();
         SetReadableRegstInfo(readable_regst, info);
