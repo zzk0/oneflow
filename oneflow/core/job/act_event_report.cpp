@@ -40,6 +40,6 @@ int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   LOG(INFO) << "make a memory report from " << FLAGS_plan_filepath;
-  oneflow::MemReport(FLAGS_plan_filepath, FLAGS_act_event_filepath);
+  oneflow::ActEventReport(FLAGS_plan_filepath, FLAGS_act_event_filepath);
   return 0;
 }
