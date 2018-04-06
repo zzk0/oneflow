@@ -57,17 +57,20 @@ void ActEventReport(const std::string& plan_filepath,
   PersistentOutStream out_stream(LocalFS(), report_filepath);
   out_stream
       << "actor,type,machine,thrd,stream,act_id,push_time,start_time,stop_time,"
-      << "block_time(s),block_time(ms)\n";
+      << "block_time(s),block_time(ms),run_time(s),run_time(ms)\n";
   for (auto event : *act_events) {
     out_stream << "'" << std::to_string(event.actor_id()) + ",";
     out_stream << GetActorInfo(plan, event.actor_id()) + ",";
     out_stream << "'" << std::to_string(event.work_stream_id()) + ",";
     out_stream << "'" << std::to_string(event.act_id()) + ",";
-    out_stream << Time2String(event.push_time()) + ",";
-    out_stream << Time2String(event.start_time()) + ",";
-    out_stream << Time2String(event.stop_time()) + ",";
+    out_stream << "'" << Time2String(event.push_time()) + ",";
+    out_stream << "'" << Time2String(event.start_time()) + ",";
+    out_stream << "'" << Time2String(event.stop_time()) + ",";
     out_stream << Time2String(event.start_time() - event.push_time()) + ",";
     out_stream << Time2HumanReadable(event.start_time() - event.push_time())
+                      + ",";
+    out_stream << Time2String(event.stop_time() - event.start_time()) + ",";
+    out_stream << Time2HumanReadable(event.stop_time() - event.start_time())
                       + "\n";
   }
   Global<JobDesc>::Delete();
