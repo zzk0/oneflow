@@ -1,0 +1,11 @@
+syntax = "proto2";
+package oneflow;
+
+message KernelEvent {
+  required string name = 1;
+  required bool is_forward = 2;
+  required int64 actor_id = 3;
+  required int64 act_id = 4;
+  required double start_time = 5;
+  required double stop_time = 6;
+}

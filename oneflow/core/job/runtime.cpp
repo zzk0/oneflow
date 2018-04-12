@@ -5,6 +5,7 @@
 #include "oneflow/core/job/machine_context.h"
 #include "oneflow/core/thread/thread_manager.h"
 #include "oneflow/core/actor/act_event_logger.h"
+#include "oneflow/core/actor/kernel_event_logger.h"
 #include "oneflow/core/graph/task_node.h"
 
 namespace oneflow {
@@ -76,6 +77,7 @@ void Runtime::NewAllGlobal(const Plan& plan, bool is_experiment_phase) {
   if (is_experiment_phase) {
     piece_num = job_desc->piece_num_of_experiment_phase();
     Global<ActEventLogger>::New();
+    Global<KernelEventLogger>::New();
   } else {
     if (job_desc->IsTrain()) {
       piece_num = job_desc->NumOfPiecesInBatch() * job_desc->TotalBatchNum();
@@ -111,6 +113,7 @@ void Runtime::DeleteAllGlobal() {
   Global<CommNet>::Delete();
   Global<RuntimeCtx>::Delete();
   Global<ActEventLogger>::Delete();
+  Global<KernelEventLogger>::Delete();
 }
 
 }  // namespace oneflow

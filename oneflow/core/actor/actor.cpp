@@ -187,6 +187,20 @@ void Actor::AsyncLaunchKernel(
     const KernelCtx& kernel_ctx,
     std::function<Regst*(int64_t)> Regst4RegstDescId) {
   for (const ExecKernel& ek : exec_kernel_vec_) {
+    KernelEvent* kernel_event = nullptr;
+    if (Global<RuntimeCtx>::Get()->is_experiment_phase()) {
+      kernel_event = new KernelEvent;
+      kernel_event->set_name(ek.kernel->op_conf().name());
+      kernel_event->set_is_forward(ek.kernel->kernel_conf().is_forward());
+      kernel_event->set_actor_id(actor_id_);
+      kernel_event->set_act_id(act_id_);
+      ForEachCurReadableRegst([&](const Regst* readable_regst) {
+        ReadableRegstInfo* info = kernel_event->add_readable_regst_infos();
+        SetReadableRegstInfo(readable_regst, info);
+      });
+      device_ctx_->AddCallBack(
+          [kernel_event]() { kernel_event->set_start_time(GetCurTime()); });
+    }
     ek.kernel->Launch(kernel_ctx, [&](const std::string& bn_in_op) -> Blob* {
       auto regst_desc_id_it = ek.bn_in_op2regst_desc_id.find(bn_in_op);
       if (regst_desc_id_it == ek.bn_in_op2regst_desc_id.end()) {
@@ -196,6 +210,13 @@ void Actor::AsyncLaunchKernel(
       const std::string& lbn = ek.kernel->Lbn4BnInOp(bn_in_op);
       return regst->GetBlobByLbn(lbn);
     });
+    if (Global<RuntimeCtx>::Get()->is_experiment_phase()) {
+      device_ctx_->AddCallBack([kernel_event]() {
+        kernel_event->set_stop_time(GetCurTime());
+        Global<CtrlClient>::Get()->PushKernelEvent(*kernel_event);
+        delete kernel_event;
+      });
+    }
   }
 }
 

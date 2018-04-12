@@ -1,5 +1,6 @@
 #include "oneflow/core/control/ctrl_server.h"
 #include "oneflow/core/actor/act_event_logger.h"
+#include "oneflow/core/actor/kernel_event_logger.h"
 #include "oneflow/core/job/profiler.h"
 
 namespace oneflow {
@@ -184,6 +185,14 @@ void CtrlServer::PushActEventHandler(
   call->SendResponse();
   Global<ActEventLogger>::Get()->PrintActEventToLogDir(act_event);
   ENQUEUE_REQUEST(PushActEvent);
+}
+
+void CtrlServer::PushKernelEventHandler(
+    CtrlCall<PushKernelEventRequest, PushKernelEventResponse>* call) {
+  KernelEvent kernel_event = call->request().kernel_event();
+  call->SendResponse();
+  Global<KernelEventLogger>::Get()->PrintKernelEventToLogDir(kernel_event);
+  ENQUEUE_REQUEST(PushKernelEvent);
 }
 
 void CtrlServer::ClearHandler(CtrlCall<ClearRequest, ClearResponse>* call) {

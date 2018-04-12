@@ -2,6 +2,7 @@ syntax = "proto2";
 package oneflow;
 
 import "oneflow/core/actor/act_event.proto";
+import "oneflow/core/actor/kernel_event.proto";
 
 message LoadServerRequest {
 }
@@ -73,6 +74,13 @@ message PushActEventRequest {
 }
 
 message PushActEventResponse {
+}
+
+message PushKernelEventRequest {
+  required KernelEvent kernel_event = 1;
+}
+
+message PushKernelEventResponse {
 }
 
 message ClearRequest {

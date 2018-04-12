@@ -30,11 +30,12 @@ class Kernel {
 
   const std::string& Lbn4BnInOp(const std::string& bn_in_op) const;
 
+  const KernelConf& kernel_conf() const { return kernel_conf_; }
+  const OperatorConf& op_conf() const { return kernel_conf_.op_conf(); }
+
  protected:
   Kernel() = default;
   virtual void VirtualKernelInit(const ParallelContext*) {}
-  const KernelConf& kernel_conf() const { return kernel_conf_; }
-  const OperatorConf& op_conf() const { return kernel_conf_.op_conf(); }
 
   virtual void InitPureModelTmpBlobs(
       DeviceCtx* ctx,
