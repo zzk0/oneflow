@@ -1,4 +1,5 @@
 #include "oneflow/core/kernel/opkernel_test_case.h"
+#include "oneflow/core/device/cuda_stream_handle.h"
 
 namespace oneflow {
 
@@ -129,25 +130,12 @@ void OpKernelTestUtil<DeviceType::kCPU>::BuildKernelCtx(KernelCtx* ctx) {
 
 template<>
 void OpKernelTestUtil<DeviceType::kGPU>::BuildKernelCtx(KernelCtx* ctx) {
-  cudaStream_t* cuda_stream = new cudaStream_t;
-  cublasHandle_t* cublas_pmh_handle = new cublasHandle_t;
-  cublasHandle_t* cublas_pmd_handle = new cublasHandle_t;
-  cudnnHandle_t* cudnn_handle = new cudnnHandle_t;
-  CudaCheck(cudaStreamCreate(cuda_stream));
-  CudaCheck(cublasCreate(cublas_pmh_handle));
-  CudaCheck(cublasCreate(cublas_pmd_handle));
-  CudaCheck(cublasSetStream(*cublas_pmh_handle, *cuda_stream));
-  CudaCheck(cublasSetStream(*cublas_pmd_handle, *cuda_stream));
-  CudaCheck(
-      cublasSetPointerMode(*cublas_pmd_handle, CUBLAS_POINTER_MODE_DEVICE));
-  CudaCheck(cudnnCreate(cudnn_handle));
-  CudaCheck(cudnnSetStream(*cudnn_handle, *cuda_stream));
-  Eigen::CudaStreamDevice* eigen_cuda_stream =
-      new Eigen::CudaStreamDevice(cuda_stream);
-  Eigen::GpuDevice* eigen_gpu_device = new Eigen::GpuDevice(eigen_cuda_stream);
-  ctx->device_ctx =
-      new CudaDeviceCtx(-1, cuda_stream, cublas_pmh_handle, cublas_pmd_handle,
-                        cudnn_handle, eigen_gpu_device);
+  if (!Global<CudaStreamHandle>::Get()) { Global<CudaStreamHandle>::New(); }
+  CudaStreamHandle* cuda_handle = Global<CudaStreamHandle>::Get();
+  ctx->device_ctx = new CudaDeviceCtx(
+      -1, cuda_handle->cuda_stream(), cuda_handle->cublas_pmh_handle(),
+      cuda_handle->cublas_pmd_handle(), cuda_handle->cudnn_handle(),
+      cuda_handle->eigen_gpu_device());
 }
 
 template<>
@@ -451,7 +439,7 @@ void OpKernelTestCase::RunKernel(Operator* op, OpContext* op_context) {
     kernel->Launch(kernel_ctx_, MakeGetterBnInOp2Blob());
     SwitchSyncStream(SwitchCase(default_device_type()), &kernel_ctx_);
   };
-  Launch(this);
+  Launch(true);
   if (Global<JobDesc>::Get()->IsTrain() && !is_forward_) {
     initiation_before_backward_();
     Launch(false);
@@ -494,6 +482,7 @@ DiffKernelImplTestCase::DiffKernelImplTestCase(bool is_train, bool is_forward,
   set_is_train(is_train);
   set_is_forward(is_forward);
   set_default_data_type(default_data_type);
+  initiate_kernel_ctx_ = [](const std::function<Blob*(const std::string&)>&) {};
 }
 
 void DiffKernelImplTestCase::SetBlobNames(
@@ -586,6 +575,7 @@ void DiffKernelImplTestCase::MultiRunThenCheck() {
     InferBlobDesc(&op, &op_context);
     InitInputBlobs();
     SwitchBuildKernelCtx(SwitchCase(default_device_type()), mut_kernel_ctx());
+    initiate_kernel_ctx_(MakeGetterBnInOp2Blob());
     RunKernel(op.get(), op_context);
     DumpBlobs(dump_prefix);
   };
@@ -607,12 +597,18 @@ void DiffKernelImplTestCase::MultiRunThenCheck() {
   template void OpKernelTestCase::ForwardCheckBlob<T>(                     \
       const std::string&, const BlobDesc* blob_desc,                       \
       const std::vector<T>& val);                                          \
+  template void OpKernelTestCase::ForwardCheckBlob<T>(                     \
+      const std::string&, const BlobDesc* blob_desc,                       \
+      const std::vector<T>& val, bool need_random_init);                   \
   template void OpKernelTestCase::ForwardCheckBlobWithAnother<T>(          \
       const std::string&, const BlobDesc* blob_desc, const std::string&,   \
       bool);                                                               \
   template void OpKernelTestCase::BackwardCheckBlob<T>(                    \
       const std::string&, const BlobDesc* blob_desc,                       \
       const std::vector<T>& val);                                          \
+  template void OpKernelTestCase::BackwardCheckBlob<T>(                    \
+      const std::string&, const BlobDesc* blob_desc,                       \
+      const std::vector<T>& val, bool need_random_init);                   \
   template void OpKernelTestCase::BackwardCheckBlobWithAnother<T>(         \
       const std::string&, const BlobDesc* blob_desc, const std::string&,   \
       bool);
