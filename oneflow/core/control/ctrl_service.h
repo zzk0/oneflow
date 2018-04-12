@@ -16,19 +16,20 @@
 
 namespace oneflow {
 
-#define CTRL_METHOD_SEQ               \
-  OF_PP_MAKE_TUPLE_SEQ(LoadServer)    \
-  OF_PP_MAKE_TUPLE_SEQ(Barrier)       \
-  OF_PP_MAKE_TUPLE_SEQ(TryLock)       \
-  OF_PP_MAKE_TUPLE_SEQ(NotifyDone)    \
-  OF_PP_MAKE_TUPLE_SEQ(WaitUntilDone) \
-  OF_PP_MAKE_TUPLE_SEQ(PushKV)        \
-  OF_PP_MAKE_TUPLE_SEQ(ClearKV)       \
-  OF_PP_MAKE_TUPLE_SEQ(PullKV)        \
-  OF_PP_MAKE_TUPLE_SEQ(PushActEvent)  \
-  OF_PP_MAKE_TUPLE_SEQ(Clear)         \
-  OF_PP_MAKE_TUPLE_SEQ(IncreaseCount) \
-  OF_PP_MAKE_TUPLE_SEQ(EraseCount)    \
+#define CTRL_METHOD_SEQ                 \
+  OF_PP_MAKE_TUPLE_SEQ(LoadServer)      \
+  OF_PP_MAKE_TUPLE_SEQ(Barrier)         \
+  OF_PP_MAKE_TUPLE_SEQ(TryLock)         \
+  OF_PP_MAKE_TUPLE_SEQ(NotifyDone)      \
+  OF_PP_MAKE_TUPLE_SEQ(WaitUntilDone)   \
+  OF_PP_MAKE_TUPLE_SEQ(PushKV)          \
+  OF_PP_MAKE_TUPLE_SEQ(ClearKV)         \
+  OF_PP_MAKE_TUPLE_SEQ(PullKV)          \
+  OF_PP_MAKE_TUPLE_SEQ(PushActEvent)    \
+  OF_PP_MAKE_TUPLE_SEQ(PushKernelEvent) \
+  OF_PP_MAKE_TUPLE_SEQ(Clear)           \
+  OF_PP_MAKE_TUPLE_SEQ(IncreaseCount)   \
+  OF_PP_MAKE_TUPLE_SEQ(EraseCount)      \
   OF_PP_MAKE_TUPLE_SEQ(PushAvgActInterval)
 
 enum class CtrlMethod {

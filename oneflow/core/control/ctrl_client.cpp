@@ -127,6 +127,12 @@ void CtrlClient::PushActEvent(const ActEvent& act_event) {
   call(GetMasterStub());
 }
 
+void CtrlClient::PushKernelEvent(const KernelEvent& kernel_event) {
+  PushKernelEventClientCall call;
+  *(call.mut_request()->mutable_kernel_event()) = kernel_event;
+  call(GetMasterStub());
+}
+
 void CtrlClient::Clear() {
   ClearClientCall call;
   call(GetThisStub());
