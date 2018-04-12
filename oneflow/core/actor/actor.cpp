@@ -194,10 +194,6 @@ void Actor::AsyncLaunchKernel(
       kernel_event->set_is_forward(ek.kernel->kernel_conf().is_forward());
       kernel_event->set_actor_id(actor_id_);
       kernel_event->set_act_id(act_id_);
-      ForEachCurReadableRegst([&](const Regst* readable_regst) {
-        ReadableRegstInfo* info = kernel_event->add_readable_regst_infos();
-        SetReadableRegstInfo(readable_regst, info);
-      });
       device_ctx_->AddCallBack(
           [kernel_event]() { kernel_event->set_start_time(GetCurTime()); });
     }
