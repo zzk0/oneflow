@@ -54,7 +54,8 @@ void ActEventReport(const std::string& plan_filepath,
   ParseProtoFromTextFile(plan_filepath, &plan);
   auto act_events = of_make_unique<std::list<ActEvent>>();
   LoadActEvents(act_event_filepath, act_events.get());
-  PersistentOutStream out_stream(LocalFS(), report_filepath);
+  // PersistentOutStream out_stream(LocalFS(), report_filepath);
+  std::ofstream out_stream(report_filepath);
   out_stream
       << "actor,type,machine,thrd,stream,act_id,push_time,start_time,stop_time,"
       << "block_time(s),block_time(ms),run_time(s),run_time(ms)\n";
@@ -73,6 +74,7 @@ void ActEventReport(const std::string& plan_filepath,
     out_stream << Time2HumanReadable(event.stop_time() - event.start_time())
                       + "\n";
   }
+  out_stream.close();
   Global<JobDesc>::Delete();
 }
 }  // namespace oneflow
