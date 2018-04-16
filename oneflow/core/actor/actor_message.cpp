@@ -1,6 +1,8 @@
 #include "oneflow/core/actor/actor_message.h"
 #include "oneflow/core/job/id_manager.h"
 #include "oneflow/core/job/machine_context.h"
+#include "oneflow/core/actor/msg_event.pb.h"
+#include "oneflow/core/control/ctrl_client.h"
 
 namespace oneflow {
 
@@ -88,4 +90,23 @@ int64_t ActorMsg::eord_regst_desc_id() const {
   return eord_regst_desc_id_;
 }
 
+MsgEvent* msg_event = nullptr;
+void ActorMsg::LogMsgEvent() const {
+  if (msg_type() == ActorMsgType::kRegstMsg) {
+    // get nanoseconds, e.g. 1505840189520477525 = 1505840189.520477525 sec
+    int64_t start =
+        std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    msg_event = new MsgEvent;
+    msg_event->set_send_time(start);
+    msg_event->set_src_actor_id(src_actor_id());
+    msg_event->set_dst_actor_id(dst_actor_id());
+    msg_event->set_piece_id(regst()->piece_id());
+    msg_event->set_act_id(act_id());
+    msg_event->set_model_version_id(regst()->model_version_id());
+    msg_event->set_regst_desc_id(regst()->regst_desc_id());
+    msg_event->set_producer_actor_id(regst()->producer_actor_id());
+    Global<CtrlClient>::Get()->PushMsgEvent(*msg_event);
+    delete msg_event;
+  }
+}
 }  // namespace oneflow

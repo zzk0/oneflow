@@ -6,6 +6,7 @@
 #include "oneflow/core/thread/thread_manager.h"
 #include "oneflow/core/actor/act_event_logger.h"
 #include "oneflow/core/actor/kernel_event_logger.h"
+#include "oneflow/core/actor/msg_event_logger.h"
 #include "oneflow/core/graph/task_node.h"
 
 namespace oneflow {
@@ -74,6 +75,7 @@ Runtime::Runtime(const Plan& plan, bool is_experiment_phase) {
 void Runtime::NewAllGlobal(const Plan& plan, bool is_experiment_phase) {
   const JobDesc* job_desc = Global<JobDesc>::Get();
   int64_t piece_num = 0;
+  Global<MsgEventLogger>::New();
   if (is_experiment_phase) {
     piece_num = job_desc->piece_num_of_experiment_phase();
     Global<ActEventLogger>::New();
@@ -85,6 +87,7 @@ void Runtime::NewAllGlobal(const Plan& plan, bool is_experiment_phase) {
       piece_num = std::numeric_limits<int64_t>::max();
     }
   }
+  LOG(INFO) << "piece_num: " << piece_num;
   Global<RuntimeCtx>::New(piece_num, is_experiment_phase);
 #ifdef PLATFORM_POSIX
   if (job_desc->use_rdma()) {
@@ -114,6 +117,7 @@ void Runtime::DeleteAllGlobal() {
   Global<RuntimeCtx>::Delete();
   Global<ActEventLogger>::Delete();
   Global<KernelEventLogger>::Delete();
+  Global<MsgEventLogger>::Delete();
 }
 
 }  // namespace oneflow

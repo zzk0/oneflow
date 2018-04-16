@@ -43,6 +43,7 @@ class CtrlClient final {
 
   void PushActEvent(const ActEvent&);
   void PushKernelEvent(const KernelEvent&);
+  void PushMsgEvent(const MsgEvent&);
   void Clear();
 
   int32_t IncreaseCount(const std::string& k, int32_t v);

@@ -27,6 +27,7 @@ namespace oneflow {
   OF_PP_MAKE_TUPLE_SEQ(PullKV)          \
   OF_PP_MAKE_TUPLE_SEQ(PushActEvent)    \
   OF_PP_MAKE_TUPLE_SEQ(PushKernelEvent) \
+  OF_PP_MAKE_TUPLE_SEQ(PushMsgEvent)    \
   OF_PP_MAKE_TUPLE_SEQ(Clear)           \
   OF_PP_MAKE_TUPLE_SEQ(IncreaseCount)   \
   OF_PP_MAKE_TUPLE_SEQ(EraseCount)      \

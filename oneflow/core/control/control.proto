@@ -3,6 +3,7 @@ package oneflow;
 
 import "oneflow/core/actor/act_event.proto";
 import "oneflow/core/actor/kernel_event.proto";
+import "oneflow/core/actor/msg_event.proto";
 
 message LoadServerRequest {
 }
@@ -81,6 +82,13 @@ message PushKernelEventRequest {
 }
 
 message PushKernelEventResponse {
+}
+
+message PushMsgEventRequest {
+  required MsgEvent Msg_event = 1;
+}
+
+message PushMsgEventResponse {
 }
 
 message ClearRequest {
