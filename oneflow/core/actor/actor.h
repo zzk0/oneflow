@@ -32,6 +32,7 @@ class Actor {
   // 1: success, and actor finish
   // 0: success, and actor not finish
   int ProcessMsg(const ActorMsg& msg) { return (this->*msg_handler_)(msg); }
+  void LogMsgEvent(ActorMsg& msg);
 
   int64_t machine_id() const;
   int64_t thrd_id() const;

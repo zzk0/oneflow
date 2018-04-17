@@ -34,7 +34,6 @@ class ActorMsg final {
   static ActorMsg BuildEordMsg(int64_t consumer, int64_t regst_desc_id);
   static ActorMsg BuildCommandMsg(int64_t dst_actor_id, ActorCmd cmd);
 
-  void LogMsgEvent() const;
   // Getters
   int64_t SrcMachineId() const;
   int64_t src_actor_id() const { return src_actor_id_; }

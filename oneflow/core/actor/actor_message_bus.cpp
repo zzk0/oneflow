@@ -5,9 +5,7 @@
 #include "oneflow/core/thread/thread_manager.h"
 
 namespace oneflow {
-
 void ActorMsgBus::SendMsg(const ActorMsg& msg) {
-  msg.LogMsgEvent();
   int64_t dst_machine_id =
       Global<IDMgr>::Get()->MachineId4ActorId(msg.dst_actor_id());
   if (dst_machine_id == Global<MachineCtx>::Get()->this_machine_id()) {
@@ -17,5 +15,4 @@ void ActorMsgBus::SendMsg(const ActorMsg& msg) {
     Global<CommNet>::Get()->SendActorMsg(dst_machine_id, msg);
   }
 }
-
 }  // namespace oneflow

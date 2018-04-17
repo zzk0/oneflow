@@ -1,6 +1,33 @@
 #include "oneflow/core/actor/actor.h"
+//#include "oneflow/core/actor/msg_event.pb.h"
+//#include "oneflow/core/control/ctrl_client.h"
+//#include "oneflow/core/actor/actor_message.h"
 
 namespace oneflow {
+
+void Actor::LogMsgEvent(ActorMsg& msg) {
+  if (msg.msg_type() == ActorMsgType::kRegstMsg) {
+    Regst* regst = msg.regst();
+    auto reading_cnt_it = produced_regst2reading_cnt_.find(regst);
+    if (reading_cnt_it == produced_regst2reading_cnt_.end()) { return; }
+    // get nanoseconds, e.g. 1505840189520477525 = 1505840189.520477525 sec
+    int64_t start =
+        std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    MsgEvent* msg_event = nullptr;
+    msg_event = new MsgEvent;
+    msg_event->set_time(start);
+    msg_event->set_src_actor_id(msg.src_actor_id());
+    msg_event->set_dst_actor_id(msg.dst_actor_id());
+    msg_event->set_producer_actor_id(regst->producer_actor_id());
+    msg_event->set_act_id(act_id_);
+    msg_event->set_model_version_id(regst->model_version_id());
+    msg_event->set_piece_id(regst->piece_id());
+    // msg_event->set_model_version_id(regst->model_version_id());
+    msg_event->set_regst_desc_id(regst->regst_desc_id());
+    Global<CtrlClient>::Get()->PushMsgEvent(*msg_event);
+    delete msg_event;
+  }
+}
 
 bool IsFirstRegstInPieceWithOrder(const Regst* regst, ColIdOrder order) {
   return (order == ColIdOrder::kAscending && regst->col_id() == 0)
