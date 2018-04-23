@@ -1,31 +1,37 @@
 #include "oneflow/core/actor/actor.h"
-//#include "oneflow/core/actor/msg_event.pb.h"
-//#include "oneflow/core/control/ctrl_client.h"
-//#include "oneflow/core/actor/actor_message.h"
 
 namespace oneflow {
 
 void Actor::LogMsgEvent(ActorMsg& msg) {
-  if (msg.msg_type() == ActorMsgType::kRegstMsg) {
-    Regst* regst = msg.regst();
-    auto reading_cnt_it = produced_regst2reading_cnt_.find(regst);
-    if (reading_cnt_it == produced_regst2reading_cnt_.end()) { return; }
-    // get nanoseconds, e.g. 1505840189520477525 = 1505840189.520477525 sec
-    int64_t start =
-        std::chrono::high_resolution_clock::now().time_since_epoch().count();
-    MsgEvent* msg_event = nullptr;
-    msg_event = new MsgEvent;
-    msg_event->set_time(start);
-    msg_event->set_src_actor_id(msg.src_actor_id());
-    msg_event->set_dst_actor_id(msg.dst_actor_id());
-    msg_event->set_producer_actor_id(regst->producer_actor_id());
-    msg_event->set_act_id(act_id_);
-    msg_event->set_model_version_id(regst->model_version_id());
-    msg_event->set_piece_id(regst->piece_id());
-    // msg_event->set_model_version_id(regst->model_version_id());
-    msg_event->set_regst_desc_id(regst->regst_desc_id());
-    Global<CtrlClient>::Get()->PushMsgEvent(*msg_event);
-    delete msg_event;
+  if (!Global<RuntimeCtx>::Get()->is_experiment_phase()) {
+    if (msg.msg_type() == ActorMsgType::kRegstMsg) {
+      // get nanoseconds, e.g. 1505840189520477525 = 1505840189.520477525 sec
+      int64_t start =
+          std::chrono::high_resolution_clock::now().time_since_epoch().count();
+      MsgEvent* msg_event = nullptr;
+      msg_event = new MsgEvent;
+      msg_event->set_time(start);
+      msg_event->set_src_actor_id(msg.src_actor_id());
+      msg_event->set_dst_actor_id(msg.dst_actor_id());
+      msg_event->set_act_id(act_id_);
+      msg_event->set_piece_id(msg.piece_id());
+      msg_event->set_model_version_id(msg.model_version_id());
+      Regst* regst = msg.regst();
+      auto reading_cnt_it = produced_regst2reading_cnt_.find(regst);
+      if (reading_cnt_it == produced_regst2reading_cnt_.end()) {
+        msg_event->set_producer_actor_id(msg.src_actor_id());
+        msg_event->set_regst_desc_id(msg.regst_desc_id());
+        msg_event->set_info("from_producer");
+      } else {
+        msg_event->set_producer_actor_id(regst->producer_actor_id());
+        // msg_event->set_model_version_id(regst->model_version_id());
+        // msg_event->set_piece_id(regst->piece_id());
+        msg_event->set_regst_desc_id(regst->regst_desc_id());
+        msg_event->set_info("from_consumer");
+      }
+      Global<CtrlClient>::Get()->PushMsgEvent(*msg_event);
+      delete msg_event;
+    }
   }
 }
 
@@ -305,8 +311,41 @@ void Actor::AsyncSendRegstMsgToProducer(Regst* regst) {
   AsyncSendRegstMsgToProducer(regst, regst->producer_actor_id());
 }
 
+void LogToProducerMsg(const ActorMsg& msg) {
+  if (Global<RuntimeCtx>::Get()->is_experiment_phase()) {
+    if (msg.msg_type() == ActorMsgType::kRegstMsg) {
+      // get nanoseconds, e.g. 1505840189520477525 = 1505840189.520477525 sec
+      int64_t start =
+          std::chrono::high_resolution_clock::now().time_since_epoch().count();
+      MsgEvent* msg_event = nullptr;
+      msg_event = new MsgEvent;
+      msg_event->set_time(start);
+      msg_event->set_src_actor_id(msg.src_actor_id());
+      msg_event->set_dst_actor_id(msg.dst_actor_id());
+      msg_event->set_producer_actor_id(msg.dst_actor_id());
+      msg_event->set_act_id(msg.act_id());
+      msg_event->set_model_version_id(msg.model_version_id());
+      msg_event->set_piece_id(msg.piece_id());
+      msg_event->set_regst_desc_id(msg.regst_desc_id());
+      msg_event->set_info("to_producer");
+      Global<CtrlClient>::Get()->PushMsgEvent(*msg_event);
+      delete msg_event;
+    }
+  }
+}
+
 void Actor::AsyncSendRegstMsgToProducer(Regst* regst, int64_t producer) {
   ActorMsg msg = ActorMsg::BuildRegstMsgToProducer(actor_id_, producer, regst);
+  if (in_regst_desc_id() < 0) {
+    RegstStatus r = regst->status();
+    r.regst_desc_id = regst->regst_desc_id();
+    msg.set_regst_status(r);
+  } else {
+    RegstStatus r = produced_regsts_.begin()->second.front()->status();
+    r.regst_desc_id = in_regst_desc_id();
+    msg.set_regst_status(r);
+  }
+  LogToProducerMsg(msg);
   device_ctx_->AddCallBack(
       [msg]() { Global<ActorMsgBus>::Get()->SendMsg(msg); });
 }

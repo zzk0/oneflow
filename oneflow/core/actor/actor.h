@@ -37,6 +37,8 @@ class Actor {
   int64_t machine_id() const;
   int64_t thrd_id() const;
   int64_t actor_id() const { return actor_id_; }
+  // virtual bool IsCopyCommNetActor() const { return false; }
+  virtual int64_t in_regst_desc_id() const { return -1; }
 
  protected:
   friend class NaiveReadableRegstMgr;

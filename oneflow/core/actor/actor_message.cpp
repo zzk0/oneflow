@@ -3,6 +3,7 @@
 #include "oneflow/core/job/machine_context.h"
 #include "oneflow/core/actor/msg_event.pb.h"
 #include "oneflow/core/control/ctrl_client.h"
+#include "oneflow/core/job/runtime_context.h"
 
 namespace oneflow {
 
@@ -10,24 +11,27 @@ OF_DEFINE_ENUM_TO_OSTREAM_FUNC(ActorCmd);
 OF_DEFINE_ENUM_TO_OSTREAM_FUNC(ActorMsgType);
 
 void LogToConsumerMsg(const ActorMsg& msg) {
-  if (msg.msg_type() == ActorMsgType::kRegstMsg) {
-    Regst* regst = msg.regst();
-    // get nanoseconds, e.g. 1505840189520477525 = 1505840189.520477525 sec
-    int64_t start =
-        std::chrono::high_resolution_clock::now().time_since_epoch().count();
-    MsgEvent* msg_event = nullptr;
-    msg_event = new MsgEvent;
-    msg_event->set_time(start);
-    msg_event->set_src_actor_id(msg.src_actor_id());
-    msg_event->set_dst_actor_id(msg.dst_actor_id());
-    msg_event->set_producer_actor_id(regst->producer_actor_id());
-    msg_event->set_act_id(msg.act_id());
-    msg_event->set_model_version_id(regst->model_version_id());
-    msg_event->set_piece_id(regst->piece_id());
-    // msg_event->set_model_version_id(regst->model_version_id());
-    msg_event->set_regst_desc_id(regst->regst_desc_id());
-    Global<CtrlClient>::Get()->PushMsgEvent(*msg_event);
-    delete msg_event;
+  if (Global<RuntimeCtx>::Get()->is_experiment_phase()) {
+    if (msg.msg_type() == ActorMsgType::kRegstMsg) {
+      Regst* regst = msg.regst();
+      // get nanoseconds, e.g. 1505840189520477525 = 1505840189.520477525 sec
+      int64_t start =
+          std::chrono::high_resolution_clock::now().time_since_epoch().count();
+      MsgEvent* msg_event = nullptr;
+      msg_event = new MsgEvent;
+      msg_event->set_time(start);
+      msg_event->set_src_actor_id(msg.src_actor_id());
+      msg_event->set_dst_actor_id(msg.dst_actor_id());
+      msg_event->set_producer_actor_id(regst->producer_actor_id());
+      msg_event->set_act_id(msg.act_id());
+      msg_event->set_model_version_id(regst->model_version_id());
+      msg_event->set_piece_id(regst->piece_id());
+      // msg_event->set_model_version_id(regst->model_version_id());
+      msg_event->set_regst_desc_id(regst->regst_desc_id());
+      msg_event->set_info("to_consumer");
+      Global<CtrlClient>::Get()->PushMsgEvent(*msg_event);
+      delete msg_event;
+    }
   }
 }
 
@@ -44,8 +48,10 @@ ActorMsg ActorMsg::BuildRegstMsgToConsumer(int64_t producer, int64_t consumer,
   } else {
     msg.regst_wrapper_.comm_net_token =
         regst_raw_ptr->packed_blob()->comm_net_token();
-    msg.regst_wrapper_.regst_status = regst_raw_ptr->status();
   }
+  msg.regst_wrapper_.regst_status = regst_raw_ptr->status();
+  msg.regst_wrapper_.regst_status.regst_desc_id =
+      regst_raw_ptr->regst_desc_id();
   LogToConsumerMsg(msg);
   return msg;
 }
@@ -101,6 +107,16 @@ int64_t ActorMsg::piece_id() const {
 int64_t ActorMsg::act_id() const {
   CHECK_EQ(msg_type_, ActorMsgType::kRegstMsg);
   return regst_wrapper_.regst_status.act_id;
+}
+
+int64_t ActorMsg::model_version_id() const {
+  CHECK_EQ(msg_type_, ActorMsgType::kRegstMsg);
+  return regst_wrapper_.regst_status.model_version_id;
+}
+
+int64_t ActorMsg::regst_desc_id() const {
+  CHECK_EQ(msg_type_, ActorMsgType::kRegstMsg);
+  return regst_wrapper_.regst_status.regst_desc_id;
 }
 
 const void* ActorMsg::comm_net_token() const {

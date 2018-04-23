@@ -43,6 +43,8 @@ class ActorMsg final {
   Regst* regst() const;
   int64_t piece_id() const;
   int64_t act_id() const;
+  int64_t model_version_id() const;
+  int64_t regst_desc_id() const;
   const void* comm_net_token() const;
   int64_t eord_regst_desc_id() const;
 
@@ -55,6 +57,7 @@ class ActorMsg final {
   void Deserialize(StreamT& in_stream) {
     in_stream.Read(this, sizeof(ActorMsg));
   }
+  void set_regst_status(RegstStatus r) { regst_wrapper_.regst_status = r; };
 
  private:
   struct RegstWrapper {

@@ -12,6 +12,7 @@ struct RegstStatus {
   int64_t act_id;
   int32_t col_id;
   int32_t max_col_id;
+  int64_t regst_desc_id;
 };
 
 class Regst final {
@@ -53,6 +54,7 @@ class Regst final {
   void set_act_id(int64_t val) { status_.act_id = val; }
   void set_col_id(int32_t val) { status_.col_id = val; }
   void set_max_col_id(int32_t val) { status_.max_col_id = val; }
+  void set_regst_desc_id(int32_t val) { status_.regst_desc_id = val; }
 
  private:
   friend class RegstMgr;

@@ -10,6 +10,8 @@ class CopyCommNetActor final : public Actor {
   OF_DISALLOW_COPY_AND_MOVE(CopyCommNetActor);
   CopyCommNetActor() = default;
   ~CopyCommNetActor();
+  // bool IsCopyCommNetActor() const override { return true; }
+  int64_t in_regst_desc_id() const override { return in_regst_desc_id_; }
 
  private:
   class CommNetDeviceCtx;

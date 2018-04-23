@@ -10,4 +10,5 @@ message MsgEvent {
   required int64 model_version_id = 6;
   required int64 regst_desc_id = 7;
   required double time = 8;
+  optional string info = 9;
 }
