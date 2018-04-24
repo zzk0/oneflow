@@ -3,7 +3,7 @@
 namespace oneflow {
 
 void Actor::LogMsgEvent(ActorMsg& msg) {
-  if (!Global<RuntimeCtx>::Get()->is_experiment_phase()) {
+  if (Global<RuntimeCtx>::Get()->is_experiment_phase()) {
     if (msg.msg_type() == ActorMsgType::kRegstMsg) {
       // get nanoseconds, e.g. 1505840189520477525 = 1505840189.520477525 sec
       int64_t start =

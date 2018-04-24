@@ -6,44 +6,29 @@
 #include "oneflow/core/job/event_report_util.h"
 namespace oneflow {
 
-std::string GetLastUpRegstTime(
-    const std::vector<int64_t>& regsts,
-    const HashMap<std::string, RegstEvent>& regst_events,
-    const int64_t actor_id, const int64_t act_id) {
-  // key: regst_desc_id _ actor_id _ act_id
+std::string GetLastRegstTime(const std::vector<int64_t>& regsts,
+                             const std::list<MsgEvent>& msg_events,
+                             const ActEvent& act_event,
+                             const double time_diff) {
   int64_t id = -1;
   double time = 0.0;
   for (int64_t regst_desc_id : regsts) {
-    std::string key = std::to_string(regst_desc_id) + "_"
-                      + std::to_string(actor_id) + "_" + std::to_string(act_id);
-    auto re = regst_events.find(key);
-    if (re == regst_events.end()) return ",,";
-    if (re->second.from_producer_time > time) {
-      time = re->second.from_producer_time;
-      id = regst_desc_id;
+    for (auto msg : msg_events) {
+      if (msg.dst_actor_id() == act_event.actor_id()
+          && msg.info().find("from") != std::string::npos
+          && msg.regst_desc_id() == regst_desc_id
+          && msg.time() < act_event.start_time()) {
+        if (msg.time() > time) {
+          time = msg.time();
+          id = regst_desc_id;
+        }
+      }
     }
   }
-  return std::to_string(id) + "," + Time2String(time) + ",";
+  if (id == -1) return ",,";
+  return std::to_string(id) + ",'" + Time2String(time - time_diff) + ",";
 }
-std::string GetLastDownRegstTime(
-    const std::vector<int64_t>& regsts,
-    const HashMap<std::string, RegstEvent>& regst_events,
-    const int64_t actor_id, const int64_t act_id) {
-  // key: regst_desc_id _ actor_id _ act_id
-  int64_t id = -1;
-  double time = 0.0;
-  for (int64_t regst_desc_id : regsts) {
-    std::string key = std::to_string(regst_desc_id) + "_"
-                      + std::to_string(actor_id) + "_" + std::to_string(act_id);
-    auto re = regst_events.find(key);
-    if (re == regst_events.end()) return ",,";
-    if (re->second.from_consumer_time > time) {
-      time = re->second.from_consumer_time;
-      id = regst_desc_id;
-    }
-  }
-  return std::to_string(id) + "," + Time2String(time) + ",";
-}
+
 void ActEventAnalysis(const std::string& plan_filepath,
                       const std::string& act_event_filepath,
                       const std::string& time_diff_filepath,
@@ -56,10 +41,10 @@ void ActEventAnalysis(const std::string& plan_filepath,
                   actor_id2consumed_regsts);
   std::vector<double> machine_time_diffs;
   GetMachineTimeDiff(time_diff_filepath, machine_time_diffs);
-  HashMap<std::string, RegstEvent> regst_events;
-  Msg2RegstEvents(msg_event_filepath, regst_events, time_diff_filepath);
   Plan plan;
   ParseProtoFromTextFile(plan_filepath, &plan);
+  auto msg_events = of_make_unique<std::list<MsgEvent>>();
+  LoadEvents<MsgEvent>(msg_event_filepath, msg_events.get());
   std::ofstream out_stream(report_filepath);
   out_stream << "actor,type,machine,thrd,stream,act_id,push_time,start_time,"
                 "stop_time,"
@@ -84,10 +69,10 @@ void ActEventAnalysis(const std::string& plan_filepath,
     out_stream << Time2String(event.stop_time() - event.start_time()) + ",";
     out_stream << Time2HumanReadable(event.stop_time() - event.start_time())
                       + ",";
-    out_stream << GetLastUpRegstTime(actor_id2produced_regsts[actor_id],
-                                     regst_events, actor_id, event.act_id());
-    out_stream << GetLastDownRegstTime(actor_id2consumed_regsts[actor_id],
-                                       regst_events, actor_id, event.act_id());
+    out_stream << GetLastRegstTime(actor_id2consumed_regsts[actor_id],
+                                   *msg_events, event, time_diff);
+    out_stream << GetLastRegstTime(actor_id2produced_regsts[actor_id],
+                                   *msg_events, event, time_diff);
     out_stream << "\n";
   }
   out_stream.close();
