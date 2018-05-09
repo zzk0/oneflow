@@ -16,12 +16,12 @@ class Thread {
 
   void AddTask(const TaskProto&);
 
-  Channel<ActorMsg>* GetMsgChannelPtr() { return &msg_channel_; }
+  Channel<ActorMsg>* GetMsgChannelPtr() { return msg_channel_.get(); }
 
   void JoinAllActor() { actor_thread_.join(); }
 
  protected:
-  Thread() = default;
+  Thread(bool is_spin);
   std::thread& mut_actor_thread() { return actor_thread_; }
   void PollMsgChannel(const ThreadCtx& thread_ctx);
   void set_thrd_id(int64_t val) { thrd_id_ = val; }
@@ -33,7 +33,7 @@ class Thread {
   std::mutex id2task_mtx_;
 
   std::thread actor_thread_;
-  Channel<ActorMsg> msg_channel_;
+  std::unique_ptr<Channel<ActorMsg>> msg_channel_;
   HashMap<int64_t, std::unique_ptr<Actor>> id2actor_ptr_;
 
   int64_t thrd_id_;

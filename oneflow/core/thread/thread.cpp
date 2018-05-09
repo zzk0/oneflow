@@ -1,12 +1,14 @@
 #include "oneflow/core/thread/thread.h"
+#include "oneflow/core/common/blocking_channel.h"
+#include "oneflow/core/common/spin_channel.h"
 
 namespace oneflow {
 
 Thread::~Thread() {
   actor_thread_.join();
   CHECK(id2task_.empty());
-  msg_channel_.CloseSendEnd();
-  msg_channel_.CloseReceiveEnd();
+  msg_channel_->CloseSendEnd();
+  msg_channel_->CloseReceiveEnd();
 }
 
 void Thread::AddTask(const TaskProto& task) {
@@ -14,10 +16,18 @@ void Thread::AddTask(const TaskProto& task) {
   CHECK(id2task_.emplace(task.task_id(), task).second);
 }
 
+Thread::Thread(bool is_spin) {
+  if (is_spin) {
+    msg_channel_.reset(new SpinChannel<ActorMsg>);
+  } else {
+    msg_channel_.reset(new BlockingChannel<ActorMsg>);
+  }
+}
+
 void Thread::PollMsgChannel(const ThreadCtx& thread_ctx) {
   ActorMsg msg;
   while (true) {
-    CHECK_EQ(msg_channel_.Receive(&msg), 0);
+    CHECK_EQ(msg_channel_->Receive(&msg), 0);
     if (msg.msg_type() == ActorMsgType::kCmdMsg) {
       if (msg.actor_cmd() == ActorCmd::kStopThread) {
         CHECK(id2actor_ptr_.empty());

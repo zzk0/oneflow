@@ -2,7 +2,7 @@
 
 namespace oneflow {
 
-CpuThread::CpuThread(int64_t thrd_id) {
+CpuThread::CpuThread(int64_t thrd_id) : Thread(false) {
   set_thrd_id(thrd_id);
   mut_actor_thread() = std::thread([this]() {
     ThreadCtx ctx;

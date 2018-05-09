@@ -14,7 +14,7 @@ train_conf {
   model_save_snapshots_path: "/tmp/snapshot"
   num_of_batches_in_snapshot: 3000
   staleness: 0
-  total_batch_num: 30000
+  total_batch_num: 1000
   default_initializer_conf {
     random_normal_conf {
       mean: 0.0
