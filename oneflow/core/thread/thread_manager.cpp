@@ -25,7 +25,8 @@ ThreadMgr::ThreadMgr(const Plan& plan) {
 #ifdef WITH_CUDA
   FOR_RANGE(int64_t, i, 0, 4) {
     FOR_RANGE(int64_t, dev_phy_id, 0, job_desc->GpuDeviceNum()) {
-      threads_.push_back(new GpuThread(thrd_id, dev_phy_id, info.buf_size(thrd_id)));
+      threads_.push_back(
+          new GpuThread(thrd_id, dev_phy_id, info.buf_size(thrd_id), i == 0 ? 1 : 0));
       thrd_id += 1;
     }
   }

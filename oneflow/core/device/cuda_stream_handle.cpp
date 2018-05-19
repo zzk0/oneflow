@@ -8,7 +8,8 @@ namespace oneflow {
 const cudaStream_t* CudaStreamHandle::cuda_stream() {
   if (!cuda_stream_) {
     cuda_stream_.reset(new cudaStream_t);
-    CudaCheck(cudaStreamCreate(cuda_stream_.get()));
+    CudaCheck(
+        cudaStreamCreateWithPriority(cuda_stream_.get(), cudaStreamDefault, stream_priority_));
   }
   return cuda_stream_.get();
 }

@@ -11,7 +11,8 @@ namespace oneflow {
 class CudaStreamHandle final {
  public:
   OF_DISALLOW_COPY_AND_MOVE(CudaStreamHandle);
-  CudaStreamHandle() = default;
+  CudaStreamHandle() : CudaStreamHandle(0) {}
+  CudaStreamHandle(int stream_priority) : stream_priority_(stream_priority) {}
 
   const cudaStream_t* cuda_stream();
   const cublasHandle_t* cublas_pmh_handle();
@@ -22,6 +23,7 @@ class CudaStreamHandle final {
   ~CudaStreamHandle();
 
  private:
+  int stream_priority_;
   std::unique_ptr<cudaStream_t> cuda_stream_;
   std::unique_ptr<cublasHandle_t> cublas_pmh_handle_;
   std::unique_ptr<cublasHandle_t> cublas_pmd_handle_;
