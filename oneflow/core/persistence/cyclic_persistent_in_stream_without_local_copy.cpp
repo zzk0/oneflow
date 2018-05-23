@@ -1,4 +1,5 @@
 #include "oneflow/core/persistence/cyclic_persistent_in_stream_without_local_copy.h"
+#include "oneflow/core/job/job_desc.h"
 
 namespace oneflow {
 
@@ -10,8 +11,9 @@ CyclicPersistentInStreamWithoutLocalCopy::CyclicPersistentInStreamWithoutLocalCo
 }
 
 void CyclicPersistentInStreamWithoutLocalCopy::UpdateBuffer() {
-  if (is_first_update_buffer_ == false && file_size() <= mut_buffer()->size() - 1) {
-    set_cur_buf_begin(mut_buffer()->data());
+  if (is_first_update_buffer_ == false
+      && file_size() <= Global<JobDesc>::Get()->persistence_buf_byte()) {
+    set_cur_buf_begin(mut_buffer());
   } else {
     PersistentInStreamWithoutLocalCopy::UpdateBuffer();
   }

@@ -9,7 +9,7 @@ class CyclicPersistentInStreamWithoutLocalCopy final : public PersistentInStream
  public:
   OF_DISALLOW_COPY_AND_MOVE(CyclicPersistentInStreamWithoutLocalCopy);
   CyclicPersistentInStreamWithoutLocalCopy() = delete;
-  ~CyclicPersistentInStreamWithoutLocalCopy() = default;
+  ~CyclicPersistentInStreamWithoutLocalCopy() { WaitUntilStandByBufferReadyBytesNotEqualZero(); }
 
   CyclicPersistentInStreamWithoutLocalCopy(fs::FileSystem* fs, const std::string& file_path);
 

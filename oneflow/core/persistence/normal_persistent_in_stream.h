@@ -18,6 +18,8 @@ class NormalPersistentInStream final : public PersistentInStreamWithoutLocalCopy
   NormalPersistentInStream(fs::FileSystem* fs, const std::string& file_path)
       : NormalPersistentInStream(fs, file_path, 0) {}
 
+  ~NormalPersistentInStream() { WaitUntilStandByBufferReadyBytesNotEqualZero(); }
+
  private:
   void AddNForCurFilePos(uint64_t n) override { set_cur_file_pos(cur_file_pos() + n); }
 };
