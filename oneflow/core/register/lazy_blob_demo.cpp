@@ -76,35 +76,10 @@ void EagerEvaluate() {
   std::cout << "eager evaluation: " << end - start << std::endl;
 }
 
-ALWAYS_INLINE int32_t Add(const int32_t x, const int32_t y) { return x + y; }
-
-struct Adder final {
-  static int32_t Add(const int32_t x, const int32_t y) { return x + y; }
-};
-
-void TestAdder() {
-  int32_t* x0_ptr = TestBlob()->mut_dptr<int32_t>();
-  int32_t* x1_ptr = TestBlob()->mut_dptr<int32_t>();
-
-  {
-    int64_t start = GetCurTime();
-    FOR_RANGE(int32_t, i, 0, kSize) { x1_ptr[i] = Add(x0_ptr[i], x0_ptr[i]); }
-    int64_t end = GetCurTime();
-    std::cout << "Add: " << end - start << std::endl;
-  }
-  {
-    int64_t start = GetCurTime();
-    FOR_RANGE(int32_t, i, 0, kSize) { x1_ptr[i] = Adder::Add(x0_ptr[i], x0_ptr[i]); }
-    int64_t end = GetCurTime();
-    std::cout << "Adder::Add: " << end - start << std::endl;
-  }
-}
-
 void LazyBlobPerformance() {
   EagerEvaluate();
   EigenEvaluate();
   LazyEvaluate();
-  TestAdder();
 }
 
 }  // namespace
