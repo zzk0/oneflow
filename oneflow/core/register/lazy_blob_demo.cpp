@@ -27,9 +27,10 @@ void LazyEvaluate() {
   Blob* x4_blob = TestBlob();
   Blob* ret_blob = TestBlob();
   int64_t start = GetCurTime();
-  LAZY_EVALUATE(int32_t, lazy) {
+  {
+    LazyBlobBuilder<int32_t> lazy;
     lazy(ret_blob) = lazy(x0_blob) * lazy(x1_blob) * (lazy(x0_blob) + lazy(x1_blob))
-                     * (lazy(x2_blob) + lazy(x3_blob) + lazy(x4_blob));
+                     * (lazy(x2_blob), lazy(x3_blob), lazy(x4_blob));
   }
   int64_t end = GetCurTime();
   std::cout << "lazy evaluation: " << end - start << std::endl;

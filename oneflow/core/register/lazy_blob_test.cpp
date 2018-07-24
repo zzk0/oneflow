@@ -20,7 +20,10 @@ TEST(LazyEvaluation, simple_add) {
   CHECK_EQ(x_blob->dptr<int32_t>(), data.data());
   std::vector<int32_t> ret_data{0};
   Blob* ret_blob = NewTestBlob(blob_desc, ret_data.data());
-  LAZY_EVALUATE(int32_t, var) { var(ret_blob) = var(x_blob) + var(x_blob); }
+  {
+    LazyBlobBuilder<int32_t> lazy;
+    lazy(ret_blob) = lazy(x_blob) + lazy(x_blob);
+  }
   ASSERT_EQ(ret_blob->dptr<int32_t>()[0], 2);
 }
 
@@ -31,10 +34,11 @@ TEST(LazyEvaluation, simple_mul) {
   CHECK_EQ(x_blob->dptr<int32_t>(), data.data());
   std::vector<int32_t> ret_data{0};
   Blob* ret_blob = NewTestBlob(blob_desc, ret_data.data());
-  LAZY_EVALUATE(int32_t, var) {
-    auto& val0 = var(x_blob) + var(x_blob);
-    auto& val1 = var(x_blob) + var(x_blob) + var(x_blob);
-    var(ret_blob) = val0 * val1;
+  {
+    LazyBlobBuilder<int32_t> lazy;
+    const auto& val0 = lazy(x_blob) + lazy(x_blob);
+    const auto& val1 = lazy(x_blob) + lazy(x_blob) + lazy(x_blob);
+    lazy(ret_blob) = val0 * val1;
   }
   ASSERT_EQ(ret_blob->dptr<int32_t>()[0], 6);
 }
@@ -47,7 +51,10 @@ TEST(LazyEvaluation, add) {
   CHECK_EQ(x_blob->dptr<int32_t>(), data.data());
   std::vector<int32_t> ret_data(data);
   Blob* ret_blob = NewTestBlob(blob_desc, ret_data.data());
-  LAZY_EVALUATE(int32_t, var) { var(ret_blob) = var(x_blob) + var(x_blob); }
+  {
+    LazyBlobBuilder<int32_t> lazy;
+    lazy(ret_blob) = lazy(x_blob) + lazy(x_blob);
+  }
   FOR_RANGE(int32_t, i, 0, data.size()) { ASSERT_EQ(ret_blob->dptr<int32_t>()[i], i * 2); }
 }
 
@@ -59,10 +66,11 @@ TEST(LazyEvaluation, mul) {
   CHECK_EQ(x_blob->dptr<int32_t>(), data.data());
   std::vector<int32_t> ret_data(data);
   Blob* ret_blob = NewTestBlob(blob_desc, ret_data.data());
-  LAZY_EVALUATE(int32_t, var) {
-    auto& val0 = var(x_blob) + var(x_blob);
-    auto& val1 = var(x_blob) + var(x_blob) + var(x_blob);
-    var(ret_blob) = val0 * val1;
+  {
+    LazyBlobBuilder<int32_t> lazy;
+    const auto& val0 = lazy(x_blob) + lazy(x_blob);
+    const auto& val1 = lazy(x_blob) + lazy(x_blob) + lazy(x_blob);
+    lazy(ret_blob) = val0 * val1;
   }
   FOR_RANGE(int32_t, i, 0, data.size()) { ASSERT_EQ(ret_blob->dptr<int32_t>()[i], i * i * 6); }
 }
