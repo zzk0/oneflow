@@ -117,6 +117,7 @@ message Conv2DOpConf {
   optional InitializerConf bias_initializer = 12;
   optional string weight = 13;
   optional string bias = 14;
+  optional int32 group_num = 15 [default = 1];
 }
 
 message Conv3DOpConf {
