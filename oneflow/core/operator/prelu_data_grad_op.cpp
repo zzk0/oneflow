@@ -1,26 +1,23 @@
-#include "oneflow/core/operator/prelu_op.h"
+#include "oneflow/core/operator/prelu_grad_op.h"
 #include "oneflow/core/register/runtime_blob_desc.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
 
 namespace oneflow {
 
-void PReluOp::InitFromOpConf() {
-  CHECK(op_conf().has_prelu_conf());
+void PReluGradOp::InitFromOpConf() {
+  CHECK(op_conf().has_prelu_grad_conf());
   StrFieldTolower("data_format");
-  EnrollInputBn("in");
-  if (GetValFromCustomizedConf<std::string>("alpha").empty()) {
-    EnrollTmpBn("alpha");
-  } else {
-    EnrollInputBn("alpha");
-  }
-  EnrollOutputBn("out")->set_mutable_inplace_ibn("in");
+  EnrollInputBn("x");
+  EnrollInputBn("dy");
+  EnrollTmpBn("alpha");
+  EnrollOutputBn("dx")->set_mutable_inplace_ibn("dy");
 }
 
-const PbMessage& PReluOp::GetCustomizedConf() const { return op_conf().prelu_conf(); }
+const PbMessage& PReluGradOp::GetCustomizedConf() const { return op_conf().prelu_conf(); }
 
-void PReluOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+void PReluGradOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                              const ParallelContext* parallel_ctx) const {
-  const PReluOpConf& conf = op_conf().prelu_conf();
+  const PReluGradOpConf& conf = op_conf().prelu_conf();
   const BlobDesc* in_blob_desc = GetBlobDesc4BnInOp("in");
   *GetBlobDesc4BnInOp("out") = *in_blob_desc;
   BlobDesc* alpha_blob_desc = GetBlobDesc4BnInOp("alpha");
@@ -39,10 +36,10 @@ void PReluOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlo
   alpha_blob_desc->set_data_type(in_blob_desc->data_type());
 }
 
-void PReluOp::VirtualGenKernelConf(
+void PReluGradOp::VirtualGenKernelConf(
     std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, KernelConf* kernel_conf) const {
-  const PReluOpConf& conf = op_conf().prelu_conf();
+  const PReluGradOpConf& conf = op_conf().prelu_conf();
   PbRf<int32_t>* perm = kernel_conf->mutable_prelu_conf()->mutable_perm();
   const BlobDesc* in_blob_desc = GetBlobDesc4BnInOp("in");
   int64_t num_axes = in_blob_desc->shape().NumAxes();
@@ -60,7 +57,7 @@ void PReluOp::VirtualGenKernelConf(
   }
 }
 
-void PReluOp::GetSbpSignatures(
+void PReluGradOp::GetSbpSignatures(
     const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4Ibn,
     SbpSignatureList* sbp_sig_list) const {
   SbpSignatureBuilder()
@@ -70,6 +67,6 @@ void PReluOp::GetSbpSignatures(
       .Build(sbp_sig_list);
 }
 
-REGISTER_OP(OperatorConf::kPreluConf, PReluOp);
+REGISTER_OP(OperatorConf::kPreluConf, PReluGradOp);
 
 }  // namespace oneflow
