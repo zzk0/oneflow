@@ -1,15 +1,15 @@
-#ifndef ONEFLOW_CORE_OPERATOR_PRELU_OP_H_
-#define ONEFLOW_CORE_OPERATOR_PRELU_OP_H_
+#ifndef ONEFLOW_CORE_OPERATOR_PRELU_DATA_GRAD_OP_H_
+#define ONEFLOW_CORE_OPERATOR_PRELU_DATA_GRAD_OP_H_
 
 #include "oneflow/core/operator/operator.h"
 
 namespace oneflow {
 
-class PReluGradOp final : public Operator {
+class PReluDataGradOp final : public Operator {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(PReluGradOp);
-  PReluGradOp() = default;
-  ~PReluGradOp() = default;
+  OF_DISALLOW_COPY_AND_MOVE(PReluDataGradOp);
+  PReluDataGradOp() = default;
+  ~PReluDataGradOp() = default;
 
   void InitFromOpConf() override;
   const PbMessage& GetCustomizedConf() const override;

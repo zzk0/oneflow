@@ -1,48 +1,33 @@
-#include "oneflow/core/operator/prelu_grad_op.h"
+#include "oneflow/core/operator/prelu_data_grad_op.h"
 #include "oneflow/core/register/runtime_blob_desc.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
 
 namespace oneflow {
 
-void PReluGradOp::InitFromOpConf() {
-  CHECK(op_conf().has_prelu_grad_conf());
-  StrFieldTolower("data_format");
-  EnrollInputBn("x");
-  EnrollInputBn("dy");
-  EnrollTmpBn("alpha");
-  EnrollOutputBn("dx")->set_mutable_inplace_ibn("dy");
+void PReluDataGradOp::InitFromOpConf() {
+  CHECK(op_conf().has_prelu_data_grad_conf());
+  EnrollInputBn("dy", false);
+  EnrollInputBn("alpha", false);
+  EnrollInputBn("x", false);
+  EnrollOutputBn("dx", false);
 }
 
-const PbMessage& PReluGradOp::GetCustomizedConf() const { return op_conf().prelu_conf(); }
+const PbMessage& PReluDataGradOp::GetCustomizedConf() const { return op_conf().prelu_data_grad_conf(); }
 
-void PReluGradOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+void PReluDataGradOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                              const ParallelContext* parallel_ctx) const {
-  const PReluGradOpConf& conf = op_conf().prelu_conf();
-  const BlobDesc* in_blob_desc = GetBlobDesc4BnInOp("in");
-  *GetBlobDesc4BnInOp("out") = *in_blob_desc;
-  BlobDesc* alpha_blob_desc = GetBlobDesc4BnInOp("alpha");
-  if (conf.channel_shared()) {
-    alpha_blob_desc->mut_shape() = Shape({1});
-  } else {
-    if (conf.data_format() == "channels_first") {
-      alpha_blob_desc->mut_shape() = Shape({in_blob_desc->shape().At(1)});
-    } else if (conf.data_format() == "channels_last") {
-      alpha_blob_desc->mut_shape() =
-          Shape({in_blob_desc->shape().At(in_blob_desc->shape().NumAxes() - 1)});
-    } else {
-      UNIMPLEMENTED();
-    }
-  }
-  alpha_blob_desc->set_data_type(in_blob_desc->data_type());
+  const PReluDataGradOpConf& conf = this->op_conf().prelu_data_grad_conf();
+  *GetBlobDesc4BnInOp("dx") = *GetBlobDesc4BnInOp("x");
 }
 
-void PReluGradOp::VirtualGenKernelConf(
+void PReluDataGradOp::VirtualGenKernelConf(
     std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, KernelConf* kernel_conf) const {
-  const PReluGradOpConf& conf = op_conf().prelu_conf();
+  const PReluDataGradOpConf& conf = op_conf().prelu_data_grad_conf();
+  //PbRf<int32_t>* perm = kernel_conf->mutable_prelu_data_grad_conf()->mutable_perm();
   PbRf<int32_t>* perm = kernel_conf->mutable_prelu_conf()->mutable_perm();
-  const BlobDesc* in_blob_desc = GetBlobDesc4BnInOp("in");
-  int64_t num_axes = in_blob_desc->shape().NumAxes();
+  const BlobDesc* x = GetBlobDesc4BnInOp("x");
+  int64_t num_axes = x->shape().NumAxes();
   FOR_RANGE(int64_t, i, 0, num_axes) { perm->Add(i); }
   if (!conf.channel_shared()) {
     if (conf.data_format() == "channels_first") {
@@ -54,10 +39,10 @@ void PReluGradOp::VirtualGenKernelConf(
     } else {
       UNIMPLEMENTED();
     }
-  }
+  }  
 }
 
-void PReluGradOp::GetSbpSignatures(
+void PReluDataGradOp::GetSbpSignatures(
     const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4Ibn,
     SbpSignatureList* sbp_sig_list) const {
   SbpSignatureBuilder()
@@ -67,6 +52,6 @@ void PReluGradOp::GetSbpSignatures(
       .Build(sbp_sig_list);
 }
 
-REGISTER_OP(OperatorConf::kPreluConf, PReluGradOp);
+REGISTER_OP(OperatorConf::kPreluDataGradConf, PReluDataGradOp);
 
 }  // namespace oneflow

@@ -5,11 +5,11 @@
 
 namespace oneflow {
 
-class PReluGradOp final : public Operator {
+class PReluAlphaGradOp final : public Operator {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(PReluGradOp);
-  PReluGradOp() = default;
-  ~PReluGradOp() = default;
+  OF_DISALLOW_COPY_AND_MOVE(PReluAlphaGradOp);
+  PReluAlphaGradOp() = default;
+  ~PReluAlphaGradOp() = default;
 
   void InitFromOpConf() override;
   const PbMessage& GetCustomizedConf() const override;
