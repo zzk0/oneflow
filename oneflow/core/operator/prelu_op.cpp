@@ -39,25 +39,9 @@ void PReluOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlo
   alpha_blob_desc->set_data_type(in_blob_desc->data_type());
 }
 
-void PReluOp::VirtualGenKernelConf(
-    std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, KernelConf* kernel_conf) const {
-  const PReluOpConf& conf = op_conf().prelu_conf();
-  PbRf<int32_t>* perm = kernel_conf->mutable_prelu_conf()->mutable_perm();
-  const BlobDesc* in_blob_desc = GetBlobDesc4BnInOp("in");
-  int64_t num_axes = in_blob_desc->shape().NumAxes();
-  FOR_RANGE(int64_t, i, 0, num_axes) { perm->Add(i); }
-  if (!conf.channel_shared()) {
-    if (conf.data_format() == "channels_first") {
-      (*perm)[0] = 1;
-      (*perm)[1] = 0;
-    } else if (conf.data_format() == "channels_last") {
-      (*perm)[num_axes - 1] = 0;
-      (*perm)[0] = num_axes - 1;
-    } else {
-      UNIMPLEMENTED();
-    }
-  }
+void PReluOp::InferHasBatchDim(
+    std::function<bool*(const std::string&)> HasBatchDim4BnInOp) const {
+  *HasBatchDim4BnInOp("out") = *HasBatchDim4BnInOp("in");
 }
 
 void PReluOp::GetSbpSignatures(

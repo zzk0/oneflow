@@ -19,8 +19,8 @@ def Conv(input_blob, num_filter=1, kernel=None, stride=None, pad='valid', num_gr
                              use_bias=False, dilation_rate=[1, 1], **kw)
   input_blob = dl_net.Normalization(input_blob, name='%s%s_batchnorm' % (name, suffix), axis=1, momentum=0.9,
                                     epsilon=0.001, scale=True, center=True, activation=op_conf_pb2.kNone)
-  #input_blob = dl_net.PRelu(input_blob, name='%s%s_relu' % (name, suffix), data_format='channels_first')
-  input_blob = dl_net.Relu(input_blob, name='%s%s_relu' % (name, suffix))
+  input_blob = dl_net.PRelu(input_blob, name='%s%s_relu' % (name, suffix), data_format='channels_first')
+  #input_blob = dl_net.Relu(input_blob, name='%s%s_relu' % (name, suffix))
 
   return input_blob
 
@@ -56,7 +56,6 @@ def Residual(input_blob, num_block=1, num_out=1, kernel=None, stride=None, pad='
     conv = DResidual_v1(input_blob=identity, num_out=num_out, kernel=kernel, stride=stride, pad=pad,
                         num_group=num_group,
                         name='%s%s_block' % (name, suffix), suffix='%d' % i)
-    #identity = dl_net.Concat([conv, shortcut], axis=1)  # in channel axis
     identity = dl_net.Add([conv, shortcut])
   return identity
 

@@ -10,14 +10,14 @@ from fmobilefacenet import CreateInitializer
 config = flow.ConfigProtoBuilder()
 config.gpu_device_num(1)
 config.grpc_use_no_signal()
-config.model_load_snapshot_path("")
+config.model_load_snapshot_path("/home/guoran/job_set/test_dir/insightface_model")
 _MODEL_SAVE = "./model_save-{}".format(
     str(datetime.now().strftime('%Y-%m-%d-%H:%M:%S')))
 config.model_save_snapshots_path(_MODEL_SAVE)
 flow.init(config)
 
 _DATA_DIR = "/home/guoran/insightface_proj/ofrecord/train_16_part"
-_SINGLE_PIC_DATA_DIR = '/home/guoran/insightface_proj/ofrecord'
+_SINGLE_PIC_DATA_DIR = '/home/guoran/insightface_proj/ofrecord/train_16_part'
 _EVAL_DIR = _DATA_DIR
 _TRAIN_DIR = _SINGLE_PIC_DATA_DIR
 
@@ -25,7 +25,7 @@ _TRAIN_DIR = _SINGLE_PIC_DATA_DIR
 def MobileFacenetDecoder(dl_net, data_dir='', buffer_size=4096):
   return dl_net.DecodeOFRecord(data_dir,
     name='decode', part_name_suffix_length=5,
-    random_shuffle_conf={'buffer_size': buffer_size},
+    #random_shuffle_conf={'buffer_size': buffer_size},
     blob=[
     {
       'name': 'encoded',
@@ -37,9 +37,9 @@ def MobileFacenetDecoder(dl_net, data_dir='', buffer_size=4096):
             {
               'bgr2rgb': {}
             },
-            {
-              'mirror': {},
-            },
+            #{
+            #  'mirror': {},
+            #},
           ]
         },
       },
@@ -75,9 +75,10 @@ def TrainInsightface():
     job_conf = flow.get_cur_job_conf_builder()
     job_conf.batch_size(64).data_part_num(1).default_data_type(flow.float)
     job_conf.train_conf()
-    job_conf.default_initializer_conf(CreateInitializer('one'))
-    job_conf.train_conf().primary_lr = 0.1
-    job_conf.train_conf().num_of_batches_in_snapshot = 100
+    #job_conf.default_initializer_conf(CreateInitializer('one'))
+    job_conf.default_initializer_conf(dict(constant_conf=dict(value=1.0)))
+    job_conf.train_conf().primary_lr = 0
+    job_conf.train_conf().num_of_batches_in_snapshot = 1
     job_conf.train_conf().model_update_conf.naive_conf.SetInParent()
     job_conf.train_conf().loss_lbn.extend(["softmax_loss/out"])
     return BuildInsightfaceWithDeprecatedAPI(_TRAIN_DIR)
@@ -85,6 +86,7 @@ def TrainInsightface():
 
 def EvaluateInsightface():
     job_conf = flow.get_cur_job_conf_builder()
+    job_conf.default_initializer_conf(dict(constant_conf=dict(value=1.0)))
     job_conf.batch_size(64).data_part_num(1).default_data_type(flow.float)
     return BuildInsightfaceWithDeprecatedAPI(_EVAL_DIR)
 
@@ -99,10 +101,8 @@ if __name__ == '__main__':
         print('{:>12}  {:>12}  {:>12}'.format(
             "iter", "loss type", "loss value"))
         for i in range(100):
-            print(fmt_str.format(i, "train loss:", sess.run(
-                TrainAlexNet).get().mean()))
+            print(fmt_str.format(i, "train loss:", sess.run(TrainInsightface).get().mean()))
             if (i + 1) % 10 is 0:
-                print(fmt_str.format(i, "eval loss:", sess.run(
-                    EvaluateAlexNet).get().mean()))
+                print(fmt_str.format(i, "eval loss:", sess.run(EvaluateInsightface).get().mean()))
             if (i + 1) % 100 is 0:
                 check_point.save(session=sess)

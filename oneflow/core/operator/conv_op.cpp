@@ -122,7 +122,7 @@ void ConvOp<NDims>::InferBlobDescs(std::function<BlobDesc*(const std::string&)> 
   // weight
   std::vector<int64_t> weight_shape(in_blob_desc->shape().dim_vec());
   weight_shape[0] = filters;
-    int32_t group_num = GetValFromCustomizedConf<int32_t>("group_num");
+  int32_t group_num = GetValFromCustomizedConf<int32_t>("group_num");
   CHECK_GT(group_num, 0);
   if (data_format == "channels_first") {
     CHECK_LE(group_num, weight_shape[1]);

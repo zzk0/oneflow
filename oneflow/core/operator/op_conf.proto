@@ -144,6 +144,7 @@ message ConvConf {
   repeated int32 kernel_size = 4;
   repeated int32 strides = 5;
   repeated int32 dilation_rate = 6;
+  optional int32 group_num = 7 [default = 1];
 }
 
 message ConvDataGradOpConf {
@@ -280,6 +281,7 @@ message PReluOpConf {
   required string data_format = 3;
   optional bool channel_shared = 4 [default = false];
   optional float alpha_init = 5 [default = 0.25];
+  optional string alpha = 6;
 }
 
 message PReluDataGradOpConf {
@@ -294,7 +296,7 @@ message PReluDataGradOpConf {
 message PReluAlphaGradOpConf {
   required string dy = 1;
   required string x = 2;
-  required string alpha_diff = 3;
+  required string alpha_grad = 3;
   required string data_format = 4;
   optional bool channel_shared = 5 [default = false];
 }

@@ -20,28 +20,13 @@ void PReluDataGradOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)
   *GetBlobDesc4BnInOp("dx") = *GetBlobDesc4BnInOp("x");
 }
 
-void PReluDataGradOp::VirtualGenKernelConf(
-    std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, KernelConf* kernel_conf) const {
-  const PReluDataGradOpConf& conf = op_conf().prelu_data_grad_conf();
-  //PbRf<int32_t>* perm = kernel_conf->mutable_prelu_data_grad_conf()->mutable_perm();
-  PbRf<int32_t>* perm = kernel_conf->mutable_prelu_conf()->mutable_perm();
-  const BlobDesc* x = GetBlobDesc4BnInOp("x");
-  int64_t num_axes = x->shape().NumAxes();
-  FOR_RANGE(int64_t, i, 0, num_axes) { perm->Add(i); }
-  if (!conf.channel_shared()) {
-    if (conf.data_format() == "channels_first") {
-      (*perm)[0] = 1;
-      (*perm)[1] = 0;
-    } else if (conf.data_format() == "channels_last") {
-      (*perm)[num_axes - 1] = 0;
-      (*perm)[0] = num_axes - 1;
-    } else {
-      UNIMPLEMENTED();
-    }
-  }  
+void PReluDataGradOp::InferHasBatchDim(
+    std::function<bool*(const std::string&)> HasBatchDim4BnInOp) const {
+  CHECK(*HasBatchDim4BnInOp("dy"));
+  CHECK(*HasBatchDim4BnInOp("x"));
+  CHECK(*HasBatchDim4BnInOp("alpha") == false);
+  *HasBatchDim4BnInOp("dx") = true;
 }
-
 void PReluDataGradOp::GetSbpSignatures(
     const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4Ibn,
     SbpSignatureList* sbp_sig_list) const {
