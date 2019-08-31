@@ -24,19 +24,20 @@ Maybe<void> PReluOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)>
   const PReluOpConf& conf = op_conf().prelu_conf();
   const BlobDesc* in_blob_desc = GetBlobDesc4BnInOp("in");
   *GetBlobDesc4BnInOp("out") = *in_blob_desc;
-  Shape alpha_shape;
+  int32_t alpha_size;
   if (conf.channel_shared()) {
-    alpha_shape = Shape({1});
+    alpha_size = 1;
   } else {
     if (conf.data_format() == "channels_first") {
-      alpha_shape = Shape({in_blob_desc->shape().At(1)});
+      alpha_size = in_blob_desc->shape().At(1);
     } else if (conf.data_format() == "channels_last") {
-      alpha_shape =
-          Shape({in_blob_desc->shape().At(in_blob_desc->shape().NumAxes() - 1)});
+      alpha_size =
+          in_blob_desc->shape().At(in_blob_desc->shape().NumAxes() - 1);
     } else {
       UNIMPLEMENTED_THEN_RETURN();
     }
   }
+  const Shape alpha_shape({alpha_size});
   if (conf.has_alpha()) {
     CHECK_EQ_OR_RETURN(GetBlobDesc4BnInOp("alpha")->shape(), alpha_shape);
     CHECK_EQ_OR_RETURN(GetBlobDesc4BnInOp("alpha")->data_type(), in_blob_desc->data_type());
