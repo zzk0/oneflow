@@ -1,5 +1,4 @@
 #include "oneflow/core/operator/prelu_alpha_grad_op.h"
-#include "oneflow/core/register/runtime_blob_desc.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
 
 namespace oneflow {
@@ -36,15 +35,14 @@ Maybe<void> PReluAlphaGradOp::InferBlobDescs(
       UNIMPLEMENTED();
     }
   }
+  alpha_grad_blob_desc->set_data_type(x->data_type());
   if (device_type() == DeviceType::kGPU) {
     BlobDesc* bw_buf_desc = GetBlobDesc4BnInOp("bw_buf");
     BlobDesc* alpha_grad_buf_desc = GetBlobDesc4BnInOp("alpha_grad_buf");
-
     *alpha_grad_buf_desc = *GetBlobDesc4BnInOp("x");
-    if (op_conf().prelu_alpha_grad_conf().channel_shared()) {
+    if (conf.channel_shared()) {
       *bw_buf_desc = *GetBlobDesc4BnInOp("x");
     } else {
-      const PReluAlphaGradOpConf& conf = op_conf().prelu_alpha_grad_conf();
       const BlobDesc* x = GetBlobDesc4BnInOp("x");
       bw_buf_desc->set_data_type(x->data_type());
       std::vector<int64_t> bw_buf_shape_vec = x->shape().dim_vec();
@@ -61,7 +59,6 @@ Maybe<void> PReluAlphaGradOp::InferBlobDescs(
       }
     }
   }
-  alpha_grad_blob_desc->set_data_type(x->data_type());
   return Maybe<void>::Ok();
 }
 
@@ -88,7 +85,8 @@ void PReluAlphaGradOp::VirtualGenKernelConf(
 
 Maybe<void> PReluAlphaGradOp::InferHasBatchDim(
     std::function<bool*(const std::string&)> HasBatchDim4BnInOp) const {
-  CHECK(*HasBatchDim4BnInOp("dy"));
+  CHECK_OR_RETURN(*HasBatchDim4BnInOp("dy"));
+  CHECK_OR_RETURN(*HasBatchDim4BnInOp("x"));
   *HasBatchDim4BnInOp("alpha_grad") = false;
   return Maybe<void>::Ok();
 }
@@ -97,10 +95,10 @@ void PReluAlphaGradOp::GetSbpSignatures(
     const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4Ibn,
     SbpSignatureList* sbp_sig_list) const {
   SbpSignatureBuilder()
-      .Split(input_bns(), 0)
-      .Split(output_bns(), 0)
-      .MakeSplitSignatureListBuilder(LogicalBlobDesc4Ibn(output_bns().Get(0)).shape().NumAxes())
-      .Build(sbp_sig_list);
+      .Split("dy", 0)
+      .Split("x", 0)
+      .PartialSum("alpha_grad")
+      .Build(sbp_sig_list->mutable_sbp_signature()->Add());
 }
 
 REGISTER_OP(OperatorConf::kPreluAlphaGradConf, PReluAlphaGradOp);
