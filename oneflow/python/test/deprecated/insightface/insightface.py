@@ -77,8 +77,8 @@ def TrainInsightface():
     job_conf.train_conf()
     #job_conf.default_initializer_conf(CreateInitializer('one'))
     job_conf.default_initializer_conf(dict(constant_conf=dict(value=1.0)))
-    job_conf.train_conf().primary_lr = 0
-    job_conf.train_conf().num_of_batches_in_snapshot = 1
+    job_conf.train_conf().primary_lr = 0.1
+    job_conf.train_conf().num_of_batches_in_snapshot = 100
     job_conf.train_conf().model_update_conf.naive_conf.SetInParent()
     job_conf.train_conf().loss_lbn.extend(["softmax_loss/out"])
     return BuildInsightfaceWithDeprecatedAPI(_TRAIN_DIR)
