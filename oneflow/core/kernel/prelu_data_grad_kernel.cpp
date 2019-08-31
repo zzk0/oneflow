@@ -9,15 +9,15 @@ void PReluDataGradKernel<device_type, T>::ForwardDataContent(
   if (dx_blob == nullptr) { return; }
   Memset<device_type>(ctx.device_ctx, dx_blob->mut_dptr<T>(), 0,
                       dx_blob->ByteSizeOfDataContentField());
-  PReluDataGradKernelUtil<device_type, T>::Compute(
-      ctx, this->op_conf().prelu_data_grad_conf(), BnInOp2Blob("x"),
-      BnInOp2Blob("alpha"), BnInOp2Blob("dy"), dx_blob);
+  PReluDataGradKernelUtil<device_type, T>::Compute(ctx, this->op_conf().prelu_data_grad_conf(),
+                                                   BnInOp2Blob("x"), BnInOp2Blob("alpha"),
+                                                   BnInOp2Blob("dy"), dx_blob);
 }
 
 template<typename T>
 struct PReluDataGradKernelUtil<DeviceType::kCPU, T> {
   static void Compute(const KernelCtx& ctx, const PReluDataGradOpConf& conf, const Blob* x_blob,
-                       const Blob* alpha_blob, const Blob* dy_blob, Blob* dx_blob) {
+                      const Blob* alpha_blob, const Blob* dy_blob, Blob* dx_blob) {
     const T* x = x_blob->dptr<T>();
     const T* alpha_dptr = alpha_blob->dptr<T>();
     const T* dy = dy_blob->dptr<T>();
@@ -52,6 +52,7 @@ struct PReluDataGradKernelUtil<DeviceType::kCPU, T> {
   }
 };
 
-ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kPreluDataGradConf, PReluDataGradKernel, FLOATING_DATA_TYPE_SEQ);
+ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kPreluDataGradConf, PReluDataGradKernel,
+                           FLOATING_DATA_TYPE_SEQ);
 
 }  // namespace oneflow

@@ -9,16 +9,19 @@ void PReluAlphaGradOp::InitFromOpConf() {
   EnrollInputBn("dy", false);
   EnrollInputBn("x", false);
   EnrollOutputBn("alpha_grad", false);
-  if (device_type() == DeviceType::kGPU) { 
+  if (device_type() == DeviceType::kGPU) {
     EnrollTmpBn("bw_buf");
     EnrollTmpBn("alpha_grad_buf");
   }
 }
 
-const PbMessage& PReluAlphaGradOp::GetCustomizedConf() const { return op_conf().prelu_alpha_grad_conf(); }
+const PbMessage& PReluAlphaGradOp::GetCustomizedConf() const {
+  return op_conf().prelu_alpha_grad_conf();
+}
 
-void PReluAlphaGradOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-                             const ParallelContext* parallel_ctx) const {
+Maybe<void> PReluAlphaGradOp::InferBlobDescs(
+    std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+    const ParallelContext* parallel_ctx) const {
   const PReluAlphaGradOpConf& conf = op_conf().prelu_alpha_grad_conf();
   const BlobDesc* x = GetBlobDesc4BnInOp("x");
   BlobDesc* alpha_grad_blob_desc = GetBlobDesc4BnInOp("alpha_grad");
@@ -28,8 +31,7 @@ void PReluAlphaGradOp::InferBlobDescs(std::function<BlobDesc*(const std::string&
     if (conf.data_format() == "channels_first") {
       alpha_grad_blob_desc->mut_shape() = Shape({x->shape().At(1)});
     } else if (conf.data_format() == "channels_last") {
-      alpha_grad_blob_desc->mut_shape() =
-          Shape({x->shape().At(x->shape().NumAxes() - 1)});
+      alpha_grad_blob_desc->mut_shape() = Shape({x->shape().At(x->shape().NumAxes() - 1)});
     } else {
       UNIMPLEMENTED();
     }
@@ -60,6 +62,7 @@ void PReluAlphaGradOp::InferBlobDescs(std::function<BlobDesc*(const std::string&
     }
   }
   alpha_grad_blob_desc->set_data_type(x->data_type());
+  return Maybe<void>::Ok();
 }
 
 void PReluAlphaGradOp::VirtualGenKernelConf(
@@ -80,13 +83,14 @@ void PReluAlphaGradOp::VirtualGenKernelConf(
     } else {
       UNIMPLEMENTED();
     }
-  }  
+  }
 }
 
-void PReluAlphaGradOp::InferHasBatchDim(
+Maybe<void> PReluAlphaGradOp::InferHasBatchDim(
     std::function<bool*(const std::string&)> HasBatchDim4BnInOp) const {
   CHECK(*HasBatchDim4BnInOp("dy"));
   *HasBatchDim4BnInOp("alpha_grad") = false;
+  return Maybe<void>::Ok();
 }
 
 void PReluAlphaGradOp::GetSbpSignatures(

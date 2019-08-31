@@ -20,9 +20,8 @@ class PReluAlphaGradKernel final : public KernelIf<device_type> {
 template<DeviceType device_type, typename T>
 struct PReluAlphaGradKernelUtil {
   static void Compute(const KernelCtx& ctx, const PReluAlphaGradOpConf& conf,
-                       const PbRf<int32_t>& permutation, const Blob* x_blob,
-                       const Blob* dy_blob, Blob* bw_buf_blob,
-                       Blob* alpha_grad_buf_blob, Blob* alpha_grad_blob);
+                      const PbRf<int32_t>& permutation, const Blob* x_blob, const Blob* dy_blob,
+                      Blob* bw_buf_blob, Blob* alpha_grad_buf_blob, Blob* alpha_grad_blob);
 };
 
 }  // namespace oneflow

@@ -10,20 +10,16 @@ namespace {
 template<typename T>
 __global__ void PReluAlphaBackward(const int64_t elem_cnt, const T* x, const T* dy,
                                    T* alpha_grad_buf_dptr) {
-  CUDA_1D_KERNEL_LOOP(i, elem_cnt) {
-    alpha_grad_buf_dptr[i] = (x[i] <= 0) ? dy[i] * x[i] : 0;
-  }
+  CUDA_1D_KERNEL_LOOP(i, elem_cnt) { alpha_grad_buf_dptr[i] = (x[i] <= 0) ? dy[i] * x[i] : 0; }
 }
 
 }  // namespace
 
 template<typename T>
 struct PReluAlphaGradKernelUtil<DeviceType::kGPU, T> {
-
   static void Compute(const KernelCtx& ctx, const PReluAlphaGradOpConf& conf,
-                          const PbRf<int32_t>& permutation, const Blob* x_blob,
-                          const Blob* dy_blob, Blob* bw_buf_blob,
-                          Blob* alpha_grad_buf_blob, Blob* alpha_grad_blob) {
+                      const PbRf<int32_t>& permutation, const Blob* x_blob, const Blob* dy_blob,
+                      Blob* bw_buf_blob, Blob* alpha_grad_buf_blob, Blob* alpha_grad_blob) {
     const int64_t elem_cnt = dy_blob->shape().elem_cnt();
     PReluAlphaBackward<<<BlocksNum4ThreadsNum(elem_cnt), kCudaThreadsNumPerBlock, 0,
                          ctx.device_ctx->cuda_stream()>>>(

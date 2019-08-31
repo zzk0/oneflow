@@ -10,17 +10,16 @@ void PReluAlphaGradKernel<device_type, T>::ForwardDataContent(
   Memset<device_type>(ctx.device_ctx, alpha_grad_blob->mut_dptr<T>(), 0,
                       alpha_grad_blob->ByteSizeOfDataContentField());
   PReluAlphaGradKernelUtil<device_type, T>::Compute(
-      ctx, this->op_conf().prelu_alpha_grad_conf(), this->kernel_conf().prelu_alpha_grad_conf().perm(), BnInOp2Blob("x"),
-      BnInOp2Blob("dy"), BnInOp2Blob("bw_buf"), BnInOp2Blob("alpha_grad_buf"),
-      alpha_grad_blob);
+      ctx, this->op_conf().prelu_alpha_grad_conf(),
+      this->kernel_conf().prelu_alpha_grad_conf().perm(), BnInOp2Blob("x"), BnInOp2Blob("dy"),
+      BnInOp2Blob("bw_buf"), BnInOp2Blob("alpha_grad_buf"), alpha_grad_blob);
 }
 
 template<typename T>
 struct PReluAlphaGradKernelUtil<DeviceType::kCPU, T> {
   static void Compute(const KernelCtx& ctx, const PReluAlphaGradOpConf& conf,
-                       const PbRf<int32_t>& permutation, const Blob* x_blob,
-                       const Blob* dy_blob, Blob* bw_buf_blob,
-                       Blob* alpha_grad_buf_blob, Blob* alpha_grad_blob) {
+                      const PbRf<int32_t>& permutation, const Blob* x_blob, const Blob* dy_blob,
+                      Blob* bw_buf_blob, Blob* alpha_grad_buf_blob, Blob* alpha_grad_blob) {
     const T* x = x_blob->dptr<T>();
     const T* dy = dy_blob->dptr<T>();
     T* alpha_grad_dptr = alpha_grad_blob->mut_dptr<T>();
@@ -50,6 +49,7 @@ struct PReluAlphaGradKernelUtil<DeviceType::kCPU, T> {
   }
 };
 
-ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kPreluAlphaGradConf, PReluAlphaGradKernel, FLOATING_DATA_TYPE_SEQ);
+ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kPreluAlphaGradConf, PReluAlphaGradKernel,
+                           FLOATING_DATA_TYPE_SEQ);
 
 }  // namespace oneflow

@@ -14,10 +14,8 @@ void GenerateInputVarOpConf(
   if (!conf.has_alpha()) {
     OperatorConf alpha_var_op =
         GenerateVariableOpConf(BlobDesc4ModelBn("alpha"), op.op_name() + "-alpha", "alpha");
-    alpha_var_op.mutable_variable_conf()
-        ->mutable_initializer()
-        ->mutable_constant_conf()
-        ->set_value(conf.alpha_init());
+    alpha_var_op.mutable_variable_conf()->mutable_initializer()->mutable_constant_conf()->set_value(
+        conf.alpha_init());
     op_confs->push_back(alpha_var_op);
     mut_conf->set_alpha(alpha_var_op.name() + "/out");
   }

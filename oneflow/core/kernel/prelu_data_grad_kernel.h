@@ -19,7 +19,8 @@ class PReluDataGradKernel final : public KernelIf<device_type> {
 
 template<DeviceType device_type, typename T>
 struct PReluDataGradKernelUtil {
-  static void Compute(const KernelCtx& ctx, const PReluDataGradOpConf& conf, const Blob* x_blob, const Blob* alpha_blob, const Blob* dy_blob, Blob* dx_blob);
+  static void Compute(const KernelCtx& ctx, const PReluDataGradOpConf& conf, const Blob* x_blob,
+                      const Blob* alpha_blob, const Blob* dy_blob, Blob* dx_blob);
 };
 
 }  // namespace oneflow

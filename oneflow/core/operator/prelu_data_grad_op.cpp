@@ -12,20 +12,25 @@ void PReluDataGradOp::InitFromOpConf() {
   EnrollOutputBn("dx", false);
 }
 
-const PbMessage& PReluDataGradOp::GetCustomizedConf() const { return op_conf().prelu_data_grad_conf(); }
-
-void PReluDataGradOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-                             const ParallelContext* parallel_ctx) const {
-  const PReluDataGradOpConf& conf = this->op_conf().prelu_data_grad_conf();
-  *GetBlobDesc4BnInOp("dx") = *GetBlobDesc4BnInOp("x");
+const PbMessage& PReluDataGradOp::GetCustomizedConf() const {
+  return op_conf().prelu_data_grad_conf();
 }
 
-void PReluDataGradOp::InferHasBatchDim(
+Maybe<void> PReluDataGradOp::InferBlobDescs(
+    std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+    const ParallelContext* parallel_ctx) const {
+  const PReluDataGradOpConf& conf = this->op_conf().prelu_data_grad_conf();
+  *GetBlobDesc4BnInOp("dx") = *GetBlobDesc4BnInOp("x");
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> PReluDataGradOp::InferHasBatchDim(
     std::function<bool*(const std::string&)> HasBatchDim4BnInOp) const {
   CHECK(*HasBatchDim4BnInOp("dy"));
   CHECK(*HasBatchDim4BnInOp("x"));
   CHECK(*HasBatchDim4BnInOp("alpha") == false);
   *HasBatchDim4BnInOp("dx") = true;
+  return Maybe<void>::Ok();
 }
 void PReluDataGradOp::GetSbpSignatures(
     const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4Ibn,

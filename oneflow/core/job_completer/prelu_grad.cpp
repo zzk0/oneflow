@@ -12,7 +12,8 @@ void GenerateBackwardOpConf(
   if (DiffLbi4BnInOp("in") != nullptr) {
     OperatorConf prelu_data_grad_op;
     prelu_data_grad_op.set_name(op.op_name() + "_data_grad");
-    PReluDataGradOpConf* prelu_data_grad_op_conf = prelu_data_grad_op.mutable_prelu_data_grad_conf();
+    PReluDataGradOpConf* prelu_data_grad_op_conf =
+        prelu_data_grad_op.mutable_prelu_data_grad_conf();
     prelu_data_grad_op_conf->set_dy(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
     prelu_data_grad_op_conf->set_x(GenLogicalBlobName(op.BnInOp2Lbi("in")));
     prelu_data_grad_op_conf->set_alpha(GenLogicalBlobName(op.BnInOp2Lbi("alpha")));
@@ -26,7 +27,8 @@ void GenerateBackwardOpConf(
   if (DiffLbi4BnInOp("alpha") != nullptr) {
     OperatorConf prelu_alpha_grad_op;
     prelu_alpha_grad_op.set_name(op.op_name() + "_alpha_grad");
-    PReluAlphaGradOpConf* prelu_alpha_grad_op_conf = prelu_alpha_grad_op.mutable_prelu_alpha_grad_conf();
+    PReluAlphaGradOpConf* prelu_alpha_grad_op_conf =
+        prelu_alpha_grad_op.mutable_prelu_alpha_grad_conf();
     prelu_alpha_grad_op_conf->set_dy(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
     prelu_alpha_grad_op_conf->set_x(GenLogicalBlobName(op.BnInOp2Lbi("in")));
     prelu_alpha_grad_op_conf->set_data_format(conf.data_format());

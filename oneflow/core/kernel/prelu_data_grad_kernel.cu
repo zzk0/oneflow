@@ -10,8 +10,8 @@ namespace {
 
 template<typename T>
 __global__ void PReluDataBackward(const int64_t elem_cnt, const int64_t channel_num,
-                                  const int64_t area, const T* x, const T* alpha_dptr,
-                                  const T* dy, T* dx) {
+                                  const int64_t area, const T* x, const T* alpha_dptr, const T* dy,
+                                  T* dx) {
   CUDA_1D_KERNEL_LOOP(i, elem_cnt) {
     int64_t c = (i / area) % channel_num;
     dx[i] = (x[i] <= 0) ? dy[i] * alpha_dptr[c] : dy[i];
@@ -22,9 +22,8 @@ __global__ void PReluDataBackward(const int64_t elem_cnt, const int64_t channel_
 
 template<typename T>
 struct PReluDataGradKernelUtil<DeviceType::kGPU, T> {
-  
-  static void Compute(const KernelCtx& ctx, const PReluDataGradOpConf& conf,
-                       const Blob* x_blob, const Blob* alpha_blob, const Blob* dy_blob, Blob* dx_blob) {
+  static void Compute(const KernelCtx& ctx, const PReluDataGradOpConf& conf, const Blob* x_blob,
+                      const Blob* alpha_blob, const Blob* dy_blob, Blob* dx_blob) {
     const int64_t elem_cnt = dy_blob->shape().elem_cnt();
     if (conf.channel_shared()) {
       PReluDataBackward<<<BlocksNum4ThreadsNum(elem_cnt), kCudaThreadsNumPerBlock, 0,
@@ -42,8 +41,8 @@ struct PReluDataGradKernelUtil<DeviceType::kGPU, T> {
         const int64_t channel_num = dy_blob->shape().At(x_blob->shape().NumAxes() - 1);
         PReluDataBackward<<<BlocksNum4ThreadsNum(elem_cnt), kCudaThreadsNumPerBlock, 0,
                             ctx.device_ctx->cuda_stream()>>>(
-            elem_cnt, channel_num, 1, x_blob->dptr<T>(), alpha_blob->dptr<T>(),
-            dy_blob->dptr<T>(), dx_blob->mut_dptr<T>());
+            elem_cnt, channel_num, 1, x_blob->dptr<T>(), alpha_blob->dptr<T>(), dy_blob->dptr<T>(),
+            dx_blob->mut_dptr<T>());
       } else {
         UNIMPLEMENTED();
       }
