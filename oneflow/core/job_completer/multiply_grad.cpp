@@ -36,6 +36,6 @@ void GenerateBackwardOpConf(
 
 }  // namespace
 
-REGISTER_OP_GRAD(OperatorConf::kSquareConf, &GenerateBackwardOpConf);
+REGISTER_OP_GRAD(OperatorConf::kMultiplyConf, &GenerateBackwardOpConf);
 
 }  // namespace oneflow
