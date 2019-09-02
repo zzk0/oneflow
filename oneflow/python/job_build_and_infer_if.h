@@ -67,36 +67,24 @@ bool CurJobBuildAndInferCtx_HasJobConf(std::string* error_str) {
   return ctx->HasJobConf();
 }
 
-std::string CurJobBuildAndInferCtx_AddAndInferInputOp(const std::string& serialized_op_conf) {
+std::string CurJobBuildAndInferCtx_AddAndInferOp(const std::string& serialized_op_conf,
+                                                 const std::string& serialized_parallel_conf) {
   using namespace oneflow;
   // parse
   OperatorConf op_conf;
   if (TxtString2PbMessage(serialized_op_conf, &op_conf) == false) {
     return PbMessage2TxtString(ErrorUtil::ProtoParseFailedError("operator conf parse failed"));
   }
-  // get current JobBuildandInferCtx
-  std::string error_str;
-  JobBuildAndInferCtx* ctx = JobBuildAndInferHelper::GetCurInferCtx(&error_str);
-  if (ctx == nullptr) { return error_str; }
-  // add and infer input_op
-  auto maybe_ok = TRY(ctx->AddAndInferInputOp(op_conf));
-  if (maybe_ok.IsOk() == false) { return PbMessage2TxtString(*maybe_ok.error()); }
-  return PbMessage2TxtString(ErrorUtil::Ok());
-}
-
-std::string CurJobBuildAndInferCtx_AddAndInferNonInputOp(const std::string& serialized_op_conf) {
-  using namespace oneflow;
-  // parse
-  OperatorConf op_conf;
-  if (TxtString2PbMessage(serialized_op_conf, &op_conf) == false) {
-    return PbMessage2TxtString(ErrorUtil::ProtoParseFailedError("operator conf parse failed"));
+  ParallelConf parallel_conf;
+  if (TxtString2PbMessage(serialized_parallel_conf, &parallel_conf) == false) {
+    return PbMessage2TxtString(ErrorUtil::ProtoParseFailedError("parallel conf parse failed"));
   }
   // get current JobBuildandInferCtx
   std::string error_str;
   JobBuildAndInferCtx* ctx = JobBuildAndInferHelper::GetCurInferCtx(&error_str);
   if (ctx == nullptr) { return error_str; }
   // add and infer input_op
-  auto maybe_ok = TRY(ctx->AddAndInferNonInputOp(op_conf));
+  auto maybe_ok = TRY(ctx->AddAndInferOp(op_conf, parallel_conf));
   if (maybe_ok.IsOk() == false) { return PbMessage2TxtString(*maybe_ok.error()); }
   return PbMessage2TxtString(ErrorUtil::Ok());
 }
@@ -168,21 +156,21 @@ long long JobBuildAndInferCtx_GetDataType(const std::string& job_name, const std
   return *maybe_data_type.data();
 }
 
-bool JobBuildAndInferCtx_GetHasBatchDim(const std::string& job_name, const std::string& lbn,
-                                        std::string* error_str) {
+std::string JobBuildAndInferCtx_GetBatchAxis(const std::string& job_name, const std::string& lbn,
+                                             std::string* error_str) {
   using namespace oneflow;
   auto maybe_ctx = TRY(Global<JobBuildAndInferCtxMgr>::Get()->FindJobBuildAndInferCtx(job_name));
   if (maybe_ctx.IsOk() == false) {
     PbMessage2TxtString(*maybe_ctx.error(), error_str);
-    return false;
+    return PbMessage2TxtString(OptInt64());
   }
-  auto maybe_has_batch_dim = TRY(maybe_ctx.data()->GetHasBatchDim(lbn));
+  auto maybe_has_batch_dim = TRY(maybe_ctx.data()->GetBatchAxis(lbn));
   if (maybe_has_batch_dim.IsOk() == false) {
     PbMessage2TxtString(*maybe_has_batch_dim.error(), error_str);
-    return false;
+    return PbMessage2TxtString(OptInt64());
   }
   PbMessage2TxtString(ErrorUtil::Ok(), error_str);
-  return *maybe_has_batch_dim.data();
+  return PbMessage2TxtString(*maybe_has_batch_dim.data());
 }
 
 bool JobBuildAndInferCtx_GetHasSplitAxisFromProducerView(const std::string& job_name,

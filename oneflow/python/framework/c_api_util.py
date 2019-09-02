@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import oneflow.core.common.error_pb2 as error_util
+import oneflow.core.common.data_type_pb2 as dtype_util
 from oneflow.core.job.inter_user_job_info_pb2 import InterUserJobInfo
 import oneflow.core.job.job_set_pb2 as job_set_util
 import oneflow.core.job.placement_pb2 as placment_util
@@ -60,15 +61,11 @@ def CurJobBuildAndInferCtx_SetJobConf(job_config_proto):
     error = text_format.Parse(serialized_error, error_util.Error())
     if error.HasField("error_type"): raise JobBuildAndInferError(error)
 
-def CurJobBuildAndInferCtx_AddAndInferInputOp(op_conf_proto):
+def CurJobBuildAndInferCtx_AddAndInferOp(op_conf_proto, parallel_conf_proto):
     serialized_op_conf = str(text_format.MessageToString(op_conf_proto))
-    serialized_error = oneflow_internal.CurJobBuildAndInferCtx_AddAndInferInputOp(serialized_op_conf)
-    error = text_format.Parse(serialized_error, error_util.Error())
-    if error.HasField("error_type"): raise JobBuildAndInferError(error)
-
-def CurJobBuildAndInferCtx_AddAndInferNonInputOp(op_conf_proto):
-    serialized_op_conf = str(text_format.MessageToString(op_conf_proto))
-    error_str = oneflow_internal.CurJobBuildAndInferCtx_AddAndInferNonInputOp(serialized_op_conf)
+    serialized_parallel_conf = str(text_format.MessageToString(parallel_conf_proto))
+    add_and_infer = oneflow_internal.CurJobBuildAndInferCtx_AddAndInferOp
+    error_str = add_and_infer(serialized_op_conf, serialized_parallel_conf)
     error = text_format.Parse(error_str, error_util.Error())
     if error.HasField("error_type"): raise JobBuildAndInferError(error)
 
@@ -113,13 +110,15 @@ def JobBuildAndInferCtx_GetDataType(job_name, lbn):
     if error.HasField("error_type"): raise JobBuildAndInferError(error)
     return int(dtype)
 
-def JobBuildAndInferCtx_GetHasBatchDim(job_name, lbn):
+def JobBuildAndInferCtx_GetBatchAxis(job_name, lbn):
     job_name = str(job_name)
     lbn = str(lbn)
-    has_batch_dim, error_str = oneflow_internal.JobBuildAndInferCtx_GetHasBatchDim(job_name, lbn)
+    batch_axis_str, error_str = oneflow_internal.JobBuildAndInferCtx_GetBatchAxis(job_name, lbn)
+    batch_axis = text_format.Parse(batch_axis_str, dtype_util.OptInt64())
     error = text_format.Parse(error_str, error_util.Error())
     if error.HasField("error_type"): raise JobBuildAndInferError(error)
-    return has_batch_dim
+    if batch_axis.HasField("value"): return batch_axis.value
+    return None
 
 def JobBuildAndInferCtx_GetHasSplitAxisFromProducerView(job_name, lbn):
     job_name = str(job_name)
