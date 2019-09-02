@@ -7,10 +7,10 @@ namespace {
 void GenerateBackwardOpConf(
     const Operator& op, std::vector<OperatorConf>* op_confs,
     const std::function<LogicalBlobId*(const std::string&)>& DiffLbi4BnInOp) {
-  CHECK(op.op_conf().has_square_conf());
+  CHECK(op.op_conf().has_multiply_conf());
   if (DiffLbi4BnInOp("in_0") != nullptr) {
     OperatorConf multiply_in_0_grad_op;
-    multiply_in_0_grad_op.set_name(op.op_name() + "_multiply_in_0_grad");
+    multiply_in_0_grad_op.set_name(op.op_name() + "_in_0_grad");
     MultiplyOpConf* multiply_in_0_grad_op_conf =
         multiply_in_0_grad_op.mutable_multiply_conf();
     multiply_in_0_grad_op_conf->set_in_0(GenLogicalBlobName(op.BnInOp2Lbi("in_1")));
@@ -22,7 +22,7 @@ void GenerateBackwardOpConf(
   }
   if (DiffLbi4BnInOp("in_1") != nullptr) {
     OperatorConf multiply_in_1_grad_op;
-    multiply_in_1_grad_op.set_name(op.op_name() + "_multiply_in_1_grad");
+    multiply_in_1_grad_op.set_name(op.op_name() + "_in_1_grad");
     MultiplyOpConf* multiply_in_1_grad_op_conf =
         multiply_in_1_grad_op.mutable_multiply_conf();
     multiply_in_1_grad_op_conf->set_in_0(GenLogicalBlobName(op.BnInOp2Lbi("in_0")));

@@ -19,7 +19,7 @@ void GenerateBackwardOpConf(
     op_confs->push_back(multiply_in_op);
 
     OperatorConf scalar_mul_op;
-    scalar_mul_op.set_name(op.op_name() + "_scalar_mul_grad");
+    scalar_mul_op.set_name(op.op_name() + "_scalar_mul_in_grad");
     ScalarMulOpConf* scalar_mul_op_conf = scalar_mul_op.mutable_scalar_mul_conf();
     scalar_mul_op_conf->set_int_operand(2);
     scalar_mul_op_conf->set_in(multiply_in_op.name() + "/out");
