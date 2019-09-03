@@ -1,12 +1,12 @@
 #include "oneflow/core/job/job_build_and_infer_ctx.h"
-#include "oneflow/core/common/error_util.h"
 
 namespace oneflow {
 
-Error GenJobBuildAndInferError(JobBuildAndInferError err_code, std::string msg) {
-  Error err;
-  err.set_msg(msg);
-  err.set_job_build_and_infer_error(err_code);
+std::shared_ptr<ErrorProto> GenJobBuildAndInferError(JobBuildAndInferError err_code,
+                                                     std::string msg) {
+  auto err = std::make_shared<ErrorProto>();
+  err->set_msg(msg);
+  err->set_job_build_and_infer_error(err_code);
   return err;
 }
 
@@ -210,7 +210,7 @@ Maybe<void> JobBuildAndInferCtx::CheckPlacement() const {
 
 Maybe<void> JobBuildAndInferCtx::CheckJobConf() const {
   if (job_->job_conf().job_type_case() == JobConfigProto::JOB_TYPE_NOT_SET) {
-    return ErrorUtil::JobTypeNotSet("job_type not set, please set predict_conf or train_conf");
+    return Error::JobTypeNotSet() << "job_type not set, please set predict_conf or train_conf";
   }
   return Maybe<void>::Ok();
 }
