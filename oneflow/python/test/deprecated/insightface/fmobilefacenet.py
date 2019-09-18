@@ -15,10 +15,9 @@ def Conv(input_blob, num_filter=1, kernel=None, stride=None, pad='valid', num_gr
   dl_net = input_blob.dl_net()
   input_blob = dl_net.Conv2D(input_blob, name='%s%s_conv2d' % (name, suffix), filters=num_filter, kernel_size=kernel,
                              data_format='channels_first', strides=stride, padding=pad, group_num=num_group,
-                             activation=op_conf_pb2.kNone,
                              use_bias=False, dilation_rate=[1, 1], **kw)
   input_blob = dl_net.Normalization(input_blob, name='%s%s_batchnorm' % (name, suffix), axis=1, momentum=0.9,
-                                    epsilon=0.001, scale=True, center=True, activation=op_conf_pb2.kNone)
+                                    epsilon=0.001, scale=True, center=True)
   input_blob = dl_net.PRelu(input_blob, name='%s%s_relu' % (name, suffix), data_format='channels_first')
   #input_blob = dl_net.Relu(input_blob, name='%s%s_relu' % (name, suffix))
 
@@ -29,10 +28,9 @@ def Linear(input_blob, num_filter=1, kernel=None, stride=None, pad='valid', num_
   dl_net = input_blob.dl_net()
   input_blob = dl_net.Conv2D(input_blob, name='%s%s_conv2d' % (name, suffix), filters=num_filter, kernel_size=kernel,
                              data_format='channels_first', strides=stride, padding=pad, group_num=num_group,
-                             activation=op_conf_pb2.kNone,
                              use_bias=False, dilation_rate=[1, 1], **kw)
   input_blob = dl_net.Normalization(input_blob, name='%s%s_batchnorm' % (name, suffix), axis=1, momentum=0.9,
-                                    epsilon=0.001, scale=True, center=True, activation=op_conf_pb2.kNone)
+                                    epsilon=0.001, scale=True, center=True)
 
   return input_blob
 
@@ -95,8 +93,8 @@ def MobileFacenet(input_blob, embedding_size=10):
   conv_6_dw = Linear(conv_6_sep, num_filter=512, num_group=512, kernel=[7, 7], pad='valid', stride=[1, 1],
                      name="conv_6dw7_7")
   # TODO: use_bias ??
-  conv_6_f = dl_net.FullyConnected(conv_6_dw, name='pre_fc1', units=embedding_size, activation=op_conf_pb2.kNone,
+  conv_6_f = dl_net.FullyConnected(conv_6_dw, name='pre_fc1', units=embedding_size,
                                    use_bias=True)
   fc1 = dl_net.Normalization(conv_6_f, name='fc1', axis=1, momentum=0.9,
-                             epsilon=2e-5, scale=False, center=True, activation=op_conf_pb2.kNone)
+                             epsilon=2e-5, scale=False, center=True)
   return fc1

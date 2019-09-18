@@ -457,6 +457,13 @@ class DLNet(object):
         self.CreateOperator(util.GetCurFuncName(), name, [], [], **kw)
         return Blob(self, '{}/out'.format(name))
 
+    def Multiply(self, a_blob, b_blob, name=None, **kw):
+        kw['out'] = 'out'
+        kw['in_0'] = a_blob.logical_blob_name
+        kw['in_1'] = b_blob.logical_blob_name
+        name = self._GetVariableName(name, util.GetCurFuncName())
+        self.CreateOperator(util.GetCurFuncName(), name, [], [], **kw)
+        return Blob(self, '{}/out'.format(name))
     def BiasAdd(self, a_blob, b_blob, name=None, **kw):
         kw['a'] = a_blob.logical_blob_name
         kw['b'] = b_blob.logical_blob_name
@@ -481,6 +488,14 @@ class DLNet(object):
         self.CreateOperator(util.GetCurFuncName(), name, [], [], **kw)
         return Blob(self, '{}/out'.format(name))
 
+    def Where(self, condition, x, y, name=None, **kw):
+        kw['condition'] = condition.logical_blob_name
+        kw['x'] = x.logical_blob_name
+        kw['y'] = y.logical_blob_name
+        kw['out'] = 'out'
+        name = self._GetVariableName(name, util.GetCurFuncName())
+        self.CreateOperator(util.GetCurFuncName(), name, [], [], **kw)
+        return Blob(self, '{}/out'.format(name))
     def Add(self, in_blobs, activation=op_conf_pb2.kNone, name=None, **kw):
         kw['in'] = [blob.logical_blob_name for blob in in_blobs]
         if activation != op_conf_pb2.kNone:
