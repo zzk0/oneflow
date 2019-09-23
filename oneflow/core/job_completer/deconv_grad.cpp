@@ -4,6 +4,31 @@ namespace oneflow {
 
 namespace {
 
+template <typename ConvNdOpConf>
+void SetNdConvOpConf(
+    ConvNdOpConf* conf, const ConvConf& conv_conf, const Operator& op,
+    const std::string out_diff_lbn, LogicalBlobId* in_diff_lbi,
+    OperatorConf& data_grad_op, std::vector<OperatorConf>* op_confs,
+    const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4BnInOp){
+
+  conf->set_in(out_diff_lbn);
+  conf->set_weight(GenLogicalBlobName(op.BnInOp2Lbi("filter")));
+  conf->set_out("y");
+  conf->set_padding(GetValFromPbMessage<std::string>(conv_conf, "padding"));
+  conf->set_data_format(GetValFromPbMessage<std::string>(conv_conf, "data_format"));
+
+  const BlobDesc& filter_logical_blob_desc = LogicalBlobDesc4BnInOp("filter");
+  conf->set_filters(filter_logical_blob_desc.shape().At(0));
+
+  *conf->mutable_kernel_size() = GetPbRfFromPbMessage<int32_t>(conv_conf, "kernel_size");
+  *conf->mutable_strides() = GetPbRfFromPbMessage<int32_t>(conv_conf, "strides");
+  *conf->mutable_dilation_rate() = GetPbRfFromPbMessage<int32_t>(conv_conf, "dilation_rate");
+  conf->set_use_bias(false);
+  op_confs->push_back(data_grad_op);
+  in_diff_lbi->set_op_name(data_grad_op.name());
+  in_diff_lbi->set_blob_name(conf->out());  
+}
+
 // auto GetNdConvOpConf(OperatorConf& data_grad_op, int32_t Ndims){
 //   if (Ndims == 1){
 //     Conv1DOpConf* conf = data_grad_op.mutable_conv_1d_conf();
@@ -29,7 +54,7 @@ void GenerateBackwardOpConf(
   if (op.GetValFromCustomizedConf<bool>("use_bias")) {
     LogicalBlobId* bias_diff_lbi = DiffLbi4BnInOp("bias");
     if (bias_diff_lbi != nullptr) {
-      OperatorConf bias_grad_op;
+      OperatorConf bias_grad_op; 
       bias_grad_op.set_name("System-AutoGrad-" + op.op_name() + "-BiasGrad");
       ConvBiasGradOpConf* conf = bias_grad_op.mutable_conv_bias_grad_conf();
       conf->set_data_format(conv_conf.data_format());
@@ -72,58 +97,16 @@ void GenerateBackwardOpConf(
 
     if (Ndims == 1) {
       Conv1DOpConf* conf = data_grad_op.mutable_conv_1d_conf();
-      conf->set_in(out_diff_lbn);
-      conf->set_weight(GenLogicalBlobName(op.BnInOp2Lbi("filter")));
-      conf->set_out("y");
-      conf->set_padding(GetValFromPbMessage<std::string>(conv_conf, "padding"));
-      conf->set_data_format(GetValFromPbMessage<std::string>(conv_conf, "data_format"));
-
-      const BlobDesc& filter_logical_blob_desc = LogicalBlobDesc4BnInOp("filter");
-      conf->set_filters(filter_logical_blob_desc.shape().At(0));
-
-      *conf->mutable_kernel_size() = GetPbRfFromPbMessage<int32_t>(conv_conf, "kernel_size");
-      *conf->mutable_strides() = GetPbRfFromPbMessage<int32_t>(conv_conf, "strides");
-      *conf->mutable_dilation_rate() = GetPbRfFromPbMessage<int32_t>(conv_conf, "dilation_rate");
-      conf->set_use_bias(false);
-      op_confs->push_back(data_grad_op);
-      in_diff_lbi->set_op_name(data_grad_op.name());
-      in_diff_lbi->set_blob_name(conf->out());
+      SetNdConvOpConf(conf, conv_conf, op, out_diff_lbn, in_diff_lbi,
+                      data_grad_op, op_confs, LogicalBlobDesc4BnInOp);
     } else if (Ndims == 2) {
       Conv2DOpConf* conf = data_grad_op.mutable_conv_2d_conf();
-      conf->set_in(out_diff_lbn);
-      conf->set_weight(GenLogicalBlobName(op.BnInOp2Lbi("filter")));
-      conf->set_out("y");
-      conf->set_padding(GetValFromPbMessage<std::string>(conv_conf, "padding"));
-      conf->set_data_format(GetValFromPbMessage<std::string>(conv_conf, "data_format"));
-
-      const BlobDesc& filter_logical_blob_desc = LogicalBlobDesc4BnInOp("filter");
-      conf->set_filters(filter_logical_blob_desc.shape().At(0));
-
-      *conf->mutable_kernel_size() = GetPbRfFromPbMessage<int32_t>(conv_conf, "kernel_size");
-      *conf->mutable_strides() = GetPbRfFromPbMessage<int32_t>(conv_conf, "strides");
-      *conf->mutable_dilation_rate() = GetPbRfFromPbMessage<int32_t>(conv_conf, "dilation_rate");
-      conf->set_use_bias(false);
-      op_confs->push_back(data_grad_op);
-      in_diff_lbi->set_op_name(data_grad_op.name());
-      in_diff_lbi->set_blob_name(conf->out());
+      SetNdConvOpConf(conf, conv_conf, op, out_diff_lbn, in_diff_lbi,
+                      data_grad_op, op_confs, LogicalBlobDesc4BnInOp);
     } else if (Ndims == 3) {
       Conv3DOpConf* conf = data_grad_op.mutable_conv_3d_conf();
-      conf->set_in(out_diff_lbn);
-      conf->set_weight(GenLogicalBlobName(op.BnInOp2Lbi("filter")));
-      conf->set_out("y");
-      conf->set_padding(GetValFromPbMessage<std::string>(conv_conf, "padding"));
-      conf->set_data_format(GetValFromPbMessage<std::string>(conv_conf, "data_format"));
-
-      const BlobDesc& filter_logical_blob_desc = LogicalBlobDesc4BnInOp("filter");
-      conf->set_filters(filter_logical_blob_desc.shape().At(0));
-
-      *conf->mutable_kernel_size() = GetPbRfFromPbMessage<int32_t>(conv_conf, "kernel_size");
-      *conf->mutable_strides() = GetPbRfFromPbMessage<int32_t>(conv_conf, "strides");
-      *conf->mutable_dilation_rate() = GetPbRfFromPbMessage<int32_t>(conv_conf, "dilation_rate");
-      conf->set_use_bias(false);
-      op_confs->push_back(data_grad_op);
-      in_diff_lbi->set_op_name(data_grad_op.name());
-      in_diff_lbi->set_blob_name(conf->out());
+      SetNdConvOpConf(conf, conv_conf, op, out_diff_lbn, in_diff_lbi,
+                      data_grad_op, op_confs, LogicalBlobDesc4BnInOp);
     } else {
       UNIMPLEMENTED();
     }
