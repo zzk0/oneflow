@@ -29,21 +29,6 @@ void SetNdConvOpConf(
   in_diff_lbi->set_blob_name(conf->out());  
 }
 
-// auto GetNdConvOpConf(OperatorConf& data_grad_op, int32_t Ndims){
-//   if (Ndims == 1){
-//     Conv1DOpConf* conf = data_grad_op.mutable_conv_1d_conf();
-//     return conf;
-//   }else if(Ndims == 2){
-//     Conv2DOpConf* conf = data_grad_op.mutable_conv_2d_conf();
-//     return conf;
-//   }else if(Ndims == 3){
-//     Conv3DOpConf* conf = data_grad_op.mutable_conv_3d_conf();
-//     return conf;
-//   }else{
-//     UNIMPLEMENTED();
-//   }
-// }
-
 void GenerateBackwardOpConf(
     const Operator& op, std::vector<OperatorConf>* op_confs,
     const std::function<LogicalBlobId*(const std::string&)>& DiffLbi4BnInOp,
@@ -84,16 +69,6 @@ void GenerateBackwardOpConf(
     OperatorConf data_grad_op;
     data_grad_op.set_name("System-AutoGrad-" + op.op_name() + "-DataGrad");
     int32_t Ndims = conv_conf.num_spatial_dims();
-
-    // if (Ndims == 1){
-    //   Conv1DOpConf* conf = data_grad_op.mutable_conv_1d_conf();
-    // }else if (Ndims == 2){
-    //   Conv2DOpConf* conf = data_grad_op.mutable_conv_2d_conf();
-    // }else if (Ndims == 3){
-    //   Conv3DOpConf* conf = data_grad_op.mutable_conv_3d_conf();
-    // }else{
-    //   UNIMPLEMENTED();
-    // }
 
     if (Ndims == 1) {
       Conv1DOpConf* conf = data_grad_op.mutable_conv_1d_conf();
