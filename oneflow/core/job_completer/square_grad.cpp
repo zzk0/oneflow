@@ -11,8 +11,7 @@ void GenerateBackwardOpConf(
   if (DiffLbi4BnInOp("in") != nullptr) {
     OperatorConf multiply_in_op;
     multiply_in_op.set_name(op.op_name() + "_multiply_in_grad");
-    MultiplyOpConf* multiply_in_op_conf =
-        multiply_in_op.mutable_multiply_conf();
+    MultiplyOpConf* multiply_in_op_conf = multiply_in_op.mutable_multiply_conf();
     multiply_in_op_conf->set_in_0(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
     multiply_in_op_conf->set_in_1(GenLogicalBlobName(op.BnInOp2Lbi("in")));
     multiply_in_op_conf->set_out("out");

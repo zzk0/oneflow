@@ -14,7 +14,7 @@ void GenerateBackwardOpConf(
   LogicalBlobId* gamma_diff_lbi = conf.has_gamma() ? DiffLbi4BnInOp("gamma") : nullptr;
   LogicalBlobId* beta_diff_lbi = conf.has_beta() ? DiffLbi4BnInOp("beta") : nullptr;
   CHECK(dx_lbi != nullptr || gamma_diff_lbi != nullptr || beta_diff_lbi != nullptr);
-  if (conf.is_training()) {  
+  if (conf.is_training()) {
     OperatorConf normalization_grad_op;
     normalization_grad_op.set_name("System-AutoGrad-" + op.op_name());
     NormalizationGradOpConf* grad_conf = normalization_grad_op.mutable_normalization_grad_conf();
@@ -57,11 +57,12 @@ void GenerateBackwardOpConf(
       ReshapeOpConf* reshape_inv_var_op_conf = reshape_inv_var_op.mutable_reshape_conf();
       reshape_inv_var_op_conf->set_out("out");
       reshape_inv_var_op_conf->set_in(rsqrt_op.name() + "/out");
-      FOR_RANGE(size_t, i, 0, in_axis) { 
-        if (i != conf.axis()){
+      FOR_RANGE(size_t, i, 0, in_axis) {
+        if (i != conf.axis()) {
           reshape_inv_var_op_conf->mutable_shape()->add_dim(1);
-        } else{
-          reshape_inv_var_op_conf->mutable_shape()->add_dim(LogicalBlobDesc4BnInOp("in").shape().At(conf.axis()));
+        } else {
+          reshape_inv_var_op_conf->mutable_shape()->add_dim(
+              LogicalBlobDesc4BnInOp("in").shape().At(conf.axis()));
         }
       }
       op_confs->push_back(reshape_inv_var_op);
@@ -75,34 +76,43 @@ void GenerateBackwardOpConf(
         reshape_mean_op_conf->set_y("y");
         op_confs->push_back(reshape_mean_op);
 
-        //normalized
+        // normalized
         OperatorConf normalized_broadcast_sub_mean_op;
-        normalized_broadcast_sub_mean_op.set_name("System-AutoGrad-" + op.op_name() + "-NormalizedBroadcastSubMean");
-        BroadcastSubOpConf* normalized_broadcast_sub_mean_op_conf = normalized_broadcast_sub_mean_op.mutable_broadcast_sub_conf();
+        normalized_broadcast_sub_mean_op.set_name("System-AutoGrad-" + op.op_name()
+                                                  + "-NormalizedBroadcastSubMean");
+        BroadcastSubOpConf* normalized_broadcast_sub_mean_op_conf =
+            normalized_broadcast_sub_mean_op.mutable_broadcast_sub_conf();
         normalized_broadcast_sub_mean_op_conf->set_a(GenLogicalBlobName(op.BnInOp2Lbi("in")));
         normalized_broadcast_sub_mean_op_conf->set_b(reshape_mean_op.name() + "/y");
         normalized_broadcast_sub_mean_op_conf->set_out("out");
         op_confs->push_back(normalized_broadcast_sub_mean_op);
 
         OperatorConf normalized_broadcast_mul_inv_var_op;
-        normalized_broadcast_mul_inv_var_op.set_name("System-AutoGrad-" + op.op_name() + "-NormalizedBroadcastMulInvVariance");
-        BroadcastMulOpConf* normalized_broadcast_mul_inv_var_op_conf = normalized_broadcast_mul_inv_var_op.mutable_broadcast_mul_conf();
+        normalized_broadcast_mul_inv_var_op.set_name("System-AutoGrad-" + op.op_name()
+                                                     + "-NormalizedBroadcastMulInvVariance");
+        BroadcastMulOpConf* normalized_broadcast_mul_inv_var_op_conf =
+            normalized_broadcast_mul_inv_var_op.mutable_broadcast_mul_conf();
         normalized_broadcast_mul_inv_var_op_conf->set_a(reshape_inv_var_op.name() + "/out");
-        normalized_broadcast_mul_inv_var_op_conf->set_b(normalized_broadcast_sub_mean_op.name() + "/out");
+        normalized_broadcast_mul_inv_var_op_conf->set_b(normalized_broadcast_sub_mean_op.name()
+                                                        + "/out");
         normalized_broadcast_mul_inv_var_op_conf->set_out("out");
         op_confs->push_back(normalized_broadcast_mul_inv_var_op);
 
         OperatorConf broadcast_mul_normalize_op;
-        broadcast_mul_normalize_op.set_name("System-AutoGrad-" + op.op_name() + "-BroadcastMulNormalize");
-        BroadcastMulOpConf* broadcast_mul_normalize_op_conf = broadcast_mul_normalize_op.mutable_broadcast_mul_conf();
+        broadcast_mul_normalize_op.set_name("System-AutoGrad-" + op.op_name()
+                                            + "-BroadcastMulNormalize");
+        BroadcastMulOpConf* broadcast_mul_normalize_op_conf =
+            broadcast_mul_normalize_op.mutable_broadcast_mul_conf();
         broadcast_mul_normalize_op_conf->set_a(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
         broadcast_mul_normalize_op_conf->set_b(normalized_broadcast_mul_inv_var_op.name() + "/out");
         broadcast_mul_normalize_op_conf->set_out("out");
-        op_confs->push_back(broadcast_mul_normalize_op);     
-        
+        op_confs->push_back(broadcast_mul_normalize_op);
+
         OperatorConf reduce_sum_gamma_diff_op;
-        reduce_sum_gamma_diff_op.set_name("System-AutoGrad-" + op.op_name() + "-ReduceSum-GammaDiff");
-        ReduceSumOpConf* reduce_sum_gamma_diff_op_conf = reduce_sum_gamma_diff_op.mutable_reduce_sum_conf();
+        reduce_sum_gamma_diff_op.set_name("System-AutoGrad-" + op.op_name()
+                                          + "-ReduceSum-GammaDiff");
+        ReduceSumOpConf* reduce_sum_gamma_diff_op_conf =
+            reduce_sum_gamma_diff_op.mutable_reduce_sum_conf();
         reduce_sum_gamma_diff_op_conf->set_in(broadcast_mul_normalize_op.name() + "/out");
         reduce_sum_gamma_diff_op_conf->set_out("out");
         FOR_RANGE(int32_t, i, 0, in_axis) {
@@ -126,39 +136,41 @@ void GenerateBackwardOpConf(
 
         OperatorConf broadcast_mul_gamma_op;
         broadcast_mul_gamma_op.set_name("System-AutoGrad-" + op.op_name() + "-BroadcastMulGamma");
-        BroadcastMulOpConf* broadcast_mul_gamma_op_conf = broadcast_mul_gamma_op.mutable_broadcast_mul_conf();
+        BroadcastMulOpConf* broadcast_mul_gamma_op_conf =
+            broadcast_mul_gamma_op.mutable_broadcast_mul_conf();
         broadcast_mul_gamma_op_conf->set_a(reshape_gamma_op.name() + "/y");
         broadcast_mul_gamma_op_conf->set_b(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
         broadcast_mul_gamma_op_conf->set_out("out");
         op_confs->push_back(broadcast_mul_gamma_op);
 
         OperatorConf broadcast_mul_inv_var_op;
-        broadcast_mul_inv_var_op.set_name("System-AutoGrad-" + op.op_name() + "-BroadcastMulInvVar");
-        BroadcastMulOpConf* broadcast_mul_inv_var_op_conf = broadcast_mul_inv_var_op.mutable_broadcast_mul_conf();
+        broadcast_mul_inv_var_op.set_name("System-AutoGrad-" + op.op_name()
+                                          + "-BroadcastMulInvVar");
+        BroadcastMulOpConf* broadcast_mul_inv_var_op_conf =
+            broadcast_mul_inv_var_op.mutable_broadcast_mul_conf();
         broadcast_mul_inv_var_op_conf->set_a(broadcast_mul_gamma_op.name() + "/out");
         broadcast_mul_inv_var_op_conf->set_b(reshape_inv_var_op.name() + "/out");
         broadcast_mul_inv_var_op_conf->set_out("out");
         op_confs->push_back(broadcast_mul_inv_var_op);
-  
+
         dx_lbi->set_op_name(broadcast_mul_inv_var_op.name());
         dx_lbi->set_blob_name("out");
       }
     }
 
     if (beta_diff_lbi != nullptr) {
-        OperatorConf reduce_sum_beta_op;
-        reduce_sum_beta_op.set_name("System-AutoGrad-" + op.op_name() + "-ReduceSum-BetaDiff");
-        ReduceSumOpConf* reduce_sum_beta_op_conf = reduce_sum_beta_op.mutable_reduce_sum_conf();
-        reduce_sum_beta_op_conf->set_in(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
-        reduce_sum_beta_op_conf->set_out("out");
-        FOR_RANGE(int32_t, i, 0, in_axis) {
-          if (i != conf.axis()) { reduce_sum_beta_op_conf->add_axis(i); }
-        }
-        reduce_sum_beta_op_conf->set_keep_dims(false);
-        op_confs->push_back(reduce_sum_beta_op);
-        beta_diff_lbi->set_op_name(reduce_sum_beta_op.name());
-        beta_diff_lbi->set_blob_name("out");
-
+      OperatorConf reduce_sum_beta_op;
+      reduce_sum_beta_op.set_name("System-AutoGrad-" + op.op_name() + "-ReduceSum-BetaDiff");
+      ReduceSumOpConf* reduce_sum_beta_op_conf = reduce_sum_beta_op.mutable_reduce_sum_conf();
+      reduce_sum_beta_op_conf->set_in(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
+      reduce_sum_beta_op_conf->set_out("out");
+      FOR_RANGE(int32_t, i, 0, in_axis) {
+        if (i != conf.axis()) { reduce_sum_beta_op_conf->add_axis(i); }
+      }
+      reduce_sum_beta_op_conf->set_keep_dims(false);
+      op_confs->push_back(reduce_sum_beta_op);
+      beta_diff_lbi->set_op_name(reduce_sum_beta_op.name());
+      beta_diff_lbi->set_blob_name("out");
     }
   }
 }
