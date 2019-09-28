@@ -44,16 +44,17 @@ Maybe<void> SwitchOutputOp::InferBatchAxis(
   return Maybe<void>::Ok();
 }
 
-void SwitchOutputOp::GetSbpSignatures(
-    const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4Ibn,
+Maybe<void> SwitchOutputOp::GetSbpSignatures(
+    const std::function<Maybe<const BlobDesc*>(const std::string&)>& LogicalBlobDesc4Ibn,
     SbpSignatureList* sbp_sig_list) const {
   InterfaceOpUtil::GetOutputLikeOpSbpSignature(op_conf().switch_output_conf().blob_conf(),
                                                input_bns(), output_bns(),
                                                sbp_sig_list->mutable_sbp_signature()->Add());
+  return Maybe<void>::Ok();
 }
 
 REGISTER_OP(OperatorConf::kSwitchOutputConf, SwitchOutputOp);
-REGISTER_OP_SAME_OUTPUT_BLOB_MEM_BLOCK_NUM(OperatorConf::kSwitchOutputConf, 1);
+REGISTER_OP_SAME_OUTPUT_BLOB_REGST_NUM(OperatorConf::kSwitchOutputConf, 1);
 REGISTER_INTERFACE_OP(OperatorConf::kSwitchOutputConf);
 
 }  // namespace oneflow

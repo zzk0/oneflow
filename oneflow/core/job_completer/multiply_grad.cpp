@@ -6,31 +6,35 @@ namespace {
 
 void GenerateBackwardOpConf(
     const Operator& op, std::vector<OperatorConf>* op_confs,
-    const std::function<LogicalBlobId*(const std::string&)>& DiffLbi4BnInOp) {
+    const std::function<LogicalBlobId*(const std::string&)>& DiffLbi4BnInOp,
+    const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4BnInOp) {
   CHECK(op.op_conf().has_multiply_conf());
   if (DiffLbi4BnInOp("in_0") != nullptr) {
-    OperatorConf multiply_in_0_grad_op;
-    multiply_in_0_grad_op.set_name(op.op_name() + "_in_0_grad");
-    MultiplyOpConf* multiply_in_0_grad_op_conf =
-        multiply_in_0_grad_op.mutable_multiply_conf();
-    multiply_in_0_grad_op_conf->set_in_0(GenLogicalBlobName(op.BnInOp2Lbi("in_1")));
-    multiply_in_0_grad_op_conf->set_in_1(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
-    multiply_in_0_grad_op_conf->set_out("out");
-    op_confs->push_back(multiply_in_0_grad_op);
-    DiffLbi4BnInOp("in_0")->set_op_name(multiply_in_0_grad_op.name());
+    OperatorConf op_conf;
+    op_conf.set_name(op.op_name() + "_in0_grad");
+    MultiplyOpConf* conf = op_conf.mutable_multiply_conf();
+    conf->set_out("out");
+
+    conf->set_in_0(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
+    conf->set_in_1(GenLogicalBlobName(op.BnInOp2Lbi("in_1")));
+
+    op_confs->push_back(op_conf);
+
+    DiffLbi4BnInOp("in_0")->set_op_name(op_conf.name());
     DiffLbi4BnInOp("in_0")->set_blob_name("out");
   }
   if (DiffLbi4BnInOp("in_1") != nullptr) {
-    OperatorConf multiply_in_1_grad_op;
-    multiply_in_1_grad_op.set_name(op.op_name() + "_in_1_grad");
-    MultiplyOpConf* multiply_in_1_grad_op_conf =
-        multiply_in_1_grad_op.mutable_multiply_conf();
-    multiply_in_1_grad_op_conf->set_in_0(GenLogicalBlobName(op.BnInOp2Lbi("in_0")));
-    multiply_in_1_grad_op_conf->set_in_1(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
-    multiply_in_1_grad_op_conf->set_out("out");
-    op_confs->push_back(multiply_in_1_grad_op);
-    DiffLbi4BnInOp("in_1")->set_op_name(multiply_in_1_grad_op.name());
-    DiffLbi4BnInOp("in_1")->set_blob_name("out");
+    OperatorConf op_conf;
+    op_conf.set_name(op.op_name() + "_in1_grad");
+    MultiplyOpConf* conf = op_conf.mutable_multiply_conf();
+    conf->set_out("out");
+
+    conf->set_in_0(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
+    conf->set_in_1(GenLogicalBlobName(op.BnInOp2Lbi("in_0")));
+
+    op_confs->push_back(op_conf);
+
+    DiffLbi4BnInOp("in_1")->set_op_name(op_conf.name());
   }
 }
 

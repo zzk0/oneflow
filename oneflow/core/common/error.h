@@ -21,7 +21,7 @@ class Error final {
   static Error Todo();
   static Error Unimplemented();
 
-  const std::shared_ptr<ErrorProto>& error_proto() const { return error_proto_; }
+  std::shared_ptr<ErrorProto> error_proto() const { return error_proto_; }
   ErrorProto* operator->() const { return error_proto_.get(); }
   operator std::string() const;
 
@@ -34,6 +34,12 @@ Error&& operator<<(Error&& error, const T& x) {
   std::ostringstream ss;
   ss << x;
   error->set_msg(error->msg() + ss.str());
+  return std::move(error);
+}
+
+template<>
+inline Error&& operator<<(Error&& error, const JobBuildAndInferError& x) {
+  error->set_job_build_and_infer_error(x);
   return std::move(error);
 }
 

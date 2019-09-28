@@ -5,6 +5,7 @@ import oneflow.python.framework.remote_blob as remote_blob_util
 import oneflow.python.framework.id_util as id_util
 import oneflow.core.operator.op_conf_pb2 as op_conf_util
 import oneflow.core.register.logical_blob_id_pb2 as logical_blob_id_util
+import oneflow
 from oneflow.python.oneflow_export import oneflow_export
 
 import collections
@@ -20,12 +21,15 @@ def conv2d(
     dilations=None,
     name=None,
 ):
+    assert len(input.static_shape) == 4
+    assert len(filters.static_shape) == 4
+
     if isinstance(strides, (list, tuple)):
         assert len(strides) == 2, ValueError(
             "strides length must be 2 when passed as a list."
         )
     elif isinstance(strides, int):
-        strides = [strides] * 2
+        strides = [strides, strides]
     else:
         raise ValueError("strides must be an int or a list.")
 
@@ -40,35 +44,34 @@ def conv2d(
     )
 
     if dilations is None:
-        dilations = [1] * 2
+        dilations = [1, 1]
     else:
         if isinstance(dilations, (list, tuple)):
             assert len(dilations) == 2, ValueError(
                 "dilations length must be 2 when passed as a list."
             )
         elif isinstance(dilations, int):
-            dilations = [dilations] * 2
+            dilations = [dilations, dilations]
         else:
             raise ValueError("dilations must be an int or a list.")
 
     op_conf = op_conf_util.OperatorConf()
+    setattr(op_conf, "name", name if name is not None else id_util.UniqueStr("Conv2d_"))
     setattr(op_conf.conv_2d_conf, "in", input.logical_blob_name)
     op_conf.conv_2d_conf.out = "out"
     op_conf.conv_2d_conf.weight = filters.logical_blob_name
     op_conf.conv_2d_conf.filters = filters.static_shape[0]
     op_conf.conv_2d_conf.padding = padding.lower()
     op_conf.conv_2d_conf.data_format = channel_pos
-    op_conf.conv_2d_conf.kernel_size.extend(
-        [filters.static_shape[2], filters.static_shape[3]]
-    )
+    if channel_pos == "channels_first":
+        op_conf.conv_2d_conf.kernel_size.extend(filters.static_shape[2:4])
+    elif channel_pos == "channels_last":
+        op_conf.conv_2d_conf.kernel_size.extend(filters.static_shape[-3:-1])
+    else:
+        raise ValueError("invalid data_format")
     op_conf.conv_2d_conf.strides.extend(strides)
     op_conf.conv_2d_conf.dilation_rate.extend(dilations)
     op_conf.conv_2d_conf.use_bias = False
-
-    if name is None:
-        op_conf.name = id_util.UniqueStr("Conv2d_")
-    else:
-        op_conf.name = name
 
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
@@ -93,18 +96,12 @@ def bias_add(value, bias, data_format=None, name=None):
             raise ValueError(
                 "data_format must be of the form `N...C` or `NC...`"
             )
+    bias_extended_shape = [1] * len(value.shape)
+    bias_extended_shape[bias_add_axis] = value.shape[bias_add_axis]
+    assert bias_extended_shape[bias_add_axis] == bias.shape[0]
+    bias = oneflow.reshape(bias, bias_extended_shape)
 
-    op_conf = op_conf_util.OperatorConf()
-    op_conf.name = name
-    op_conf.bias_add_conf.a = value.logical_blob_name
-    op_conf.bias_add_conf.b = bias.logical_blob_name
-    op_conf.bias_add_conf.axis = bias_add_axis
-
-    compile_context.CurJobAddOp(op_conf)
-    lbi = logical_blob_id_util.LogicalBlobId()
-    lbi.op_name = op_conf.name
-    lbi.blob_name = "out"
-    return remote_blob_util.RemoteBlob(lbi)
+    return value + bias
 
 
 @oneflow_export("nn.max_pool1d")
@@ -283,6 +280,33 @@ def sparse_softmax_cross_entropy_with_logits(
     lbi.blob_name = "out"
     return remote_blob_util.RemoteBlob(lbi)
 
+@oneflow_export("nn.sigmoid_cross_entropy_with_logits")
+def sigmoid_cross_entropy_with_logits(
+    labels=None, logits=None, name=None
+):
+    assert labels is not None
+    assert logits is not None
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("SigmoidCrossEntropy_"),
+    )
+    setattr(
+        op_conf.sigmoid_cross_entropy_loss_conf,
+        "prediction",
+        logits.logical_blob_name,
+    )
+    setattr(
+        op_conf.sigmoid_cross_entropy_loss_conf, "label", labels.logical_blob_name
+    )
+    setattr(op_conf.sigmoid_cross_entropy_loss_conf, "loss", "loss")
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "loss"
+    return remote_blob_util.RemoteBlob(lbi)
+
 
 def _GetSequence(value, n, name):
     """Formats value from input"""
@@ -302,3 +326,26 @@ def _GetSequence(value, n, name):
                 name, n, current_n
             )
         )
+
+
+@oneflow_export("nn.dropout")
+def dropout(x, noise_shape=None, seed=None, name=None, rate=None):
+    op_conf = op_conf_util.OperatorConf()
+    if name is None:
+        op_conf.name = id_util.UniqueStr("Dropout_")
+    else:
+        op_conf.name = name
+    setattr(op_conf.dropout_conf, "in", x.logical_blob_name)
+    setattr(op_conf.dropout_conf, "out", "out")
+    if noise_shape is not None:
+        assert isinstance(noise_shape, (list, tuple))
+        op_conf.dropout_conf.noise_shape.dim.extend(list(noise_shape))
+    if seed is not None:
+        setattr(op_conf.dropout_conf, "seed", seed)
+    assert rate is not None
+    setattr(op_conf.dropout_conf, "rate", rate)
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)

@@ -6,9 +6,6 @@
 
 namespace oneflow {
 
-void SetBnValInOpTypeConf(PbMessage* pb_msg, const std::string& bn, const std::string& old_val,
-                          const std::string& new_val);
-
 const static std::string kProducedLbi2ConsumedDiffLbi = "produced_lbi2consumed_diff_lbi";
 
 std::function<const ParallelConf*(const std::string&)> MakeGetterParallelConf4OpName(
@@ -35,6 +32,7 @@ class JobBuilder final {
   void MutParallelConfOnlyOnce(const std::string& op_name, const ParallelConf& parallel_conf);
   void AddOrMutOpsOnlyOnce(const ParallelConf& parallel_conf,
                            const std::vector<OperatorConf>& op_confs);
+  void DelOps(const std::vector<OperatorConf>& op_confs);
   SbpParallel* MutSbpParallel4Oba(const OpBlobArg& oba) const;
   void BindIdenticalSbpOpBlobArgPair(const OpBlobArg& first, const OpBlobArg& second);
 

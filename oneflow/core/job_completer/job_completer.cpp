@@ -1,6 +1,5 @@
 #include "oneflow/core/device/cuda_util.h"
 #include "oneflow/core/job_completer/job_completer.h"
-#include "oneflow/core/job_completer/autovar.h"
 #include "oneflow/core/job_completer/autograd.h"
 #include "oneflow/core/job_completer/autotick.h"
 #include "oneflow/core/job_completer/add_keep_header_only_op_conf.h"
@@ -11,7 +10,9 @@
 #include "oneflow/core/job_completer/all_reduce_sequence_pass.h"
 #include "oneflow/core/job_completer/group_boxing_by_dst_parallel.h"
 #include "oneflow/core/job_completer/auto_mixed_precision.h"
-#include "oneflow/core/job_completer/auto_global_step.h"
+#include "oneflow/core/job_completer/non_distributed_optimizer_pass.h"
+#include "oneflow/core/job_completer/nccl_tuple_broadcast_reduce_sequence_pass.h"
+#include "oneflow/core/job_completer/auto_train_step.h"
 #include "oneflow/core/job_completer/auto_learning_rate.h"
 
 namespace oneflow {
@@ -200,7 +201,7 @@ void AddIdentityOpAndReconnect(
       std::string lbn_check = GenLogicalBlobName(lbi);
       std::string identity_out_lbn = GenLogicalBlobName(old_lbi2new_lbi.at(lbi));
       for (const std::string& ibn : edge->lbi2ibns().at(lbi)) {
-        SetBnValInOpTypeConf(op_type_conf, ibn, lbn_check, identity_out_lbn);
+        ReplaceStrValInPbFdOrPbRpf(op_type_conf, ibn, lbn_check, identity_out_lbn);
         const auto& sbp_parallel = edge->dst_node()->SbpParallel4BnInOp(ibn);
         const auto& sbp_iter = old_lbi2sbp_parallel.find(lbi);
         if (sbp_iter == old_lbi2sbp_parallel.end()) {
@@ -308,7 +309,8 @@ void SetOpTimeShape7BatchAxisLbis(const OpGraph& op_graph, JobBuilder* job_build
 }
 
 void RewriteBoxingWithAllReduce(const OpGraph& op_graph, JobBuilder* job_builder) {
-  if (GlobalJobDesc().enable_all_reduce_group()) {
+  if (!GlobalJobDesc().enable_non_distributed_optimizer()
+      && GlobalJobDesc().enable_all_reduce_group()) {
     AllReduceAddPass().Apply(op_graph, job_builder);
   }
 }
@@ -330,21 +332,32 @@ void EnableAutoMixedPrecision(const OpGraph& op_graph, JobBuilder* job_builder) 
       .Apply(op_graph, job_builder);
 }
 
+void EnableNonDistributedOptimizer(const OpGraph& op_graph, JobBuilder* job_builder) {
+  if (!GlobalJobDesc().enable_non_distributed_optimizer()) { return; }
+  CHECK(GlobalJobDesc().enable_nccl());
+  NonDistributedOptimizerPass().Apply(op_graph, job_builder);
+}
+
+void MakeNcclTupleBroadcastReduceSequence(const OpGraph& op_graph, JobBuilder* job_builder) {
+  NcclTupleBroadcastReduceSequencePass().Apply(op_graph, job_builder);
+}
+
 }  // namespace
 
 void JobCompleter::Complete(Job* job) const {
   // replace facade op
   WithOpGraphAndMutJobBuilder(job, &ReplaceFacade);
   // complete variable ops
-  WithOpGraphAndMutJobBuilder(job, &AutoVar);
   WithOpGraphAndMutJobBuilder(job, &SetDefaultVariableConf);
   if (GlobalJobDesc().IsTrain()) {
     WithOpGraphAndMutJob(job, &TieUpChainHeadersUnReachableFromAnyVariableOps);
     WithOpGraphAndMutJobBuilder(job, &EnableAutoMixedPrecision);
-    WithOpGraphAndMutJob(job, &AutoGlobalStep);
+    WithOpGraphAndMutJobBuilder(job, &EnableNonDistributedOptimizer);
+    WithOpGraphAndMutJob(job, &AutoTrainStep);
     WithOpGraphAndMutJob(job, &AutoLearningRate);
     // complete ops for trainning
     WithOpGraphAndMutJobBuilder(job, &GenerateOpConf4Trainning);
+    WithOpGraphAndMutJobBuilder(job, &MakeNcclTupleBroadcastReduceSequence);
     WithOpGraphAndMutJobBuilder(job, &RewriteBoxingWithAllReduce);
     WithOpGraphAndMutJobBuilder(job, &MakeAllReduceSequence);
   }

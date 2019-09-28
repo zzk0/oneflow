@@ -29,7 +29,7 @@ LogicalNode* ReduceConcatOp::NewProperLogicalNode() const {
 
 Maybe<void> ReduceConcatOp::InferBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, int64_t record_piece_size,
+    const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature,
     std::function<void(OpContext*)> EnrollOpCtx) const {
   const BlobDesc* first_in_blob = GetBlobDesc4BnInOp(input_bns().Get(0));
   const DataType data_type = first_in_blob->data_type();
@@ -87,10 +87,10 @@ Maybe<void> ReduceConcatOp::InferBatchAxis(
 Maybe<void> ReduceConcatOp::InferSbpSignature(
     SbpSignature* sbp_signature, const SbpSignature& sbp_sig_conf,
     const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
-    std::function<const SbpInferHint&(const std::string&)> SbpInferHint4Ibn,
+    std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
     const ParallelDesc& parallel_desc) const {
   for (const auto& ibn : input_bns()) {
-    CHECK_OR_RETURN(SbpInferHint4Ibn(ibn).sbp_parallel().has_partial_sum_parallel());
+    CHECK_OR_RETURN(JUST(SbpInferHint4Ibn(ibn))->sbp_parallel().has_partial_sum_parallel());
   }
   SbpSignatureBuilder().PartialSum(input_bns()).PartialSum(output_bns()).Build(sbp_signature);
   return Maybe<void>::Ok();
