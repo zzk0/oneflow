@@ -18,6 +18,7 @@ def get_variable(
     trainable=None,
     model_name=None,
     random_seed=None,
+    primary_lr=None,
     distribute=distribute_util.broadcast(),
 ):
     assert isinstance(name, str)
@@ -44,6 +45,8 @@ def get_variable(
             op_conf.variable_conf.split_axis.value = distribute.axis
         else:
             op_conf.variable_conf.split_axis.ClearField("value")
+        if primary_lr is not None:
+            op_conf.variable_conf.primary_lr = primary_lr
 
         if random_seed is not None:
             op_conf.variable_conf.random_seed = random_seed

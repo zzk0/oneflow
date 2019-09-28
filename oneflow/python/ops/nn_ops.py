@@ -19,6 +19,7 @@ def conv2d(
     padding,
     data_format="NHWC",
     dilations=None,
+    group_num=1,
     name=None,
 ):
     assert len(input.static_shape) == 4
@@ -63,6 +64,7 @@ def conv2d(
     op_conf.conv_2d_conf.filters = filters.static_shape[0]
     op_conf.conv_2d_conf.padding = padding.lower()
     op_conf.conv_2d_conf.data_format = channel_pos
+    op_conf.conv_2d_conf.group_num = group_num
     if channel_pos == "channels_first":
         op_conf.conv_2d_conf.kernel_size.extend(filters.static_shape[2:4])
     elif channel_pos == "channels_last":
