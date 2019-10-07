@@ -1439,10 +1439,8 @@ message DeconvOpConf {
     required string y = 2;
     required string filter = 3;
     required int32 filters = 4;
-    required ConvConf conv_conf = 5;
-    optional bool use_bias = 6 [default = true];
-    optional InitializerConf weight_initializer = 7;
-    optional InitializerConf bias_initializer = 8;
+    repeated int32 output_padding = 5;
+    required ConvConf conv_conf = 6;
 }
 
 message OperatorConf {

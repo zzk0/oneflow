@@ -7,30 +7,41 @@ namespace oneflow {
 
 namespace {
 
-void GetDewindowedOutputSize(int64_t input_size, int32_t filter_size, int32_t stride,
-                             const std::string& padding_type, int64_t* output_size,
-                             int32_t* padding_before, int32_t* padding_after) {
+void GetDewindowedOutputSize(int64_t input_size, int32_t filter_size, int32_t dilation_rate,
+                           int32_t stride, int32_t output_padding, const std::string& padding_type, int64_t* output_size,
+                           int32_t* padding_before, int32_t* padding_after) {
   CHECK_GT(stride, 0);
+  CHECK_GE(dilation_rate, 1);
 
-  if (padding_type == "valid" || padding_type == "same") {
+  int32_t effective_filter_size = (filter_size - 1) * dilation_rate + 1;
+  if (padding_type == "valid") {
+    if (output_size) { *output_size = (input_size - 1) * stride + effective_filter_size + output_padding; }
     if (padding_before) { *padding_before = 0; }
     if (padding_after) { *padding_after = 0; }
-    if (output_size) { *output_size = (input_size - 1) * stride + filter_size; }
+  } else if (padding_type == "same") {
+    int64_t tmp_output_size = (input_size - 1) * stride + output_padding;
+    if (output_size) { *output_size = tmp_output_size; }
+    LOG(INFO) << "DECONV INFER OUTPUT SHAPE "<<tmp_output_size;
+    // const int32_t padding_needed = std::max(
+    //     0,
+    //     static_cast<int32_t>((input_size - 1) * stride + effective_filter_size - tmp_output_size));
+    const int32_t padding_needed = std::max(0, static_cast<int32_t>(effective_filter_size));
+    // For odd values of total padding, add more padding at the 'right'
+    // side of the given dimension.
+    if (padding_before) { *padding_before = padding_needed / 2; }
+    if (padding_after) { 
+      *padding_after = padding_needed - padding_needed / 2; 
+      LOG(INFO) << "DECONV INFER PADDING AFTER "<<*padding_after;
+    }
   } else {
     UNIMPLEMENTED();
   }
   if (output_size) { CHECK_GE((*output_size), 0); }
 }
 
-void GetDewindowedOutputSize(int64_t input_size, int32_t filter_size, int32_t stride,
-                             const std::string& padding_type, int64_t* output_size,
-                             int32_t* padding_size) {
-  GetDewindowedOutputSize(input_size, filter_size, stride, padding_type, output_size, padding_size,
-                          nullptr);
-}
-
-void GetOutAndPad(const Shape& in_blob_shape, const ConvConf& conv_conf, std::vector<int64_t>* out,
+void GetOutAndPad(const Shape& in_blob_shape, const DeconvOpConf& conf, std::vector<int64_t>* out,
                   std::vector<int32_t>* pad_small_side, std::vector<int32_t>* pad_large_side) {
+  const ConvConf& conv_conf = conf.conv_conf();
   int32_t opkernel_dim = in_blob_shape.NumAxes() - 2;
   if (out) { out->assign(opkernel_dim, 0); }
   if (pad_small_side) { pad_small_side->assign(opkernel_dim, 0); }
@@ -38,10 +49,12 @@ void GetOutAndPad(const Shape& in_blob_shape, const ConvConf& conv_conf, std::ve
   const auto& data_format = conv_conf.data_format();
   const std::string& padding = conv_conf.padding();
   const auto& strides = conv_conf.strides();
+  const PbRf<int32_t>& dilation_rate = conv_conf.dilation_rate();
   const PbRf<int32_t>& kernel_size = conv_conf.kernel_size();
+  const PbRf<int32_t>& output_padding = conf.output_padding();
   FOR_RANGE(int32_t, i, 0, opkernel_dim) {
-    GetDewindowedOutputSize(in_blob_shape.At(DhwOffset(data_format) + i), kernel_size.Get(i),
-                            strides.Get(i), padding, out ? &(out->at(i)) : nullptr,
+    GetDewindowedOutputSize(in_blob_shape.At(DhwOffset(data_format) + i), kernel_size.Get(i), dilation_rate.Get(i),
+                            strides.Get(i), output_padding.Get(i), padding, out ? &(out->at(i)) : nullptr,
                             pad_small_side ? &(pad_small_side->at(i)) : nullptr,
                             pad_large_side ? &(pad_large_side->at(i)) : nullptr);
   }
@@ -53,13 +66,14 @@ void GetOutAndPad(const Shape& in_blob_shape, const ConvConf& conv_conf, std::ve
 CudnnDeconvDesc::~CudnnDeconvDesc() { CudaCheck(cudnnDestroyConvolutionDescriptor(val_)); }
 
 CudnnDeconvDesc::CudnnDeconvDesc(const DataType& data_type, const Shape& in_blob_shape,
-                                 const ConvConf& conv_conf) {
+                                 const DeconvOpConf& conf) {
+  const ConvConf& conv_conf = conf.conv_conf();
   int32_t opkernel_dim = in_blob_shape.NumAxes() - 2;
   CudaCheck(cudnnCreateConvolutionDescriptor(&val_));
   std::vector<int32_t> pad_large_side;
-  GetOutAndPad(in_blob_shape, conv_conf, nullptr, nullptr, &pad_large_side);
+  GetOutAndPad(in_blob_shape, conf, nullptr, nullptr, &pad_large_side);
   const PbRf<int32_t>& strides = conv_conf.strides();
-  const std::vector<int32_t> dilation_rate(opkernel_dim, 1);
+  const PbRf<int32_t>& dilation_rate = conv_conf.dilation_rate();
   if (opkernel_dim == 2) {
     CudaCheck(cudnnSetConvolution2dDescriptor(
         val_, pad_large_side[0], pad_large_side[1], strides.Get(0), strides.Get(1),
@@ -84,7 +98,6 @@ class DeconvOp : public Operator {
     EnrollInputBn("x");
     EnrollOutputBn("y");
     EnrollInputBn("filter");
-    if (op_conf().deconv_conf().use_bias()) { EnrollInputBn("bias"); }
     EnrollTmpBn("cudnn_buf");
   }
 
@@ -104,7 +117,7 @@ class DeconvOp : public Operator {
     int64_t data_num = x_blob_desc->shape().At(0);
     int32_t filters = conf.filters();
     std::vector<int64_t> out;
-    GetOutAndPad(x_blob_desc->shape(), conv_conf, &out, nullptr, nullptr);
+    GetOutAndPad(x_blob_desc->shape(), conf, &out, nullptr, nullptr);
     std::vector<int64_t> y_shape = {data_num, filters};
     size_t dhw_offset = DhwOffset(data_format);
     for (size_t i = 0; i < NDims(); ++i) {
@@ -113,8 +126,8 @@ class DeconvOp : public Operator {
     BlobDesc* y_blob_desc = GetBlobDesc4BnInOp("y");
     *y_blob_desc = *x_blob_desc;
     y_blob_desc->mut_shape() = Shape(y_shape);
+    LOG(INFO) << "DECONV InferOutBlobDescs END ";
 
-    if (conf.use_bias()) { GetBlobDesc4BnInOp("bias")->mut_shape() = Shape({filters, 1}); }
     return Maybe<void>::Ok();
   }
 
@@ -134,7 +147,7 @@ class DeconvOp : public Operator {
     int64_t channels = x_blob_desc->shape().At(1);
     int32_t filters = conf.filters();
     std::vector<int64_t> out;
-    GetOutAndPad(x_blob_desc->shape(), conv_conf, &out, nullptr, nullptr);
+    GetOutAndPad(x_blob_desc->shape(), conf, &out, nullptr, nullptr);
     std::vector<int64_t> y_shape = {data_num, filters};
     size_t dhw_offset = DhwOffset(data_format);
     for (size_t i = 0; i < NDims(); ++i) {
@@ -159,8 +172,6 @@ class DeconvOp : public Operator {
     BlobDesc* filter_blob_desc = GetBlobDesc4BnInOp("filter");
     CHECK_EQ_OR_RETURN(GetBlobDesc4BnInOp("filter")->shape(), Shape(weight_shape));
 
-    if (conf.use_bias()) { GetBlobDesc4BnInOp("bias")->mut_shape() = Shape({filters, 1}); }
-
 #ifdef WITH_CUDA
     if (DevIsGpuAndEnableCudnn()) {
       DeconvOpCtx* deconv_op_ctx = new DeconvOpCtx();
@@ -175,6 +186,7 @@ class DeconvOp : public Operator {
       cudnn_buf->mut_shape() = Shape({static_cast<int64_t>(buf_size)});
     }
 #endif  // WITH_CUDA
+    LOG(INFO) << "DECONV InferBlobDescs END ";
     return Maybe<void>::Ok();
   }
 
@@ -199,15 +211,15 @@ class DeconvOp : public Operator {
     GetBlobDesc4BnInOp("y")->shape().ToProto(deconv_conf->mutable_out());
     GetBlobDesc4BnInOp("filter")->shape().ToProto(deconv_conf->mutable_weight());
 
-    std::vector<int32_t> pad_small_side;
-    std::vector<int32_t> pad_large_side;
-    GetOutAndPad(GetBlobDesc4BnInOp("x")->shape(), op_conf().deconv_conf().conv_conf(), nullptr,
-                 &pad_small_side, &pad_large_side);
+    // std::vector<int32_t> pad_small_side;
+    // std::vector<int32_t> pad_large_side;
+    // GetOutAndPad(GetBlobDesc4BnInOp("x")->shape(), op_conf().deconv_conf(), nullptr,
+    //              nullptr, &pad_large_side);
 
-    for (size_t i = 0; i < NDims(); ++i) {
-      AddValToPbRfInCustomizedKernelConf(kernel_conf, "pad_small_side", pad_small_side[i]);
-      AddValToPbRfInCustomizedKernelConf(kernel_conf, "pad_large_side", pad_large_side[i]);
-    }
+    // for (size_t i = 0; i < NDims(); ++i) {
+    //   AddValToPbRfInCustomizedKernelConf(kernel_conf, "pad_small_side", pad_small_side[i]);
+    //   AddValToPbRfInCustomizedKernelConf(kernel_conf, "pad_large_side", pad_large_side[i]);
+    // }
 #ifdef WITH_CUDA
     if (device_type() == DeviceType::kGPU) {
       const DeconvOpCtx* deconv_op_ctx = static_cast<const DeconvOpCtx*>(op_ctx);
@@ -216,6 +228,7 @@ class DeconvOp : public Operator {
           static_cast<int32_t>(deconv_op_ctx->cudnn_deconv_algo_ctx.bwd_data_algo));
     }
 #endif  // WITH_CUDA
+    LOG(INFO) << "DECONV VirtualGenKernelConf END ";
   }
 
   Maybe<void> InferBatchAxis(

@@ -335,7 +335,8 @@ def deconv2d(
     name=None,
     input=None,
     filters=None,
-    dilations=None
+    dilations=None,
+    output_padding=None,
 ):
     r"""2d transposed convolution
     Args:
@@ -360,10 +361,14 @@ def deconv2d(
         filters is not None), "only one of `filter` and `filters` could be not None"
     filters = filters or filter
     input = input or value
-    assert output_shape is None, "output_shape not supported yet"
-    assert dilations is None, "dilations not supported yet"
+
+    assert (output_padding is not None) ^ (
+        output_shape is not None), "only one of `output_padding` and `output_shape` could be not None"
+
     assert len(input.static_shape) == 4
     assert len(filters.static_shape) == 4
+
+    # strides
 
     if isinstance(strides, (list, tuple)):
         assert len(strides) == 2, ValueError(
@@ -377,12 +382,65 @@ def deconv2d(
     if padding.upper() != "SAME" and padding.upper() != "VALID":
         raise ValueError('padding must be "SAME" or "VALID".')
 
-    if data_format.upper() != "NCHW" and data_format.upper() != "NHWC":
+    # data format
+    if data_format.upper() == "NCHW":
+        input_shape = input.static_shape[2:]
+        kernel_size = filters.static_shape[2:4]
+        channel_pos = "channels_first"
+    elif data_format.upper() == "NHWC":
+        input_shape = input.static_shape[1:3]
+        kernel_size = filters.static_shape[-3:-1]
+        channel_pos = "channels_last"
+    else:
         raise ValueError('data_format must be "NHWC" or "NCHW".')
 
-    channel_pos = (
-        "channels_first" if data_format.startswith("NC") else "channels_last"
-    )
+
+    # dilations
+
+    if dilations is None:
+        dilations = [1, 1]
+    else:
+        if isinstance(dilations, (list, tuple)):
+            assert len(dilations) == 2, ValueError(
+                "dilations length must be 2 when passed as a list."
+            )
+        elif isinstance(dilations, int):
+            dilations = [dilations, dilations]
+        else:
+            raise ValueError("dilations must be an int or a list.")
+
+    # output_padding setting
+
+    if output_padding is not None:
+        if isinstance(output_padding, (list, tuple)):
+            assert len(output_padding) == 2, ValueError(
+                "output_padding length must be 2 when passed as a list."
+            )
+        elif isinstance(output_padding, int):
+            output_padding = [output_padding, output_padding]
+        else:
+            raise ValueError("output_padding must be an int or a list.")
+
+        assert (output_padding[0] >= 0) and (output_padding[0] < strides[0]) and \
+               (output_padding[1] >= 0) and (output_padding[1] < strides[1]), \
+                ValueError("output_padding value should be in range [0, stride]")
+
+
+    if output_shape is not None:
+        assert len(output_shape) == 2
+        output_padding = [0, 0]
+        if padding.upper() == "SAME":
+            output_padding[0] = output_shape[0]-1-(input_shape[0]-1)*strides[0]
+            output_padding[1] = output_shape[1]-1-(input_shape[1]-1)*strides[1]
+        elif padding.upper() == "VALID":
+            output_padding[0] = output_shape[0]-1-(input_shape[0]-1)*strides[0] \
+                                -dilations[0]*(kernel_size[0]-1)
+            output_padding[1] = output_shape[1]-1-(input_shape[1]-1)*strides[1] \
+                                -dilations[1]*(kernel_size[1]-1)
+        assert (output_padding[0] >= 0) and (output_padding[0] <= strides[0]) and \
+               (output_padding[1] >= 0) and (output_padding[1] <= strides[1]), \
+                ValueError("invalid output_shape")
+            
 
     op_conf = op_conf_util.OperatorConf()
     setattr(op_conf, "name",
@@ -403,21 +461,9 @@ def deconv2d(
     else:
         raise ValueError("invalid data_format")
 
-    if dilations is None:
-        dilations = [1, 1]
-    else:
-        if isinstance(dilations, (list, tuple)):
-            assert len(dilations) == 2, ValueError(
-                "dilations length must be 2 when passed as a list."
-            )
-        elif isinstance(dilations, int):
-            dilations = [dilations, dilations]
-        else:
-            raise ValueError("dilations must be an int or a list.")
-
+    op_conf.deconv_conf.output_padding.extend(output_padding)
     op_conf.deconv_conf.conv_conf.strides.extend(strides)
     op_conf.deconv_conf.conv_conf.dilation_rate.extend(dilations)
-    op_conf.deconv_conf.use_bias = False
     op_conf.deconv_conf.conv_conf.num_spatial_dims = 2
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
