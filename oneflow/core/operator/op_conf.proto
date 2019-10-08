@@ -1439,8 +1439,9 @@ message DeconvOpConf {
     required string y = 2;
     required string filter = 3;
     required int32 filters = 4;
-    repeated int32 output_padding = 5;
-    required ConvConf conv_conf = 6;
+    repeated int32 paddings = 5;
+    repeated int32 output_padding = 6;
+    required ConvConf conv_conf = 7;
 }
 
 message OperatorConf {
