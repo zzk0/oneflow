@@ -35,7 +35,6 @@ class DeconvGPUKernel final : public KernelIf<DeviceType::kGPU> {
 
   void ForwardDataContent(const KernelCtx& ctx,
                           std::function<Blob*(const std::string&)> BnInOp2Blob) const override {
-    LOG(INFO) << "DECONV KERNEL FORWARD ";
     const Blob* x_blob = BnInOp2Blob("x");
     const Blob* filter_blob = BnInOp2Blob("filter");
     // const Blob* bias_blob = BnInOp2Blob("bias");

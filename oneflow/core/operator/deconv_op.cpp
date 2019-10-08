@@ -8,36 +8,18 @@ namespace oneflow {
 namespace {
 
 void GetDewindowedOutputSize(int64_t input_size, int32_t filter_size, int32_t dilation_rate,
-                           int32_t stride, int32_t output_padding, const int32_t padding, int64_t* output_size,
+                           int32_t stride, int32_t output_padding, const int32_t padding_needed, int64_t* output_size,
                            int32_t* padding_before, int32_t* padding_after) {
   CHECK_GT(stride, 0);
   CHECK_GE(dilation_rate, 1);
 
   int32_t effective_filter_size = (filter_size - 1) * dilation_rate + 1;
-  if (output_size) { *output_size = (input_size - 1) * stride + effective_filter_size + output_padding - 2 * padding; }
-  if (padding_before) { *padding_before = padding; } // not used in deconv
-  if (padding_after) { *padding_after = padding; }
-  // if (padding_type == "valid") {
-  //   if (output_size) { *output_size = (input_size - 1) * stride + effective_filter_size + output_padding; }
-  //   if (padding_before) { *padding_before = 0; }
-  //   if (padding_after) { *padding_after = 0; }
-  // } else if (padding_type == "same") {
-  //   int64_t tmp_output_size = (input_size - 1) * stride + output_padding;
-  //   if (output_size) { *output_size = tmp_output_size; }
-  //   // const int32_t padding_needed = std::max(
-  //   //     0,
-  //   //     static_cast<int32_t>((input_size - 1) * stride + effective_filter_size - tmp_output_size));
-  //   const int32_t padding_needed = std::max(0, static_cast<int32_t>(effective_filter_size));
-  //   // For odd values of total padding, add more padding at the 'right'
-  //   // side of the given dimension.
-  //   if (padding_before) { *padding_before = padding_needed / 2; }
-  //   if (padding_after) { 
-  //     *padding_after = padding_needed - padding_needed / 2; 
-  //   }
-  // } else {
-  //   UNIMPLEMENTED();
-  // }
-  if (output_size) { CHECK_GE((*output_size), 0); }
+  if (output_size) { 
+    *output_size = (input_size - 1) * stride + effective_filter_size + output_padding - padding_needed;
+    CHECK_GE((*output_size), 0); 
+  }
+  if (padding_before) { *padding_before = padding_needed / 2; } // not used in deconv
+  if (padding_after) { *padding_after = padding_needed - padding_needed / 2;}
 }
 
 void GetOutAndPad(const Shape& in_blob_shape, const DeconvOpConf& conf, std::vector<int64_t>* out,
@@ -52,10 +34,10 @@ void GetOutAndPad(const Shape& in_blob_shape, const DeconvOpConf& conf, std::vec
   const PbRf<int32_t>& dilation_rate = conv_conf.dilation_rate();
   const PbRf<int32_t>& kernel_size = conv_conf.kernel_size();
   const PbRf<int32_t>& output_padding = conf.output_padding();
-  const PbRf<int32_t>& padding = conf.paddings();
+  const PbRf<int32_t>& padding_needed = conf.padding_needed();
   FOR_RANGE(int32_t, i, 0, opkernel_dim) {
     GetDewindowedOutputSize(in_blob_shape.At(DhwOffset(data_format) + i), kernel_size.Get(i), dilation_rate.Get(i),
-                            strides.Get(i), output_padding.Get(i), padding.Get(i), out ? &(out->at(i)) : nullptr,
+                            strides.Get(i), output_padding.Get(i), padding_needed.Get(i), out ? &(out->at(i)) : nullptr,
                             pad_small_side ? &(pad_small_side->at(i)) : nullptr,
                             pad_large_side ? &(pad_large_side->at(i)) : nullptr);
   }
