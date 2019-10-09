@@ -180,6 +180,14 @@ message NcclTupleBroadcastConf {
   required ParallelContext parallel_ctx = 1;
 }
 
+message ArcFaceConf {
+  required int64 lower_bound = 1;
+}
+
+message ArcFaceGradConf {
+  required int64 lower_bound = 1;
+}
+
 message KernelConf {
   required OpAttribute op_attribute = 1;
   required bool is_forward = 2;
@@ -228,5 +236,7 @@ message KernelConf {
     GatherMs0GradKernelConf gather_ms0_grad_conf = 415;
     NcclTupleReduceConf nccl_tuple_reduce_conf = 416;
     NcclTupleBroadcastConf nccl_tuple_broadcast_conf = 417;
+    ArcFaceConf arc_face_conf = 418;
+    ArcFaceGradConf arc_face_grad_conf = 419;    
   }
 }
