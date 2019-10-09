@@ -1379,8 +1379,18 @@ message TopKOpConf {
 message L2NormalizeOpConf {
   required string in = 1;
   required string out = 2;
-  required int32 axis = 3 [default = -1];
-  optional float epsilon = 4 [default = 1e-12];
+  required string square_x_sum = 3;
+  required int32 axis = 4 [default = -1];
+  optional float epsilon = 5 [default = 1e-12];
+}
+
+message L2NormalizeGradOpConf {
+  required string dy = 1;
+  required string y = 2;
+  required string square_x_sum = 3;
+  required string dx = 4;
+  required int32 axis = 5;
+  required float epsilon = 6;
 }
 
 message WhereOpConf {
@@ -1669,7 +1679,8 @@ message OperatorConf {
     WhereOpConf where_conf = 307;
     WhereGradOpConf where_grad_conf = 308;
     ArcFaceOpConf arc_face_conf = 309;
-    ArcFaceGradOpConf arc_face_grad_conf = 310;    
+    ArcFaceGradOpConf arc_face_grad_conf = 310;  
+    L2NormalizeGradOpConf l2_normalize_grad_conf = 311;  
 
     // math op
     BroadcastAddOpConf broadcast_add_conf = 500;

@@ -1,20 +1,11 @@
-#include "oneflow/core/kernel/l2_normalize_kernel.h"
+#include "oneflow/core/kernel/normalize_kernel_util.h"
 
 namespace oneflow {
 
-template<DeviceType device_type, typename T>
-void L2NormalizeKernel<device_type, T>::ForwardDataContent(
-    const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-  L2NormalizeKernelUtil<device_type, T>::Forward(
-      ctx.device_ctx, this->op_conf().l2_normalize_conf(), BnInOp2Blob("in"),
-      BnInOp2Blob("square_x_sum"), BnInOp2Blob("out"));
-}
-
 template<typename T>
-struct L2NormalizeKernelUtil<DeviceType::kCPU, T> {
-  static void Forward(DeviceCtx* ctx, const L2NormalizeOpConf& conf, const Blob* in_blob,
-                      Blob* square_x_sum_blob, Blob* out_blob) {
-    const int32_t axis = conf.axis() >= 0 ? conf.axis() : conf.axis() + in_blob->shape().NumAxes();
+struct NormalizeKernelUtil<kCPU, T> {
+  static void Normalize(DeviceCtx* ctx, const int32_t axis, const float epsilon,
+                        const Blob* in_blob, Blob* square_x_sum_blob, Blob* out_blob) {
     const int32_t c = in_blob->shape().At(axis);
     const int32_t n = in_blob->shape().elem_cnt() / c;
     const int32_t d = in_blob->shape().Count(axis + 1);
@@ -28,7 +19,7 @@ struct L2NormalizeKernelUtil<DeviceType::kCPU, T> {
         const T x = in[offset + j * d];
         square_x_sum[i] += x * x;
       }
-      const T norm = std::sqrt(std::max(square_x_sum[i], static_cast<T>(conf.epsilon())));
+      const T norm = std::sqrt(std::max(square_x_sum[i], static_cast<T>(epsilon)));
       for (int32_t j = 0; j < c; j++) {
         const int32_t index = offset + j * d;
         out[index] = in[index] / norm;
@@ -36,10 +27,10 @@ struct L2NormalizeKernelUtil<DeviceType::kCPU, T> {
     }
   }
 
-  static void Backward(DeviceCtx* ctx, const L2NormalizeOpConf& conf, const Blob* out_blob,
-                       const Blob* out_diff_blob, const Blob* square_x_sum_blob,
-                       Blob* in_diff_blob) {
-    const int32_t axis = conf.axis() >= 0 ? conf.axis() : conf.axis() + out_blob->shape().NumAxes();
+  static void NormalizeGrad(DeviceCtx* ctx, const int32_t axis, const float epsilon,
+                            const Blob* out_blob, const Blob* out_diff_blob,
+                            const Blob* square_x_sum_blob, Blob* in_diff_blob) {
+    CHECK_GE(axis, 0);
     const int32_t c = out_blob->shape().At(axis);
     const int32_t n = out_blob->shape().elem_cnt() / c;
     const int32_t d = out_blob->shape().Count(axis + 1);
@@ -49,9 +40,9 @@ struct L2NormalizeKernelUtil<DeviceType::kCPU, T> {
     T* in_diff = in_diff_blob->mut_dptr<T>();
 
     for (int32_t i = 0; i < n; i++) {
-      const T norm = std::sqrt(std::max(square_x_sum[i], static_cast<T>(conf.epsilon())));
+      const T norm = std::sqrt(std::max(square_x_sum[i], static_cast<T>(epsilon)));
       const int32_t offset = (i / d) * d * c + (i % d);
-      if (square_x_sum[i] >= conf.epsilon()) {
+      if (square_x_sum[i] >= epsilon) {
         T y_dy_inner_prod = GetZeroVal<T>();
         for (int32_t j = 0; j < c; j++) {
           const int32_t index = offset + j * d;
@@ -71,7 +62,9 @@ struct L2NormalizeKernelUtil<DeviceType::kCPU, T> {
   }
 };
 
-ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kL2NormalizeConf, L2NormalizeKernel,
-                           FLOATING_DATA_TYPE_SEQ);
+#define INSTANTIATE_NORMALIZE_KERNEL_UTIL_CPU(type_cpp, type_proto) \
+  template struct NormalizeKernelUtil<DeviceType::kCPU, type_cpp>;
+OF_PP_FOR_EACH_TUPLE(INSTANTIATE_NORMALIZE_KERNEL_UTIL_CPU, ARITHMETIC_DATA_TYPE_SEQ)
+#undef INSTANTIATE_NORMALIZE_KERNEL_UTIL_CPU
 
 }  // namespace oneflow
