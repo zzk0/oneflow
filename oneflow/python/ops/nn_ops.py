@@ -330,13 +330,13 @@ def deconv2d(
     filter=None,
     output_shape=None,
     strides=None,
-    padding=0,
+    padding=None,
     data_format='NHWC',
     name=None,
     input=None,
     filters=None,
     dilations=1,
-    output_padding=0,
+    output_padding=None,
 ):
     r"""2d transposed convolution
     Args:
@@ -430,36 +430,34 @@ def deconv2d(
             )
         elif isinstance(padding, int):
             padding_needed = 2 * padding
-            padding = [padding_needed, padding_needed]
+            padding_needed = [padding_needed, padding_needed]
         else:
             raise ValueError("padding must be an int or a list.")
 
     if output_shape is not None:
-        raise ValueError('output shape not supported')
         assert len(output_shape) == 2
         output_padding = [0, 0]
         if padding.upper() == "SAME":
-            padding = [0, 0]
+            # raise ValueError('SAME not supported')
+            padding_needed = [0, 0]
             for i in range(2):
+                assert (output_shape[i] + strides[i] - 1) // strides[i] == input_shape[i]
                 effective_filter_size = (kernel_size[i] - 1) * dilations[i] + 1
-                tmp_output_size = (input_shape[i] - 1) * strides[i] + 1
+                padding_needed[i] = max(0, (input_shape[i] - 1) * strides[i] \
+                                    + effective_filter_size - output_shape[i])
+                tmp_output_size = (input_shape[i] - 1) * strides[i] + effective_filter_size - padding_needed[i]
                 output_padding[i] = output_shape[i] - tmp_output_size
-                padding_needed = effective_filter_size - 1
-                # padding_needed = max(0, (input_shape[i] - 1) * strides[i] \
-                #                  + effective_filter_size - output_shape[i])
-                padding[i] = padding_needed
+                # padding_needed = effective_filter_size - 1
 
         elif padding.upper() == "VALID":
-            padding = [0, 0]
+            padding_needed = [0, 0]
             for i in range(2):
-                output_padding[i] = output_shape[i]-1-(input_shape[i]-1)*strides[i] \
-                                    -dilations[i]*(kernel_size[i]-1)
+                effective_filter_size = (kernel_size[i] - 1) * dilations[i] + 1
+                assert (output_shape[i] + strides[i] - effective_filter_size) // strides[i] == input_shape[i]
+                tmp_output_size = (input_shape[i] - 1) * strides[i] + effective_filter_size
+                output_padding[i] = output_shape[i] - tmp_output_size
         else:
             raise ValueError('padding must be "SAME" or "VALID".')
-
-        assert (output_padding[0] >= 0) and (output_padding[0] <= strides[0]) and \
-               (output_padding[1] >= 0) and (output_padding[1] <= strides[1]), \
-                ValueError("invalid output_shape")
         
     
     op_conf = op_conf_util.OperatorConf()
@@ -468,7 +466,7 @@ def deconv2d(
     op_conf.deconv_conf.x = input.logical_blob_name
     op_conf.deconv_conf.y = "out"
     op_conf.deconv_conf.filter = filters.logical_blob_name
-    op_conf.deconv_conf.conv_conf.padding = "valid" # not used
+    op_conf.deconv_conf.conv_conf.padding = padding.lower() if output_shape is not None else "same"
     op_conf.deconv_conf.conv_conf.data_format = channel_pos
     if channel_pos == "channels_first":
         op_conf.deconv_conf.filters = filters.static_shape[1]
@@ -485,7 +483,7 @@ def deconv2d(
     op_conf.deconv_conf.conv_conf.strides.extend(strides)
     op_conf.deconv_conf.conv_conf.dilation_rate.extend(dilations)
     op_conf.deconv_conf.conv_conf.num_spatial_dims = 2
-    op_conf.deconv_conf.padding_needed.extend(padding)
+    op_conf.deconv_conf.padding_needed.extend(padding_needed)
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
     lbi.op_name = op_conf.name

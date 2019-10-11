@@ -188,9 +188,9 @@ class DeconvOp : public Operator {
   void GenKernelConfWithCudnn(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                               KernelConf* kernel_conf, DeconvKernelConf* deconv_conf,
                               const OpContext* op_ctx) const {
-    GetBlobDesc4BnInOp("x")->shape().ToProto(deconv_conf->mutable_in());
-    GetBlobDesc4BnInOp("y")->shape().ToProto(deconv_conf->mutable_out());
-    GetBlobDesc4BnInOp("filter")->shape().ToProto(deconv_conf->mutable_weight());
+    // GetBlobDesc4BnInOp("x")->shape().ToProto(deconv_conf->mutable_in());
+    // GetBlobDesc4BnInOp("y")->shape().ToProto(deconv_conf->mutable_out());
+    // GetBlobDesc4BnInOp("filter")->shape().ToProto(deconv_conf->mutable_weight());
 
 #ifdef WITH_CUDA
     if (device_type() == DeviceType::kGPU) {

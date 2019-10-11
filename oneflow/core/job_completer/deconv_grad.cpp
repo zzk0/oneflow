@@ -36,21 +36,21 @@ void GenerateBackwardOpConf(
   CHECK(op.op_conf().has_deconv_conf());
   const ConvConf& conv_conf = op.op_conf().deconv_conf().conv_conf();
   const std::string out_diff_lbn = GenLogicalBlobName(*DiffLbi4BnInOp("y"));
-  if (op.GetValFromCustomizedConf<bool>("use_bias")) {
-    LogicalBlobId* bias_diff_lbi = DiffLbi4BnInOp("bias");
-    if (bias_diff_lbi != nullptr) {
-      OperatorConf bias_grad_op; 
-      bias_grad_op.set_name("System-AutoGrad-" + op.op_name() + "-BiasGrad");
-      ConvBiasGradOpConf* conf = bias_grad_op.mutable_conv_bias_grad_conf();
-      conf->set_data_format(conv_conf.data_format());
-      conf->set_num_spatial_dims(conv_conf.num_spatial_dims());
-      conf->set_dy(out_diff_lbn);
-      conf->set_bias_diff("bias_diff");
-      op_confs->push_back(bias_grad_op);
-      bias_diff_lbi->set_op_name(bias_grad_op.name());
-      bias_diff_lbi->set_blob_name(conf->bias_diff());
-    }
-  }
+  // if (op.GetValFromCustomizedConf<bool>("use_bias")) {
+  //   LogicalBlobId* bias_diff_lbi = DiffLbi4BnInOp("bias");
+  //   if (bias_diff_lbi != nullptr) {
+  //     OperatorConf bias_grad_op; 
+  //     bias_grad_op.set_name("System-AutoGrad-" + op.op_name() + "-BiasGrad");
+  //     ConvBiasGradOpConf* conf = bias_grad_op.mutable_conv_bias_grad_conf();
+  //     conf->set_data_format(conv_conf.data_format());
+  //     conf->set_num_spatial_dims(conv_conf.num_spatial_dims());
+  //     conf->set_dy(out_diff_lbn);
+  //     conf->set_bias_diff("bias_diff");
+  //     op_confs->push_back(bias_grad_op);
+  //     bias_diff_lbi->set_op_name(bias_grad_op.name());
+  //     bias_diff_lbi->set_blob_name(conf->bias_diff());
+  //   }
+  // }
   LogicalBlobId* filter_diff_lbi = DiffLbi4BnInOp("filter");
   if (filter_diff_lbi != nullptr) {
     OperatorConf filter_grad_op;

@@ -38,26 +38,26 @@ def test_deconv_2d_forward(dilation=1, padding=2, output_padding=2, stride=3):
     print(of_out[0].shape)
     # print(torch_out[0][0][0])
 
-def test_deconv_2d_forward_tf(dilation=1, padding='same', output_shape=27, stride=2):
+def test_deconv_2d_forward_tf(dilation=1, padding='SAME', output_shape=3, stride=1):
 
+    x = np.random.randn(5, 4, 3, 3).astype(np.float32)
     @flow.function
-    def ForwardDeconv2dJob(input=flow.input_blob_def((64, 256, 14, 14))):
+    def ForwardDeconv2dJob(input=flow.input_blob_def((5, 4, 3, 3))):
         weight = flow.get_variable(name="filter", shape=(
-            256, 3, 2, 2), dtype=flow.float32, initializer=flow.ones_initializer())
+            4, 3, 2, 2), dtype=flow.float32, initializer=flow.ones_initializer())
         output = flow.nn.conv2d_transpose(input, weight, strides=stride, output_shape=[output_shape, output_shape], 
                                           dilations=dilation, padding=padding, data_format="NCHW"),
         return output
 
-    x = np.random.randn(64, 256, 14, 14).astype(np.float32)
     # oneflow output
     check_point = flow.train.CheckPoint()
     check_point.init()
     of_out = ForwardDeconv2dJob(x).get()
     # tensorflow output
     x = tf.convert_to_tensor(x)
-    kernel = tf.ones([2, 2, 3, 256])
-    tf_out = tf.nn.conv2d_transpose(x, kernel, output_shape=[64, 3, output_shape, output_shape], 
-                                    strides=[1,1,stride,stride], padding="SAME", data_format="NCHW")
+    kernel = tf.ones([2, 2, 3, 4])
+    tf_out = tf.nn.conv2d_transpose(x, kernel, output_shape=[5, 3, output_shape, output_shape], 
+                                    strides=[1,1,stride,stride], padding=padding, data_format="NCHW")
     sess = tf.Session()
     tf.global_variables_initializer().run(session=sess)
     tf_out = tf_out.eval(session=sess)
