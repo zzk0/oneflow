@@ -26,8 +26,7 @@ Maybe<void> SparseSoftmaxCrossEntropyGradOp::InferBlobDescs(
   CHECK_EQ_OR_RETURN(dy_blob_desc->has_data_id_field(), label_blob_desc->has_data_id_field());
   CHECK_EQ_OR_RETURN(dy_blob_desc->has_dim0_valid_num_field(),
                      label_blob_desc->has_dim0_valid_num_field());
-  CHECK_EQ_OR_RETURN(dy_blob_desc->has_dim0_inner_shape(),
-                     label_blob_desc->has_dim0_inner_shape());
+  CHECK_EQ_OR_RETURN(dy_blob_desc->has_dim0_inner_shape(), label_blob_desc->has_dim0_inner_shape());
   if (dy_blob_desc->has_dim0_inner_shape()) {
     CHECK_EQ_OR_RETURN(dy_blob_desc->dim0_inner_shape().At(0), 1);
     CHECK_EQ_OR_RETURN(dy_blob_desc->dim0_inner_shape(), label_blob_desc->dim0_inner_shape());
@@ -41,7 +40,7 @@ Maybe<void> SparseSoftmaxCrossEntropyGradOp::InferBlobDescs(
   FOR_RANGE(int64_t, i, 0, num_out_axes) {
     CHECK_EQ_OR_RETURN(prob_blob_desc->shape().At(i), label_blob_desc->shape().At(i));
   }
-  //out
+  // out
   BlobDesc* dx_blob_desc = GetBlobDesc4BnInOp("dx");
   *dx_blob_desc = *prob_blob_desc;
 
@@ -54,7 +53,8 @@ Maybe<void> SparseSoftmaxCrossEntropyGradOp::InferBatchAxis(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> SparseSoftmaxCrossEntropyGradOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
+Maybe<void> SparseSoftmaxCrossEntropyGradOp::GetSbpSignatures(
+    SbpSignatureList* sbp_sig_list) const {
   SbpSignatureBuilder()
       .Split(input_bns(), 0)
       .Split(output_bns(), 0)

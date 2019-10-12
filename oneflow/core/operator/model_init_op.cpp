@@ -40,9 +40,10 @@ Maybe<void> ModelInitOp::InferBlobDescs(
     BlobDesc* out_i = GetBlobDesc4BnInOp(GenRepeatedBn("out", i));
     out_i->mut_shape() = Shape(original_variable_conf.shape());
     out_i->set_data_type(original_variable_conf.data_type());
-    if(original_variable_conf.has_normalize_conf()) { 
-      square_x_sum_cnt = out_i->shape().elem_cnt() / out_i->shape().At(original_variable_conf.normalize_conf().axis());
-      if(square_x_sum_cnt > max_model_cnt) {max_model_cnt = square_x_sum_cnt;}
+    if (original_variable_conf.has_normalize_conf()) {
+      square_x_sum_cnt = out_i->shape().elem_cnt()
+                         / out_i->shape().At(original_variable_conf.normalize_conf().axis());
+      if (square_x_sum_cnt > max_model_cnt) { max_model_cnt = square_x_sum_cnt; }
     }
   }
   *GetBlobDesc4BnInOp("square_x_sum") = *GetBlobDesc4BnInOp(GenRepeatedBn("out", 0));

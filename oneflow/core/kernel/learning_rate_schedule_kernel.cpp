@@ -139,7 +139,7 @@ double LinearCosineDecayedLearningRate(const LinearCosineDecayConf& conf, double
 }
 
 double PiecewiseScalingLearningRate(const PiecewiseScalingConf& conf, double lr,
-                                     int64_t cur_batch_num) {
+                                    int64_t cur_batch_num) {
   const PbRf<int64_t>& boundaries = conf.boundaries();
   const PbRf<double>& scales = conf.scales();
   CHECK_EQ(boundaries.size() + 1, scales.size());

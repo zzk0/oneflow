@@ -16,7 +16,7 @@ void SparseSoftmaxCrossEntropyGradKernel<device_type, T>::ForwardDataContent(
   T* dx = dx_blob->mut_dptr<T>();
   KernelUtil<device_type, T>::Copy(ctx.device_ctx, n * w, prob_blob->dptr<T>(), 1, dx, 1);
   SparseSoftmaxCrossEntropyGradKernelUtil<device_type, T, int32_t>::BackwardSub(
-        ctx.device_ctx, n, w, label_blob->dptr<int32_t>(), dx);
+      ctx.device_ctx, n, w, label_blob->dptr<int32_t>(), dx);
 }
 
 template<typename T, typename K>
@@ -28,6 +28,6 @@ struct SparseSoftmaxCrossEntropyGradKernelUtil<DeviceType::kCPU, T, K> {
 };
 
 ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kSparseSoftmaxCrossEntropyGradConf,
-                                         SparseSoftmaxCrossEntropyGradKernel, FLOATING_DATA_TYPE_SEQ);
+                           SparseSoftmaxCrossEntropyGradKernel, FLOATING_DATA_TYPE_SEQ);
 
 }  // namespace oneflow

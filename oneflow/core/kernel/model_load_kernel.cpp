@@ -24,8 +24,9 @@ class ModelLoadKernel final : public KernelIf<DeviceType::kCPU> {
       reader.Read(key, out_i);
       if (original_variable_conf.has_normalize_conf()) {
         NormalizeKernelUtil<DeviceType::kCPU, float>::Normalize(
-          ctx.device_ctx, original_variable_conf.normalize_conf().axis(), original_variable_conf.normalize_conf().epsilon(),
-          out_i, BnInOp2Blob("square_x_sum"), out_i);
+            ctx.device_ctx, original_variable_conf.normalize_conf().axis(),
+            original_variable_conf.normalize_conf().epsilon(), out_i, BnInOp2Blob("square_x_sum"),
+            out_i);
       }
     }
   }

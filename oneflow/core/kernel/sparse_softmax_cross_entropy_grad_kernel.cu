@@ -6,8 +6,7 @@ namespace {
 
 template<typename T, typename K>
 __global__ void SparseSoftmaxCrossEntropyGradBackwardSub(const int64_t n, const int64_t w,
-                                                         const K* label,
-                                                         T* in_diff) {
+                                                         const K* label, T* in_diff) {
   CUDA_1D_KERNEL_LOOP(i, n) { in_diff[i * w + static_cast<int64_t>(label[i])] -= 1; }
 }
 

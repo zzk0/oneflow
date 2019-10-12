@@ -56,7 +56,7 @@ Maybe<void> SparseSoftmaxCrossEntropyOp::InferBlobDescs(
   BlobDesc* prob_blob_desc = GetBlobDesc4BnInOp("prob");
   prob_blob_desc->mut_shape() = Shape(pred_blob_desc->shape());
   prob_blob_desc->set_data_type(pred_blob_desc->data_type());
-  //out
+  // out
   BlobDesc* out_blob_desc = GetBlobDesc4BnInOp("out");
   *out_blob_desc = *pred_blob_desc;
   out_blob_desc->mut_shape() = Shape(std::vector<int64_t>(

@@ -7,7 +7,6 @@
 #include "oneflow/core/kernel/adam_model_update_kernel.h"
 #include "oneflow/core/kernel/lazy_adam_model_update_kernel.h"
 
-
 namespace oneflow {
 
 template<DeviceType device_type, typename T>
@@ -26,10 +25,10 @@ void NormalMdUpdateKernel<device_type, T>::Forward(
   UpdateModel(ctx.device_ctx, batch_instance_num_ptr, static_cast<T>(l1), static_cast<T>(l2),
               train_step_ptr, learning_rate_ptr, BnInOp2Blob);
   const auto& norm_conf = *GetMsgPtrFromPbMessage<NormalizeConf>(op_conf, "normalize_conf");
-  if(&norm_conf != nullptr){
+  if (&norm_conf != nullptr) {
     NormalizeKernelUtil<device_type, T>::Normalize(
-        ctx.device_ctx, norm_conf.axis(), norm_conf.epsilon(),
-        BnInOp2Blob("model"), BnInOp2Blob("square_x_sum"), BnInOp2Blob("model"));
+        ctx.device_ctx, norm_conf.axis(), norm_conf.epsilon(), BnInOp2Blob("model"),
+        BnInOp2Blob("square_x_sum"), BnInOp2Blob("model"));
   }
 }
 

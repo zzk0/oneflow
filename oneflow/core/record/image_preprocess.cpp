@@ -36,13 +36,13 @@ void ImagePreprocessImpl<PreprocessCase::kCrop>::DoPreprocess(
     if (crop.has_range()) {
       int32_t full_hrange = (image->rows - height) / 2;
       int32_t cur_hrange = full_hrange;
-      if(crop.range().has_height() && crop.range().height() <= full_hrange) {
+      if (crop.range().has_height() && crop.range().height() <= full_hrange) {
         CHECK_GE(crop.range().height(), 0);
         cur_hrange = crop.range().height();
       }
       int32_t full_wrange = (image->cols - width) / 2;
       int32_t cur_wrange = full_wrange;
-      if(crop.range().has_width() && crop.range().width() <= full_wrange) {
+      if (crop.range().has_width() && crop.range().width() <= full_wrange) {
         CHECK_GE(crop.range().width(), 0);
         cur_wrange = crop.range().width();
       }
