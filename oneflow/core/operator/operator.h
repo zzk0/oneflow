@@ -114,6 +114,15 @@ class Operator {
       std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp, const ParallelContext*,
       const SbpSignature* sbp_signature, std::function<void(OpContext*)> EnrollOpCtx) const;
 
+  Maybe<void> InferOutParallelDescIf(
+      std::function<ParallelDesc*(const std::string&)> ParallelDesc4Obn,
+      std::function<const BlobDesc*(const std::string&)> LogicalBlobDesc4Ibn, const ParallelDesc&,
+      const SbpSignature*) const;
+  virtual Maybe<void> InferOutParallelDesc(
+      std::function<ParallelDesc*(const std::string&)> ParallelDesc4Obn,
+      std::function<const BlobDesc*(const std::string&)> LogicalBlobDesc4Ibn, const ParallelDesc&,
+      const SbpSignature*) const;
+
   Maybe<void> InferBatchAxisIf(
       const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4Ibn,
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {
@@ -136,8 +145,8 @@ class Operator {
       std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
       const ParallelDesc& parallel_desc) const;
   void GenKernelConf(
-      std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp, bool is_forward,
-      const ParallelContext*, KernelConf*, const OpContext*,
+      std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp, const ParallelContext*,
+      KernelConf*, const OpContext*,
       std::function<const BlobDesc&(const std::string&)> LogicalBlobDesc4BnInOp) const;
   const InputBlobModifier& InputBlobModifier4Ibn(const std::string& ibn) const;
   const OutputBlobModifier& OutputBlobModifier4Obn(const std::string& obn) const;
@@ -147,6 +156,8 @@ class Operator {
       const ParallelDesc& parallel_desc, SbpSignatureList* sbp_sig_list) const;
 
   const JobDesc& job_desc() const { return *job_desc_; }
+
+  void ForEachBnInOp(std::function<void(const std::string&)>) const;
 
  protected:
   virtual Maybe<void> GetSbpSignatures(
@@ -164,7 +175,9 @@ class Operator {
       const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
       std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
       const ParallelDesc& parallel_desc) const;
-  virtual Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const { UNIMPLEMENTED(); }
+  virtual Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
+    UNIMPLEMENTED() << " GetSbpSignatures unimplemented, op name: " << op_name();
+  }
 
   int64_t cudnn_buf_limit_byte() const;
 
@@ -245,7 +258,7 @@ class Operator {
   }
   virtual Maybe<void> InferBatchAxis(
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {
-    UNIMPLEMENTED();
+    UNIMPLEMENTED() << " InferBatchAxis unimplemented, op name: " << op_name();
     return Maybe<void>::Ok();
   }
 
@@ -274,15 +287,13 @@ struct OnlyCpuSupportPredicator {
   bool only_cpu_;
 };
 
-struct RuntimeMemBlockNum4OpSameOutputBlob final {
-  RuntimeMemBlockNum4OpSameOutputBlob(size_t num) : num_(num) {}
+struct RuntimeRegstNum4OpSameOutputBlob final {
+  RuntimeRegstNum4OpSameOutputBlob(size_t num) : num_(num) {}
   operator size_t() { return num_; }
 
  private:
   size_t num_;
 };
-
-struct IsInterfaceOpConf4OpTypeCase final {};
 
 #define REGISTER_OP(op_type_case, OpType)                                       \
   REGISTER_CLASS_CREATOR(op_type_case, OnlyCpuSupportPredicator,                \
@@ -299,13 +310,21 @@ struct IsInterfaceOpConf4OpTypeCase final {};
                          ([] { return new OnlyCpuSupportPredicator(false); })); \
   REGISTER_CLASS_CREATOR(op_type_case, Operator, creator, const OperatorConf&)
 
-#define REGISTER_OP_SAME_OUTPUT_BLOB_MEM_BLOCK_NUM(op_type_case, num)       \
-  REGISTER_CLASS_CREATOR(op_type_case, RuntimeMemBlockNum4OpSameOutputBlob, \
-                         ([] { return new RuntimeMemBlockNum4OpSameOutputBlob(num); }))
+#define REGISTER_OP_SAME_OUTPUT_BLOB_REGST_NUM(op_type_case, num)        \
+  REGISTER_CLASS_CREATOR(op_type_case, RuntimeRegstNum4OpSameOutputBlob, \
+                         ([] { return new RuntimeRegstNum4OpSameOutputBlob(num); }))
+
+struct IsInterfaceOpConf4OpTypeCase final {};
 
 #define REGISTER_INTERFACE_OP(op_type_case)                          \
   REGISTER_CLASS_CREATOR(op_type_case, IsInterfaceOpConf4OpTypeCase, \
                          ([] { return new IsInterfaceOpConf4OpTypeCase(); }))
+
+struct DisableInputBoxingGroup final {};
+
+#define REGISTER_DISABLE_INPUT_BOXING_GROUP(op_type_case)       \
+  REGISTER_CLASS_CREATOR(op_type_case, DisableInputBoxingGroup, \
+                         ([] { return new DisableInputBoxingGroup(); }))
 
 struct IsTickTockOpTypeCase final {};
 

@@ -95,7 +95,6 @@ class DeconvOp : public Operator {
 
     const BlobDesc* x_blob_desc = GetBlobDesc4BnInOp("x");
     CHECK_EQ_OR_RETURN(x_blob_desc->shape().NumAxes(), NDims() + 2);
-    CHECK_EQ_OR_RETURN(x_blob_desc->data_type(), Global<JobDesc>::Get()->DefaultDataType());
 
     int64_t data_num = x_blob_desc->shape().At(0);
     int32_t filters = conf.filters();
@@ -123,7 +122,6 @@ class DeconvOp : public Operator {
 
     const BlobDesc* x_blob_desc = GetBlobDesc4BnInOp("x");
     CHECK_EQ_OR_RETURN(x_blob_desc->shape().NumAxes(), NDims() + 2);
-    CHECK_EQ_OR_RETURN(x_blob_desc->data_type(), Global<JobDesc>::Get()->DefaultDataType());
 
     int64_t data_num = x_blob_desc->shape().At(0);
     int64_t channels = x_blob_desc->shape().At(1);
@@ -204,9 +202,6 @@ class DeconvOp : public Operator {
 
   Maybe<void> InferBatchAxis(
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
-    oneflow::OptInt64* x_split_axis = BatchAxis4BnInOp("x");
-    if (x_split_axis->has_value()) { CHECK_EQ_OR_RETURN(x_split_axis->value(), 0); }
-    CHECK_OR_RETURN(BatchAxis4BnInOp("filter")->has_value() == false);
     *BatchAxis4BnInOp("y") = *BatchAxis4BnInOp("x");
     return Maybe<void>::Ok();
   }
@@ -214,11 +209,8 @@ class DeconvOp : public Operator {
   Maybe<void> GetSbpSignatures(
       const std::function<Maybe<const BlobDesc*>(const std::string&)>& LogicalBlobDesc4Ibn,
       SbpSignatureList* sbp_sig_list) const override {
-    SbpSignatureBuilder()
-        .Split("x", 0)
-        .Broadcast("filter")
-        .Split("y", 0)
-        .Build(sbp_sig_list->mutable_sbp_signature()->Add());
+    SbpSignatureBuilder().Split("x", 0).Broadcast("filter").Split("y", 0).Build(
+        sbp_sig_list->mutable_sbp_signature()->Add());
     return Maybe<void>::Ok();
   }
 };

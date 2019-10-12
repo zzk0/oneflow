@@ -46,6 +46,12 @@ long long DeviceType4DeviceTag(const std::string& device_tag, std::string* error
                                       static_cast<long long>(oneflow::DeviceType::kInvalidDevice));
 }
 
+std::string GetMachine2DeviceIdListOFRecordFromParallelConf(const std::string& parallel_conf,
+                                                            std::string* error_str) {
+  return oneflow::GetSerializedMachineId2DeviceIdListOFRecord(parallel_conf)
+      .GetDataAndSerializedErrorProto(error_str, "");
+}
+
 int Ofblob_GetDataType(uint64_t of_blob_ptr) {
   using namespace oneflow;
   auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
@@ -58,8 +64,40 @@ size_t OfBlob_NumAxes(uint64_t of_blob_ptr) {
   return of_blob->NumAxes();
 }
 
+void OfBlob_CopyShapeFromNumpy(uint64_t of_blob_ptr, int64_t* array, int size) {
+  using namespace oneflow;
+  auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
+  return of_blob->CopyShapeFrom(array, size);
+}
+
 void OfBlob_CopyShapeToNumpy(uint64_t of_blob_ptr, int64_t* array, int size) {
   using namespace oneflow;
   auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
   return of_blob->CopyShapeTo(array, size);
+}
+
+size_t OfBlob_GetNumOfLoDLevels(uint64_t of_blob_ptr) {
+  using namespace oneflow;
+  auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
+  return of_blob->num_of_lod_levels();
+}
+
+bool OfBlob_IsDynamic(uint64_t of_blob_ptr) {
+  using namespace oneflow;
+  auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
+  return of_blob->is_dynamic();
+}
+
+std::string OfBlob_GetSerializedLoDTree(uint64_t of_blob_ptr) {
+  using namespace oneflow;
+  auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
+  return PbMessage2TxtString(of_blob->GetLoDTree());
+}
+
+void OfBlob_SetSerializedLoDTree(uint64_t of_blob_ptr, const std::string& lod_tree_str) {
+  using namespace oneflow;
+  LoDTree lod_tree;
+  CHECK(TxtString2PbMessage(lod_tree_str, &lod_tree));
+  auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
+  of_blob->SetLoDTree(lod_tree);
 }

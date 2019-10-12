@@ -55,6 +55,14 @@ Maybe<void> CurJobBuildAndInferCtx_AddLossLogicalBlobName(const std::string& lbn
   return JUST(GetCurInferCtx())->AddLossLogicalBlobName(lbn);
 }
 
+Maybe<void> CurJobBuildAndInferCtx_AddLbiAndDiffWatcherUuidPair(
+    const std::string& lbi_uuid_pair_str) {
+  LbiAndDiffWatcherUuidPair lbi_uuid_pair;
+  OF_CHECK(TxtString2PbMessage(lbi_uuid_pair_str, &lbi_uuid_pair))
+      << "LbiAndDiffWatcherUuidPair parse failed";
+  return Global<JobBuildAndInferCtxMgr>::Get()->AddLbiAndDiffWatcherUuidPair(lbi_uuid_pair);
+}
+
 Maybe<std::string> JobBuildAndInferCtx_GetSerializedIdListAsStaticShape(const std::string& job_name,
                                                                         const std::string& lbn) {
   auto* ctx = JUST(Global<JobBuildAndInferCtxMgr>::Get()->FindJobBuildAndInferCtx(job_name));
@@ -68,6 +76,17 @@ Maybe<long long> JobBuildAndInferCtx_GetDataType(const std::string& job_name,
                                                  const std::string& lbn) {
   auto* ctx = JUST(Global<JobBuildAndInferCtxMgr>::Get()->FindJobBuildAndInferCtx(job_name));
   return *JUST(ctx->GetDataType(lbn));
+}
+
+Maybe<bool> JobBuildAndInferCtx_IsDynamic(const std::string& job_name, const std::string& lbn) {
+  auto* ctx = JUST(Global<JobBuildAndInferCtxMgr>::Get()->FindJobBuildAndInferCtx(job_name));
+  return ctx->IsDynamic(lbn);
+}
+
+Maybe<long long> JobBuildAndInferCtx_GetNumOfLoDLevels(const std::string& job_name,
+                                                       const std::string& lbn) {
+  auto* ctx = JUST(Global<JobBuildAndInferCtxMgr>::Get()->FindJobBuildAndInferCtx(job_name));
+  return ctx->GetNumOfLoDLevels(lbn);
 }
 
 Maybe<std::string> JobBuildAndInferCtx_GetBatchAxis(const std::string& job_name,

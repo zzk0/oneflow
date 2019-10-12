@@ -14,10 +14,12 @@
 
 namespace oneflow {
 
+class RuntimeBlobShapeInferHelper;
+
 class Kernel {
  public:
   OF_DISALLOW_COPY_AND_MOVE(Kernel);
-  virtual ~Kernel() = default;
+  virtual ~Kernel();
 
   const JobDesc& job_desc() const { return *job_desc_; }
 
@@ -31,9 +33,15 @@ class Kernel {
   const LogicalBlobId& BnInOp2Lbi(const std::string& bn_in_op) const;
   const OperatorConf& op_conf() const { return op_attribute().op_conf(); }
   const OpAttribute& op_attribute() const { return kernel_conf().op_attribute(); }
+  /*
+   * return true means all below must be guaranteed when `Launch` function return:
+   * 1) all out blob header has been set (e.g. SyncSetHeadKernel)
+   * 2) all asynchronous task has been queued (e.g. NCCL related kernel)
+   */
+  virtual bool IsKernelLaunchSynchronized() const { return true; }
 
  protected:
-  Kernel() = default;
+  Kernel() : job_desc_(nullptr), shape_infer_helper_(nullptr) {}
   virtual void VirtualKernelInit(DeviceCtx* device_ctx) { VirtualKernelInit(); }
   virtual void VirtualKernelInit() {}
   const KernelConf& kernel_conf() const { return kernel_conf_; }
@@ -42,38 +50,20 @@ class Kernel {
                                  std::function<Blob*(const std::string&)> BnInOp2Blob) const {}
   virtual void Forward(const KernelCtx& ctx,
                        std::function<Blob*(const std::string&)> BnInOp2Blob) const;
+  virtual void ForwardHeader(const KernelCtx& ctx,
+                             std::function<Blob*(const std::string&)> BnInOp2Blob) const;
+  virtual void ForwardLoD(const KernelCtx& ctx,
+                          std::function<Blob*(const std::string&)> BnInOp2Blob) const;
+  virtual void ForwardDenseShape(const KernelCtx& ctx,
+                                 std::function<Blob*(const std::string&)> BnInOp2Blob) const;
+  void NaiveForwardDenseShape(std::function<Blob*(const std::string&)>& BnInOp2Blob) const;
+  // TODO(niuchong) : rename ForwardDataContent to ForwardBody
   virtual void ForwardDataContent(const KernelCtx& ctx,
                                   std::function<Blob*(const std::string&)> BnInOp2Blob) const {}
-  virtual void ForwardDataId(const KernelCtx& ctx,
-                             std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-    UNIMPLEMENTED();
-  }
-  virtual void ForwardColNum(const KernelCtx& ctx,
-                             std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-    UNIMPLEMENTED();
-  }
-  virtual void ForwardDim0ValidNum(const KernelCtx& ctx,
-                                   std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-    UNIMPLEMENTED();
-  }
-  virtual void ForwardDim1ValidNum(const KernelCtx& ctx,
-                                   std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-    UNIMPLEMENTED();
-  }
-  virtual void ForwardDim2ValidNum(const KernelCtx& ctx,
-                                   std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-    UNIMPLEMENTED();
-  }
-  virtual void ForwardRecordIdInDevicePiece(
-      const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-    UNIMPLEMENTED();
-  }
   virtual void ForwardPackedHeader(const KernelCtx& ctx,
                                    std::function<Blob*(const std::string&)> BnInOp2Blob) const {
     UNIMPLEMENTED();
   }
-  virtual void BackwardDataContent(const KernelCtx& ctx,
-                                   std::function<Blob*(const std::string&)> BnInOp2Blob) const {}
   virtual bool NeedForwardIfBlobEmpty() const { return false; }
   virtual const PbMessage& GetCustomizedOpConf() const { UNIMPLEMENTED(); }
   virtual const PbMessage& GetCustomizedKernelConf() const { UNIMPLEMENTED(); }
@@ -103,6 +93,7 @@ class Kernel {
 
  private:
   const JobDesc* job_desc_;
+  RuntimeBlobShapeInferHelper* shape_infer_helper_;
   KernelConf kernel_conf_;
 };
 
@@ -115,14 +106,6 @@ class KernelIf : public Kernel {
  protected:
   KernelIf() = default;
 
-  virtual void ForwardDataId(const KernelCtx& ctx,
-                             std::function<Blob*(const std::string&)> BnInOp2Blob) const override;
-  virtual void ForwardColNum(const KernelCtx& ctx,
-                             std::function<Blob*(const std::string&)> BnInOp2Blob) const override;
-  virtual void ForwardDim0ValidNum(
-      const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const override;
-  virtual void ForwardRecordIdInDevicePiece(
-      const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const override;
   virtual void ForwardPackedHeader(
       const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const override;
   void CopyField(DeviceCtx* ctx, std::function<Blob*(const std::string&)> BnInOp2Blob,

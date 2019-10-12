@@ -30,6 +30,9 @@ def CurCtxAddAndInferOp(op_conf_proto, parallel_conf_proto):
 def CurCtxAddLossLogicalBlobName(lbn):
     return c_api_util.CurJobBuildAndInferCtx_AddLossLogicalBlobName(lbn)
 
+def CurCtxAddLbiAndDiffWatcherUuidPair(lbi_and_uuid):
+    return c_api_util.CurJobBuildAndInferCtx_AddLbiAndDiffWatcherUuidPair(lbi_and_uuid)
+
 def CurCtxHasJobConf():
     return c_api_util.CurJobBuildAndInferCtx_HasJobConf()
 
@@ -38,6 +41,12 @@ def GetStaticShape(job_name, lbn):
 
 def GetDataType(job_name, lbn):
     return c_api_util.JobBuildAndInferCtx_GetDataType(job_name, lbn)
+
+def IsDynamic(job_name, lbn):
+    return c_api_util.JobBuildAndInferCtx_IsDynamic(job_name, lbn)
+
+def GetNumOfLoDLevels(job_name, lbn):
+    return c_api_util.JobBuildAndInferCtx_GetNumOfLoDLevels(job_name, lbn)
 
 def GetBatchAxis(job_name, lbn):
     return c_api_util.JobBuildAndInferCtx_GetBatchAxis(job_name, lbn)

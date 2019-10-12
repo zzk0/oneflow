@@ -5,6 +5,7 @@ import "oneflow/core/common/shape.proto";
 import "oneflow/core/common/data_type.proto";
 import "oneflow/core/operator/op_attribute.proto";
 import "oneflow/core/operator/op_conf.proto";
+import "oneflow/core/job/placement.proto";
 
 message ConvKernelConf {
   required ShapeProto in = 1;
@@ -25,7 +26,7 @@ message DropoutKernelConf {
   required ShapeProto in = 1;
   required ShapeProto random_mask = 2;
   required ShapeProto out = 3;
-};
+}
 
 message LossKernelConf {
   required DataType prediction_type = 1;
@@ -43,6 +44,10 @@ message SparseCrossEntropyLossKernelConf {
 }
 
 message SigmoidCrossEntropyLossKernelConf {
+    required LossKernelConf loss_conf = 1;
+}
+
+message SigmoidCrossEntropyLossGradKernelConf {
     required LossKernelConf loss_conf = 1;
 }
 
@@ -178,19 +183,49 @@ message DeconvKernelConf {
   optional int32 cudnn_bwd_data_algo = 8 [default = -1];
 }
 
+message TopKConf {
+  required int32 temp_storage_bytes = 1;
+}
+
+message SortConf {
+  required int32 temp_storage_bytes = 1;
+}
+
+message ArgSortConf {
+  required int32 temp_storage_bytes = 1;
+}
+
+message NcclTupleReduceConf {
+  required ParallelContext parallel_ctx = 1;
+}
+
+message NcclTupleBroadcastConf {
+  required ParallelContext parallel_ctx = 1;
+}
+
+message WhereKernelConf {
+  required DataType cond_type = 1;
+  required DataType value_type = 2;
+}
+
+message ScatterNdUpdateKernelConf {
+  required DataType idx_type = 1;
+}
+
+message GatherNdUpdateKernelConf {
+  required DataType idx_type = 1;
+}
+
+message NonzeroGpuKernelConf {
+  required int32 num_axes = 1;
+}
+
 message KernelConf {
   required OpAttribute op_attribute = 1;
-  required bool is_forward = 2;
-  required DataType data_type = 3;
-  optional bool need_do_data_id = 6 [default = false];
-  optional bool need_do_col_num = 7 [default = false];
-  optional bool need_do_opaque_header = 8 [default = false];
-  optional bool need_do_dim0_valid_num = 9 [default = false];
-  optional bool need_do_dim1_valid_num = 10 [default = false];
-  optional bool need_do_dim2_valid_num = 11 [default = false];
-  optional bool need_do_record_id_in_device_piece = 12 [default = false];
-  optional bool can_naive_do_dim0_valid_num = 13 [default = false];
-  optional bool can_naive_do_record_id_in_device_piece = 14 [default = false];
+  required DataType data_type = 2;
+  optional bool need_do_opaque_header = 4 [default = false];
+  optional bool need_do_lod = 5 [default = false];
+  optional bool need_do_dense_shape = 6 [default = false];
 
   oneof kernel_type {
     SparseSoftmaxCrossEntropyLossKernelConf sparse_softmax_cross_entropy_loss_conf = 101;
@@ -224,5 +259,15 @@ message KernelConf {
     GatherMs0KernelConf gather_ms0_conf = 413;
     GatherMs0GradKernelConf gather_ms0_grad_conf = 414;
     DeconvKernelConf deconv_conf = 415;
+    TopKConf top_k_conf = 416;
+    SortConf sort_conf = 417;
+    ArgSortConf arg_sort_conf = 418;
+    SigmoidCrossEntropyLossGradKernelConf sigmoid_cross_entropy_loss_grad_conf = 419;
+    NcclTupleReduceConf nccl_tuple_reduce_conf = 420;
+    NcclTupleBroadcastConf nccl_tuple_broadcast_conf = 421;
+    WhereKernelConf where_conf = 422;
+    ScatterNdUpdateKernelConf scatter_nd_update_conf = 423;
+    GatherNdUpdateKernelConf gather_nd_update_conf = 424;
+    NonzeroGpuKernelConf nonzero_gpu_kernel_conf = 425;
   }
 }

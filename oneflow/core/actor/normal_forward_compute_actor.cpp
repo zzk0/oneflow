@@ -209,7 +209,7 @@ void NormalForwardCompActor::SendConstBufInitMsgToBwActor() {
   CHECK_EQ(0, ReadingCnt4ProducedRegst(const_buf_regst_));
   const_buf_regst_->set_act_id(act_id());
   for (int64_t consumer : const_buf_regst_->consumers_actor_id()) {
-    AsyncSendMsg(ActorMsg::BuildRegstMsgToConsumer(actor_id(), consumer, const_buf_regst_));
+    EnqueueAsyncMsg(ActorMsg::BuildRegstMsgToConsumer(actor_id(), consumer, const_buf_regst_));
   }
   IncreaseReadingCnt4ProducedRegst(const_buf_regst_, const_buf_regst_->consumers_actor_id().size());
   IncreaseTotalReadingCnt(const_buf_regst_->consumers_actor_id().size());
@@ -223,5 +223,7 @@ REGISTER_ACTOR(TaskType::kOptimizer, NormalForwardCompActor);
 REGISTER_ACTOR(TaskType::kPrint, NormalForwardCompActor);
 REGISTER_ACTOR(TaskType::kForeignInput, NormalForwardCompActor);
 REGISTER_ACTOR(TaskType::kForeignOutput, NormalForwardCompActor);
+REGISTER_ACTOR(TaskType::kDistributeConcat, NormalForwardCompActor);
+REGISTER_ACTOR(TaskType::kDistributeSplit, NormalForwardCompActor);
 
 }  // namespace oneflow

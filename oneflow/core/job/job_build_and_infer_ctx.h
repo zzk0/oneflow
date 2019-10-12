@@ -25,6 +25,8 @@ class JobBuildAndInferCtx {
   bool HasJobConf() const;
   Maybe<Shape> GetStaticShape(const std::string& lbn) const;
   Maybe<DataType> GetDataType(const std::string& lbn) const;
+  Maybe<bool> IsDynamic(const std::string& lbn) const;
+  Maybe<long long> GetNumOfLoDLevels(const std::string& lbn) const;
   Maybe<OptInt64> GetBatchAxis(const std::string& lbn) const;
   Maybe<OptInt64> GetSplitAxisFromProducerView(const std::string& lbn) const;
   Maybe<const ParallelDesc*> GetParallelDescFromProducerView(const std::string& lbn) const;
@@ -35,6 +37,8 @@ class JobBuildAndInferCtx {
  private:
   Maybe<void> AddOpNameParallelConf2Placement(const std::string& op_name,
                                               const ParallelConf& parallel_conf);
+  Maybe<void> AddLbiParallelConf2BlobPlacement(
+      const Operator* op, std::function<ParallelDesc*(const std::string&)> ParallelDesc4Obn);
   Maybe<void> DecodeSplitHint7AddOp7AddSbpSigConf2Job(Operator*, SbpSignature*);
   Maybe<void> InferOpOutSbpParallel(Operator*, const SbpSignature&, const ParallelDesc&,
                                     SbpSignature*);
@@ -52,6 +56,7 @@ class JobBuildAndInferCtx {
   HashMap<LogicalBlobId, ParallelDesc> lbi2parallel_desc_from_producer_view_;
   HashMap<std::string, std::shared_ptr<Operator>> op_name2op_;
   HashMap<ParallelDesc, PlacementGroup*> parallel_desc2placement_group_;
+  HashMap<ParallelDesc, BlobPlacementGroup*> parallel_desc2blob_placement_group_;
   bool is_job_conf_frozen_;
   bool has_job_conf_;
 };

@@ -96,6 +96,12 @@ def CurJobBuildAndInferCtx_AddLossLogicalBlobName(lbn):
     error_str = oneflow_internal.CurJobBuildAndInferCtx_AddLossLogicalBlobName(lbn)
     error = text_format.Parse(error_str, error_util.ErrorProto())
     if error.HasField("error_type"): raise JobBuildAndInferError(error)
+    
+def CurJobBuildAndInferCtx_AddLbiAndDiffWatcherUuidPair(lbi_and_uuid):
+    serialized = str(text_format.MessageToString(lbi_and_uuid))
+    error_str = oneflow_internal.CurJobBuildAndInferCtx_AddLbiAndDiffWatcherUuidPair(serialized)
+    error = text_format.Parse(error_str, error_util.ErrorProto())
+    if error.HasField("error_type"): raise JobBuildAndInferError(error)
 
 def CurJobBuildAndInferCtx_CheckJob():
     error_str = oneflow_internal.CurJobBuildAndInferCtx_CheckJob()
@@ -126,6 +132,22 @@ def JobBuildAndInferCtx_GetDataType(job_name, lbn):
     if error.HasField("error_type"): raise JobBuildAndInferError(error)
     return int(dtype)
 
+def JobBuildAndInferCtx_IsDynamic(job_name, lbn):
+    job_name = str(job_name)
+    lbn = str(lbn)
+    ret, error_str = oneflow_internal.JobBuildAndInferCtx_IsDynamic(job_name, lbn)
+    error = text_format.Parse(error_str, error_util.ErrorProto())
+    if error.HasField("error_type"): raise JobBuildAndInferError(error)
+    return ret
+
+def JobBuildAndInferCtx_GetNumOfLoDLevels(job_name, lbn):
+    job_name = str(job_name)
+    lbn = str(lbn)
+    ret, error_str = oneflow_internal.JobBuildAndInferCtx_GetNumOfLoDLevels(job_name, lbn)
+    error = text_format.Parse(error_str, error_util.ErrorProto())
+    if error.HasField("error_type"): raise JobBuildAndInferError(error)
+    return ret
+
 def JobBuildAndInferCtx_GetBatchAxis(job_name, lbn):
     job_name = str(job_name)
     lbn = str(lbn)
@@ -139,12 +161,12 @@ def JobBuildAndInferCtx_GetBatchAxis(job_name, lbn):
 def JobBuildAndInferCtx_GetSplitAxisFromProducerView(job_name, lbn):
     job_name = str(job_name)
     lbn = str(lbn)
-    batch_axis_str, error_str = \
+    split_axis_str, error_str = \
         oneflow_internal.JobBuildAndInferCtx_GetSplitAxisFromProducerView(job_name, lbn)
-    batch_axis = text_format.Parse(batch_axis_str, dtype_util.OptInt64())
+    split_axis = text_format.Parse(split_axis_str, dtype_util.OptInt64())
     error = text_format.Parse(error_str, error_util.ErrorProto())
     if error.HasField("error_type"): raise JobBuildAndInferError(error)
-    if batch_axis.HasField("value"): return batch_axis.value
+    if split_axis.HasField("value"): return split_axis.value
     return None
 
 def JobBuildAndInferCtx_GetParallelConfFromProducerView(job_name, lbn):
@@ -155,6 +177,14 @@ def JobBuildAndInferCtx_GetParallelConfFromProducerView(job_name, lbn):
     error = text_format.Parse(error_str, error_util.ErrorProto())
     if error.HasField("error_type"): raise JobBuildAndInferError(error)
     return text_format.Parse(parallel_conf, placment_util.ParallelConf())
+
+def GetMachine2DeviceIdListOFRecordFromParallelConf(parallel_conf):
+    serialized_parallel_conf = str(text_format.MessageToString(parallel_conf))
+    ofrecord, error_str = \
+        oneflow_internal.GetMachine2DeviceIdListOFRecordFromParallelConf(serialized_parallel_conf)
+    error = text_format.Parse(error_str, error_util.ErrorProto())
+    if error.HasField("error_type"): raise JobBuildAndInferError(error)
+    return text_format.Parse(ofrecord, record_util.OFRecord())
 
 def DeviceType4DeviceTag(device_tag):
     device_tag = str(device_tag)

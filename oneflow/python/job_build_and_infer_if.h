@@ -47,6 +47,12 @@ void CurJobBuildAndInferCtx_AddLossLogicalBlobName(const std::string& lbn, std::
       error_str);
 }
 
+void CurJobBuildAndInferCtx_AddLbiAndDiffWatcherUuidPair(const std::string& lbi_uuid_pair,
+                                                         std::string* error_str) {
+  return oneflow::CurJobBuildAndInferCtx_AddLbiAndDiffWatcherUuidPair(lbi_uuid_pair)
+      .GetDataAndSerializedErrorProto(error_str);
+}
+
 std::string JobBuildAndInferCtx_GetSerializedIdListAsStaticShape(const std::string& job_name,
                                                                  const std::string& lbn,
                                                                  std::string* error_str) {
@@ -57,6 +63,18 @@ std::string JobBuildAndInferCtx_GetSerializedIdListAsStaticShape(const std::stri
 long long JobBuildAndInferCtx_GetDataType(const std::string& job_name, const std::string& lbn,
                                           std::string* error_str) {
   return oneflow::JobBuildAndInferCtx_GetDataType(job_name, lbn)
+      .GetDataAndSerializedErrorProto(error_str, 0LL);
+}
+
+bool JobBuildAndInferCtx_IsDynamic(const std::string& job_name, const std::string& lbn,
+                                   std::string* error_str) {
+  return oneflow::JobBuildAndInferCtx_IsDynamic(job_name, lbn)
+      .GetDataAndSerializedErrorProto(error_str, false);
+}
+
+long long JobBuildAndInferCtx_GetNumOfLoDLevels(const std::string& job_name, const std::string& lbn,
+                                                std::string* error_str) {
+  return oneflow::JobBuildAndInferCtx_GetNumOfLoDLevels(job_name, lbn)
       .GetDataAndSerializedErrorProto(error_str, 0LL);
 }
 

@@ -29,7 +29,7 @@ class Shape final {
   // Getters and Setters
   const std::vector<int64_t>& dim_vec() const { return dim_vec_; }
   int64_t elem_cnt() const { return elem_cnt_; }
-  int64_t At(int64_t index) const { return dim_vec_[index]; }
+  int64_t At(int64_t index) const { return dim_vec_.at(index); }
   void Set(int64_t index, int64_t val);
   int64_t NumAxes() const { return dim_vec_.size(); }
   int64_t Count(int64_t begin_axis, int64_t end_axis) const;
@@ -51,6 +51,19 @@ class Shape final {
   std::vector<int64_t> dim_vec_;
   int64_t elem_cnt_;
 };
+
+inline Shape CreateReducedShape(const Shape& shape, const std::vector<int64_t>& axis_vec) {
+  return shape.CreateReducedShape(axis_vec);
+}
+
+inline Shape CreateReducedShapeOrOnesShape(const Shape& shape,
+                                           const std::vector<int64_t>& axis_vec) {
+  return shape.CreateReducedShapeOrOnesShape(axis_vec);
+}
+
+inline Shape CreateLeftExtendedShape(const Shape& shape, int ndims_extend_to) {
+  return shape.CreateLeftExtendedShape(ndims_extend_to);
+}
 
 template<typename StreamT>
 void Shape::SerializeWithTextFormat(StreamT& out_stream) const {
