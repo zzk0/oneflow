@@ -1,4 +1,5 @@
 #include "oneflow/core/kernel/kernel.h"
+#include "oneflow/core/kernel/normalize_kernel_util.h"
 
 namespace oneflow {
 
@@ -21,6 +22,11 @@ class ModelLoadKernel final : public KernelIf<DeviceType::kCPU> {
       const std::string key =
           GenLogicalBlobName(conf.variable_op_name(i), original_variable_conf.out());
       reader.Read(key, out_i);
+      if (original_variable_conf.has_normalize_conf()) {
+        NormalizeKernelUtil<DeviceType::kCPU, float>::Normalize(
+          ctx.device_ctx, original_variable_conf.normalize_conf().axis(), original_variable_conf.normalize_conf().epsilon(),
+          out_i, BnInOp2Blob("square_x_sum"), out_i);
+      }
     }
   }
 };
