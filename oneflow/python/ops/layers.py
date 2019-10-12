@@ -20,8 +20,11 @@ def dense(
     bias_initializer=None,
     trainable=True,
     name=None,
-    model_distribute=distribute_util.broadcast(),
     primary_lr=None,
+    normalize=False,
+    norm_axis=None,
+    norm_epsilon=None,
+    model_distribute=distribute_util.broadcast(),
 ):
     in_shape = inputs.static_shape
     in_num_axes = len(in_shape)
@@ -37,6 +40,12 @@ def dense(
     if model_distribute is distribute_util.split(0):
         assert in_num_axes is 2 # model distribute is hard for reshape split dim 1
 
+    if normalize:
+        if norm_axis is None:
+            norm_axis = 1
+        if norm_epsilon is None:
+            norm_epsilon = 1e-12
+
     weight = flow.get_variable(
         name="{}-weight".format(name_prefix),
         shape=(units, inputs.static_shape[1]),
@@ -49,6 +58,9 @@ def dense(
         trainable=trainable,
         model_name="weight",
         primary_lr=primary_lr,
+        normalize=normalize,
+        norm_axis=norm_axis,
+        norm_epsilon=norm_epsilon,
         distribute=model_distribute)
     weight = weight.with_distribute(model_distribute)
 
