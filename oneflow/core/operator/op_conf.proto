@@ -520,6 +520,11 @@ message PiecewiseConstantConf {
   repeated double values = 2;
 }
 
+message PiecewiseScalingConf {
+  repeated int64 boundaries = 1;
+  repeated double scales = 2; 
+}
+
 message PolynomialDecayConf {
   required int64 decay_batches = 1;
   optional double end_learning_rate = 2 [default = 0.0001];
@@ -548,6 +553,7 @@ message LearningRateDecayConf {
     PolynomialDecayConf polynomial_conf = 2004;
     CosineDecayConf cosine_conf = 2005;
     LinearCosineDecayConf linear_cosine_conf = 2006;
+    PiecewiseScalingConf piecewise_scaling_conf = 2007;
   }
 }
 
