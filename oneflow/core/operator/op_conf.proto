@@ -352,6 +352,20 @@ message SparseCrossEntropyGradOpConf {
   required string prediction_diff = 4;
 }
 
+message SparseSoftmaxCrossEntropyOpConf {
+  required string prediction = 1;
+  required string label = 2;
+  required string out = 3;
+  required string prob = 4;
+}
+
+message SparseSoftmaxCrossEntropyGradOpConf {
+  required string prob = 1;
+  required string label = 2;
+  required string dy = 3;
+  required string dx = 4;
+}
+
 message SparseSoftmaxCrossEntropyLossOpConf {
   required string prediction = 1;
   required string label = 2;
@@ -588,6 +602,7 @@ message NormalModelUpdateOpConf {
   required string learning_rate = 6;
   required float l1 = 7;
   required float l2 = 8;
+  optional NormalizeConf normalize_conf = 9;
 }
 
 message NaiveModelUpdateOpConf {
@@ -599,6 +614,7 @@ message NaiveModelUpdateOpConf {
   required string learning_rate = 6;
   required float l1 = 7;
   required float l2 = 8;
+  optional NormalizeConf normalize_conf = 9;
 }
 
 message MomentumModelUpdateOpConf {
@@ -611,6 +627,7 @@ message MomentumModelUpdateOpConf {
   required string learning_rate = 7;
   required float l1 = 8;
   required float l2 = 9;
+  optional NormalizeConf normalize_conf = 10;
 }
 
 message RMSPropModelUpdateOpConf {
@@ -622,6 +639,7 @@ message RMSPropModelUpdateOpConf {
   required string learning_rate = 6;
   required float l1 = 7;
   required float l2 = 8;
+  optional NormalizeConf normalize_conf = 9;
 }
 
 message LARSModelUpdateOpConf {
@@ -634,6 +652,7 @@ message LARSModelUpdateOpConf {
   required string learning_rate = 7;
   required float l1 = 8;
   required float l2 = 9;
+  optional NormalizeConf normalize_conf = 10;
 }
 
 message AdamModelUpdateOpConf {
@@ -649,6 +668,7 @@ message AdamModelUpdateOpConf {
   required string learning_rate = 10;
   required float l1 = 11;
   required float l2 = 12;
+  optional NormalizeConf normalize_conf = 13;
 }
 
 message LazyAdamModelUpdateOpConf {
@@ -664,6 +684,7 @@ message LazyAdamModelUpdateOpConf {
   required string learning_rate = 10;
   required float l1 = 11;
   required float l2 = 12;
+  optional NormalizeConf normalize_conf = 13;
 }
 
 message AccumulateOpConf {
@@ -1681,6 +1702,8 @@ message OperatorConf {
     ArcFaceOpConf arc_face_conf = 309;
     ArcFaceGradOpConf arc_face_grad_conf = 310;  
     L2NormalizeGradOpConf l2_normalize_grad_conf = 311;  
+    SparseSoftmaxCrossEntropyOpConf sparse_softmax_cross_entropy_conf = 312;
+    SparseSoftmaxCrossEntropyGradOpConf sparse_softmax_cross_entropy_grad_conf = 313;
 
     // math op
     BroadcastAddOpConf broadcast_add_conf = 500;
