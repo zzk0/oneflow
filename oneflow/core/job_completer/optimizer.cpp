@@ -109,6 +109,14 @@ void ConstructMdUpdtOpConf(const VariableOp& op, const LogicalBlobId& diff_lbi_o
                           op.op_conf().variable_conf().primary_lr())
           : train_conf.primary_lr_lbn();
   const std::string& secondary_lr_lbn = train_conf.secondary_lr_lbn();
+
+  if (op.op_conf().variable_conf().has_normalize_conf()) {
+  mdupdt_op_conf->mutable_normalize_conf()->set_epsilon(
+      op.op_conf().variable_conf().normalize_conf().epsilon());
+  mdupdt_op_conf->mutable_normalize_conf()->set_axis(
+      op.op_conf().variable_conf().normalize_conf().axis());
+  }
+
   if (op.op_conf().variable_conf().model_name() == "weight") {
     mdupdt_op_conf->set_learning_rate(primary_lr_lbn);
     mdupdt_op_conf->set_l1(train_conf.weight_l1());
