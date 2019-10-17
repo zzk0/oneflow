@@ -45,6 +45,7 @@ class JobDesc final {
   bool use_nccl_inter_node_communication() const {
     return job_conf_.use_nccl_inter_node_communication();
   }
+  bool use_boxing_v2() const { return job_conf_.use_boxing_v2(); }
   bool enable_all_reduce_group() const { return job_conf_.enable_all_reduce_group(); }
   bool enable_non_distributed_optimizer() const {
     return job_conf_.enable_non_distributed_optimizer();
@@ -52,6 +53,7 @@ class JobDesc final {
   int64_t non_distributed_optimizer_group_size_mbyte() const {
     return job_conf_.non_distributed_optimizer_group_size_mbyte();
   }
+  bool disable_all_reduce_sequence() const { return job_conf_.disable_all_reduce_sequence(); }
   int64_t all_reduce_group_num() const;
   int64_t all_reduce_group_min_byte() const;
   float all_reduce_group_size_warmup() const;

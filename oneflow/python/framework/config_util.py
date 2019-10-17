@@ -279,6 +279,11 @@ def set_use_nccl_inter_node_communication(value = True):
     _SetJobConfAttr(lambda x:x, 'use_nccl_inter_node_communication', value)
     return oneflow.config
 
+@oneflow_export('config.use_boxing_v2')
+def use_boxing_v2(value=True):
+    _SetJobConfAttr(lambda x: x, 'use_boxing_v2', value)
+    return oneflow.config
+
 @oneflow_export('config.enable_all_reduce_group')
 def set_enable_all_reduce_group(value = True):
     _SetJobConfAttr(lambda x:x, 'enable_all_reduce_group', value)
@@ -312,6 +317,11 @@ def set_all_reduce_fp16(value = True):
 @oneflow_export('config.enable_non_distributed_optimizer')
 def set_enable_non_distributed_optimizer(value = True):
     _SetJobConfAttr(lambda x:x, 'enable_non_distributed_optimizer', value)
+    return oneflow.config
+
+@oneflow_export('config.disable_all_reduce_sequence')
+def disable_all_reduce_sequence(value=True):
+    _SetJobConfAttr(lambda x: x, 'disable_all_reduce_sequence', value)
     return oneflow.config
 
 @oneflow_export('config.non_distributed_optimizer_group_size_mbyte')
