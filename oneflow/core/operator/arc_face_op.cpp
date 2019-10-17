@@ -16,11 +16,12 @@ const PbMessage& ArcFaceOp::GetCustomizedConf() const { return op_conf().arc_fac
 Maybe<void> ArcFaceOp::InferBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature) const {
-  if (sbp_signature->bn_in_op2sbp_parallel().at("in").split_parallel().axis() == 0) {
-    CHECK_EQ_OR_RETURN(op_conf().arc_face_conf().depth(), 0);
-  } else {
+  if (sbp_signature->bn_in_op2sbp_parallel().at("in").split_parallel().axis() == 1) {
     CHECK_NE_OR_RETURN(op_conf().arc_face_conf().depth(), 0);
   }
+  // else {
+  //  CHECK_EQ_OR_RETURN(op_conf().arc_face_conf().depth(), 0);
+  //}
   const BlobDesc* in = GetBlobDesc4BnInOp("in");
   CHECK_GT_OR_RETURN(in->shape().NumAxes(), 0);
   const BlobDesc* label = GetBlobDesc4BnInOp("label");
@@ -48,7 +49,7 @@ Maybe<void> ArcFaceOp::GetSbpSignatures(
       .Build(sbp_sig_list->mutable_sbp_signature()->Add());
   SbpSignatureBuilder()
       .Broadcast("label")
-      .Broadcast("sin_theta_data")
+      .PartialSum("sin_theta_data")
       .Split("in", 1)
       .Split("out", 1)
       .Build(sbp_sig_list->mutable_sbp_signature()->Add());
