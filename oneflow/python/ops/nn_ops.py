@@ -284,7 +284,7 @@ def sparse_softmax_cross_entropy_with_logits(
 
 @oneflow_export("nn.sparse_softmax_cross_entropy_loss")
 def sparse_softmax_cross_entropy_loss(
-    labels=None, logits=None, name=None
+    labels=None, logits=None, depth=None, name=None
 ):
     assert labels is not None
     assert logits is not None
@@ -302,6 +302,7 @@ def sparse_softmax_cross_entropy_loss(
     setattr(
         op_conf.sparse_softmax_cross_entropy_conf, "label", labels.logical_blob_name
     )
+    setattr(op_conf.sparse_softmax_cross_entropy_conf, "depth", depth if depth is not None else 0)
     setattr(op_conf.sparse_softmax_cross_entropy_conf, "prob", "prob")
     setattr(op_conf.sparse_softmax_cross_entropy_conf, "out", "out")
     compile_context.CurJobAddOp(op_conf)
