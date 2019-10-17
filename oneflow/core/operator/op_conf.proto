@@ -343,6 +343,7 @@ message SparseCrossEntropyOpConf {
   required string prediction = 1;
   required string label = 2;
   required string out = 3;
+  optional int32 depth = 4;
 }
 
 message SparseCrossEntropyGradOpConf {
@@ -357,6 +358,7 @@ message SparseSoftmaxCrossEntropyOpConf {
   required string label = 2;
   required string out = 3;
   required string prob = 4;
+  optional int32 depth = 5 [default = 0];
 }
 
 message SparseSoftmaxCrossEntropyGradOpConf {
@@ -364,6 +366,7 @@ message SparseSoftmaxCrossEntropyGradOpConf {
   required string label = 2;
   required string dy = 3;
   required string dx = 4;
+  required int32 depth = 5;
 }
 
 message SparseSoftmaxCrossEntropyLossOpConf {

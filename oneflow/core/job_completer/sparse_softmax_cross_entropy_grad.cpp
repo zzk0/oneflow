@@ -18,6 +18,8 @@ void GenerateBackwardOpConf(
         GenLogicalBlobName(op.BnInOp2Lbi("label")));
     sparse_softmax_cross_entropy_grad_op_conf->set_prob(GenLogicalBlobName(op.BnInOp2Lbi("prob")));
     sparse_softmax_cross_entropy_grad_op_conf->set_dx("dx");
+    sparse_softmax_cross_entropy_grad_op_conf->set_depth(
+        op.op_conf().sparse_softmax_cross_entropy_conf().depth());
     op_confs->push_back(sparse_softmax_cross_entropy_grad_op);
     DiffLbi4BnInOp("prediction")->set_op_name(sparse_softmax_cross_entropy_grad_op.name());
     DiffLbi4BnInOp("prediction")->set_blob_name("dx");

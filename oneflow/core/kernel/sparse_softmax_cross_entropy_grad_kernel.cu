@@ -6,19 +6,23 @@ namespace {
 
 template<typename T, typename K>
 __global__ void SparseSoftmaxCrossEntropyGradBackwardSub(const int64_t n, const int64_t w,
-                                                         const K* label, T* in_diff) {
-  CUDA_1D_KERNEL_LOOP(i, n) { in_diff[i * w + static_cast<int64_t>(label[i])] -= 1; }
+                                                         const int64_t lower_bound, const K* label,
+                                                         T* in_diff) {
+  CUDA_1D_KERNEL_LOOP(i, n) {
+    const int64_t idx = label[i] - lower_bound;
+    if (idx >= 0 && idx < w) { in_diff[i * w + idx] -= 1; }
+  }
 }
 
 }  // namespace
 
 template<typename T, typename K>
 struct SparseSoftmaxCrossEntropyGradKernelUtil<DeviceType::kGPU, T, K> {
-  static void BackwardSub(DeviceCtx* ctx, const int64_t n, const int64_t w, const K* label,
-                          T* in_diff) {
+  static void BackwardSub(DeviceCtx* ctx, const int64_t n, const int64_t w,
+                          const int64_t lower_bound, const K* label, T* in_diff) {
     SparseSoftmaxCrossEntropyGradBackwardSub<T>
-        <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, w, label,
-                                                                                      in_diff);
+        <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+            n, w, lower_bound, label, in_diff);
   }
 };
 
