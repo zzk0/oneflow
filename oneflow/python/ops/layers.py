@@ -35,7 +35,9 @@ def dense(
 
     assert model_distribute is distribute_util.auto() or \
         model_distribute is distribute_util.broadcast() or \
-        model_distribute is distribute_util.split(0)
+        model_distribute is distribute_util.split(0) or \
+        model_distribute is distribute_util.split(1)
+
 
     if model_distribute is distribute_util.split(0):
         assert in_num_axes is 2 # model distribute is hard for reshape split dim 1
