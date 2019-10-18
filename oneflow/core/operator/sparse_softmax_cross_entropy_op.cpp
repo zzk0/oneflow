@@ -76,6 +76,12 @@ Maybe<void> SparseSoftmaxCrossEntropyOp::GetSbpSignatures(SbpSignatureList* sbp_
       .Split(input_bns(), 0)
       .Split(output_bns(), 0)
       .Build(sbp_sig_list->mutable_sbp_signature()->Add());
+  SbpSignatureBuilder()
+      .Split("prediction", 1)
+      .Broadcast("label")
+      .Split("prob", 1)
+      .PartialSum("out")
+      .Build(sbp_sig_list->mutable_sbp_signature()->Add());
   return Maybe<void>::Ok();
 }
 
