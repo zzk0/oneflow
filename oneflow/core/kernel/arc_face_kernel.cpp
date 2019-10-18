@@ -17,6 +17,8 @@ void ArcFaceKernel<device_type, T>::ForwardDataContent(
   const T cos_m = cos(margin);
   const T sin_m = sqrt(1 - cos_m * cos_m);
   BnInOp2Blob("out")->CopyDataContentFrom(ctx.device_ctx, BnInOp2Blob("in"));
+  Memset<device_type>(ctx.device_ctx, BnInOp2Blob("sin_theta_data")->mut_dptr<T>(), 0,
+                      BnInOp2Blob("sin_theta_data")->ByteSizeOfDataContentField());
   ArcFaceKernelUtil<device_type, T>::Forward(ctx.device_ctx, BnInOp2Blob("in"),
                                              BnInOp2Blob("label"), lower_bound, cos_m, sin_m,
                                              BnInOp2Blob("sin_theta_data"), BnInOp2Blob("out"));
