@@ -169,33 +169,6 @@ void SoftmaxLossSplitPass::Apply(const OpGraph& op_graph, JobBuilder* job_builde
               ->mutable_op_name2sbp_signature_conf())[sparse_cross_entropy_op_conf.name()] =
             sparse_cross_entropy_sbp_signature;
 
-        SbpSignature sparse_softmax_cross_entropy_grad_sbp_signature;
-        (*sparse_softmax_cross_entropy_grad_sbp_signature.mutable_bn_in_op2sbp_parallel())["dy"]
-            .mutable_broadcast_parallel();
-        (*sparse_softmax_cross_entropy_grad_sbp_signature.mutable_bn_in_op2sbp_parallel())["prob"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*sparse_softmax_cross_entropy_grad_sbp_signature.mutable_bn_in_op2sbp_parallel())["label"]
-            .mutable_broadcast_parallel();
-        (*sparse_softmax_cross_entropy_grad_sbp_signature.mutable_bn_in_op2sbp_parallel())["dx"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*job_builder->mutable_sbp_conf()
-              ->mutable_op_name2sbp_signature_conf())[node->op().op_name() + "_grad"] =
-            sparse_softmax_cross_entropy_grad_sbp_signature;
-        SbpSignature mat_mul_grad_a_sbp_signature;
-        (*mat_mul_grad_a_sbp_signature.mutable_bn_in_op2sbp_parallel())["a"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*mat_mul_grad_a_sbp_signature.mutable_bn_in_op2sbp_parallel())["b"]
-            .mutable_split_parallel()
-            ->set_axis(0);
-        (*mat_mul_grad_a_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
-            .mutable_partial_sum_parallel();
-        (*job_builder->mutable_sbp_conf()
-              ->mutable_op_name2sbp_signature_conf())["fc7_matmul_grad_a"] =
-            mat_mul_grad_a_sbp_signature;
-
         std::string prob_lbn = broadcast_div_op_conf.name() + "/out";
         UpdateProbConsumerOpConf(prob_lbn, node, job_builder);
       }
