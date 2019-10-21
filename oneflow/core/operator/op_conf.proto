@@ -1586,6 +1586,28 @@ message NcclBoxingAllReduceOpConf {
   required LogicalBlobId lbi = 1;
 }
 
+message ModelInitV2OpConf {
+  required string ref = 1;
+  required string variable_op_name = 2;
+  required VariableOpConf original_variable_conf = 3;
+}
+
+message ModelLoadV2OpConf {
+  required string path = 1;
+  required string ref = 2;
+  required string variable_op_name = 3;
+  required VariableOpConf original_variable_conf = 4;
+}
+
+
+message ModelSaveV2OpConf {
+  required string path = 1;
+  required string in = 2;
+  required string variable_op_name = 3;
+  required VariableOpConf original_variable_conf = 4;
+  required string out = 5;
+}
+
 message OperatorConf {
   required string name = 1;
   optional bool trainable = 3 [default = true];
@@ -1741,6 +1763,9 @@ message OperatorConf {
     SparseSoftmaxCrossEntropyOpConf sparse_softmax_cross_entropy_conf = 312;
     SparseSoftmaxCrossEntropyGradOpConf sparse_softmax_cross_entropy_grad_conf = 313;
     ReduceMaxOpConf reduce_max_conf = 314;
+    ModelInitV2OpConf model_init_v2_conf = 315;
+    ModelLoadV2OpConf model_load_v2_conf = 316;
+    ModelSaveV2OpConf model_save_v2_conf = 317;
 
     // math op
     BroadcastAddOpConf broadcast_add_conf = 500;
