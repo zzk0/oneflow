@@ -41,16 +41,16 @@ void SoftmaxLossSplitPass::Apply(const OpGraph& op_graph, JobBuilder* job_builde
         reduce_max_stage0_conf->set_keep_dims(true);
         job_builder->AddOps(node->parallel_desc().parallel_conf(), {reduce_max_stage0_op_conf});
 
-        SbpSignature reduce_max0_sbp_signature;
-        (*reduce_max0_sbp_signature.mutable_bn_in_op2sbp_parallel())["in"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*reduce_max0_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*job_builder->mutable_sbp_conf()
-              ->mutable_op_name2sbp_signature_conf())[reduce_max_stage0_op_conf.name()] =
-            reduce_max0_sbp_signature;
+        //SbpSignature reduce_max0_sbp_signature;
+        //(*reduce_max0_sbp_signature.mutable_bn_in_op2sbp_parallel())["in"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*reduce_max0_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*job_builder->mutable_sbp_conf()
+        //      ->mutable_op_name2sbp_signature_conf())[reduce_max_stage0_op_conf.name()] =
+        //    reduce_max0_sbp_signature;
 
         OperatorConf reduce_max_stage1_op_conf;
         reduce_max_stage1_op_conf.set_name(node->op().op_name() + "-softmax_reduce_max_stage1");
@@ -78,18 +78,18 @@ void SoftmaxLossSplitPass::Apply(const OpGraph& op_graph, JobBuilder* job_builde
         broadcast_sub_conf->set_out("out");
         job_builder->AddOps(node->parallel_desc().parallel_conf(), {broadcast_sub_op_conf});
 
-        SbpSignature broadcast_sub_sbp_signature;
-        (*broadcast_sub_sbp_signature.mutable_bn_in_op2sbp_parallel())["a"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*broadcast_sub_sbp_signature.mutable_bn_in_op2sbp_parallel())["b"]
-            .mutable_broadcast_parallel();
-        (*broadcast_sub_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*job_builder->mutable_sbp_conf()
-              ->mutable_op_name2sbp_signature_conf())[broadcast_sub_op_conf.name()] =
-            broadcast_sub_sbp_signature;
+        //SbpSignature broadcast_sub_sbp_signature;
+        //(*broadcast_sub_sbp_signature.mutable_bn_in_op2sbp_parallel())["a"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*broadcast_sub_sbp_signature.mutable_bn_in_op2sbp_parallel())["b"]
+        //    .mutable_broadcast_parallel();
+        //(*broadcast_sub_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*job_builder->mutable_sbp_conf()
+        //      ->mutable_op_name2sbp_signature_conf())[broadcast_sub_op_conf.name()] =
+        //    broadcast_sub_sbp_signature;
 
         OperatorConf exp_op_conf;
         exp_op_conf.set_name(node->op().op_name() + "-softmax_exp");
@@ -98,15 +98,15 @@ void SoftmaxLossSplitPass::Apply(const OpGraph& op_graph, JobBuilder* job_builde
         exp_conf->set_out("out");
         job_builder->AddOps(node->parallel_desc().parallel_conf(), {exp_op_conf});
 
-        SbpSignature exp_sbp_signature;
-        (*exp_sbp_signature.mutable_bn_in_op2sbp_parallel())["in"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*exp_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*job_builder->mutable_sbp_conf()
-              ->mutable_op_name2sbp_signature_conf())[exp_op_conf.name()] = exp_sbp_signature;
+        //SbpSignature exp_sbp_signature;
+        //(*exp_sbp_signature.mutable_bn_in_op2sbp_parallel())["in"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*exp_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*job_builder->mutable_sbp_conf()
+        //      ->mutable_op_name2sbp_signature_conf())[exp_op_conf.name()] = exp_sbp_signature;
 
         OperatorConf reduce_sum_op_conf;
         reduce_sum_op_conf.set_name(node->op().op_name() + "-softmax_reduce_sum");
@@ -117,15 +117,15 @@ void SoftmaxLossSplitPass::Apply(const OpGraph& op_graph, JobBuilder* job_builde
         reduce_sum_conf->set_keep_dims(true);
         job_builder->AddOps(node->parallel_desc().parallel_conf(), {reduce_sum_op_conf});
 
-        SbpSignature reduce_sum_sbp_signature;
-        (*reduce_sum_sbp_signature.mutable_bn_in_op2sbp_parallel())["in"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*reduce_sum_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
-            .mutable_partial_sum_parallel();
-        (*job_builder->mutable_sbp_conf()
-              ->mutable_op_name2sbp_signature_conf())[reduce_sum_op_conf.name()] =
-            reduce_sum_sbp_signature;
+        //SbpSignature reduce_sum_sbp_signature;
+        //(*reduce_sum_sbp_signature.mutable_bn_in_op2sbp_parallel())["in"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*reduce_sum_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
+        //    .mutable_partial_sum_parallel();
+        //(*job_builder->mutable_sbp_conf()
+        //      ->mutable_op_name2sbp_signature_conf())[reduce_sum_op_conf.name()] =
+        //    reduce_sum_sbp_signature;
 
         OperatorConf broadcast_div_op_conf;
         broadcast_div_op_conf.set_name(node->op().op_name() + "-softmax_div");
@@ -135,18 +135,18 @@ void SoftmaxLossSplitPass::Apply(const OpGraph& op_graph, JobBuilder* job_builde
         broadcast_div_conf->set_out("out");
         job_builder->AddOps(node->parallel_desc().parallel_conf(), {broadcast_div_op_conf});
 
-        SbpSignature broadcast_div_sbp_signature;
-        (*broadcast_div_sbp_signature.mutable_bn_in_op2sbp_parallel())["a"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*broadcast_div_sbp_signature.mutable_bn_in_op2sbp_parallel())["b"]
-            .mutable_broadcast_parallel();
-        (*broadcast_div_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*job_builder->mutable_sbp_conf()
-              ->mutable_op_name2sbp_signature_conf())[broadcast_div_op_conf.name()] =
-            broadcast_div_sbp_signature;
+        //SbpSignature broadcast_div_sbp_signature;
+        //(*broadcast_div_sbp_signature.mutable_bn_in_op2sbp_parallel())["a"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*broadcast_div_sbp_signature.mutable_bn_in_op2sbp_parallel())["b"]
+        //    .mutable_broadcast_parallel();
+        //(*broadcast_div_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*job_builder->mutable_sbp_conf()
+        //      ->mutable_op_name2sbp_signature_conf())[broadcast_div_op_conf.name()] =
+        //    broadcast_div_sbp_signature;
 
         OperatorConf sparse_cross_entropy_op_conf(node->op().op_conf());
         auto* sparse_cross_entropy_conf =
@@ -157,17 +157,17 @@ void SoftmaxLossSplitPass::Apply(const OpGraph& op_graph, JobBuilder* job_builde
         sparse_cross_entropy_conf->set_out("out");
         job_builder->MutOpsOnlyOnce({sparse_cross_entropy_op_conf});
 
-        SbpSignature sparse_cross_entropy_sbp_signature;
-        (*sparse_cross_entropy_sbp_signature.mutable_bn_in_op2sbp_parallel())["prediction"]
-            .mutable_split_parallel()
-            ->set_axis(1);
-        (*sparse_cross_entropy_sbp_signature.mutable_bn_in_op2sbp_parallel())["label"]
-            .mutable_broadcast_parallel();
-        (*sparse_cross_entropy_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
-            .mutable_partial_sum_parallel();
-        (*job_builder->mutable_sbp_conf()
-              ->mutable_op_name2sbp_signature_conf())[sparse_cross_entropy_op_conf.name()] =
-            sparse_cross_entropy_sbp_signature;
+        //SbpSignature sparse_cross_entropy_sbp_signature;
+        //(*sparse_cross_entropy_sbp_signature.mutable_bn_in_op2sbp_parallel())["prediction"]
+        //    .mutable_split_parallel()
+        //    ->set_axis(1);
+        //(*sparse_cross_entropy_sbp_signature.mutable_bn_in_op2sbp_parallel())["label"]
+        //    .mutable_broadcast_parallel();
+        //(*sparse_cross_entropy_sbp_signature.mutable_bn_in_op2sbp_parallel())["out"]
+        //    .mutable_partial_sum_parallel();
+        //(*job_builder->mutable_sbp_conf()
+        //      ->mutable_op_name2sbp_signature_conf())[sparse_cross_entropy_op_conf.name()] =
+        //    sparse_cross_entropy_sbp_signature;
 
         std::string prob_lbn = broadcast_div_op_conf.name() + "/out";
         UpdateProbConsumerOpConf(prob_lbn, node, job_builder);
