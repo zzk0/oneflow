@@ -1590,6 +1590,8 @@ message ModelInitV2OpConf {
   required string ref = 1;
   required string variable_op_name = 2;
   required VariableOpConf original_variable_conf = 3;
+  required string out = 4;
+  required string tick = 5;
 }
 
 message ModelLoadV2OpConf {
@@ -1597,6 +1599,8 @@ message ModelLoadV2OpConf {
   required string ref = 2;
   required string variable_op_name = 3;
   required VariableOpConf original_variable_conf = 4;
+  required string out = 5;
+  required string tick = 6;
 }
 
 
@@ -1606,6 +1610,7 @@ message ModelSaveV2OpConf {
   required string variable_op_name = 3;
   required VariableOpConf original_variable_conf = 4;
   required string out = 5;
+  required string tick = 6;
 }
 
 message OperatorConf {
