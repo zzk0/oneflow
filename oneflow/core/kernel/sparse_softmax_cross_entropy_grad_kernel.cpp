@@ -18,16 +18,16 @@ void SparseSoftmaxCrossEntropyGradKernel<device_type, T>::ForwardDataContent(
   T* dx = dx_blob->mut_dptr<T>();
   KernelUtil<device_type, T>::Copy(ctx.device_ctx, n * w, prob_blob->dptr<T>(), 1, dx, 1);
   SparseSoftmaxCrossEntropyGradKernelUtil<device_type, T, int32_t>::BackwardSub(
-      ctx.device_ctx, n, w, lower_bound, label_blob->dptr<int32_t>(), dx);
+      ctx.device_ctx, n, w, lower_bound, dy_blob->dptr<T>(), label_blob->dptr<int32_t>(), dx);
 }
 
 template<typename T, typename K>
 struct SparseSoftmaxCrossEntropyGradKernelUtil<DeviceType::kCPU, T, K> {
   static void BackwardSub(DeviceCtx* ctx, const int64_t n, const int64_t w,
-                          const int64_t lower_bound, const K* label, T* in_diff) {
+                          const int64_t lower_bound, const T* dy, const K* label, T* in_diff) {
     for (int64_t i = 0; i < n; ++i) {
       const int64_t idx = label[i] - lower_bound;
-      if (idx >= 0 && idx < w) { in_diff[i * w + idx] -= 1; }
+      if (idx >= 0 && idx < w) { in_diff[i * w + idx] = dy[i] * (in_diff[i * w + idx] - 1); }
     }
   }
 };

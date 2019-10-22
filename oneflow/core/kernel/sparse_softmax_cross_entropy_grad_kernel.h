@@ -20,7 +20,7 @@ class SparseSoftmaxCrossEntropyGradKernel final : public KernelIf<device_type> {
 template<DeviceType device_type, typename T, typename K>
 struct SparseSoftmaxCrossEntropyGradKernelUtil {
   static void BackwardSub(DeviceCtx* ctx, const int64_t n, const int64_t w,
-                          const int64_t lower_bound, const K* label, T* in_diff);
+                          const int64_t lower_bound, const T* dy, const K* label, T* in_diff);
 };
 
 }  // namespace oneflow
