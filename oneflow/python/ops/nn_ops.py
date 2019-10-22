@@ -19,6 +19,7 @@ def conv2d(
     padding,
     data_format="NHWC",
     dilations=None,
+    group_num=1,
     name=None,
 ):
     assert len(input.static_shape) == 4
@@ -63,6 +64,7 @@ def conv2d(
     op_conf.conv_2d_conf.filters = filters.static_shape[0]
     op_conf.conv_2d_conf.padding = padding.lower()
     op_conf.conv_2d_conf.data_format = channel_pos
+    op_conf.conv_2d_conf.group_num = group_num
     if channel_pos == "channels_first":
         op_conf.conv_2d_conf.kernel_size.extend(filters.static_shape[2:4])
     elif channel_pos == "channels_last":
@@ -287,6 +289,35 @@ def sparse_softmax_cross_entropy_with_logits(
     lbi.blob_name = "out"
     return remote_blob_util.RemoteBlob(lbi)
 
+@oneflow_export("nn.sparse_softmax_cross_entropy_loss")
+def sparse_softmax_cross_entropy_loss(
+    labels=None, logits=None, depth=None, name=None
+):
+    assert labels is not None
+    assert logits is not None
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("SparseSoftmaxCrossEntropy_"),
+    )
+    setattr(
+        op_conf.sparse_softmax_cross_entropy_conf,
+        "prediction",
+        logits.logical_blob_name,
+    )
+    setattr(
+        op_conf.sparse_softmax_cross_entropy_conf, "label", labels.logical_blob_name
+    )
+    setattr(op_conf.sparse_softmax_cross_entropy_conf, "depth", depth if depth is not None else 0)
+    setattr(op_conf.sparse_softmax_cross_entropy_conf, "prob", "prob")
+    setattr(op_conf.sparse_softmax_cross_entropy_conf, "out", "out")
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+
 @oneflow_export("nn.sigmoid_cross_entropy_with_logits")
 def sigmoid_cross_entropy_with_logits(
     labels=None, logits=None, name=None
@@ -351,6 +382,50 @@ def dropout(x, noise_shape=None, seed=None, name=None, rate=None):
         setattr(op_conf.dropout_conf, "seed", seed)
     assert rate is not None
     setattr(op_conf.dropout_conf, "rate", rate)
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+
+@oneflow_export("nn.arcface")
+def arcface(input, label, margin=None, depth=None, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    if name is None:
+        op_conf.name = id_util.UniqueStr("Arcface_")
+    else:
+        op_conf.name = name
+    setattr(op_conf.arc_face_conf, "in", input.logical_blob_name)
+    setattr(op_conf.arc_face_conf, "label", label.logical_blob_name)
+    setattr(op_conf.arc_face_conf, "sin_theta_data", "sin_theta_data")
+    setattr(op_conf.arc_face_conf, "out", "out")
+    if margin is not None:
+        setattr(op_conf.arc_face_conf, "margin", margin)
+    assert depth is not None
+    setattr(op_conf.arc_face_conf, "depth", depth)
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+
+@oneflow_export("nn.l2_normalize")
+def l2_normalize(input, axis=None, epsilon=None, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    if name is None:
+        op_conf.name = id_util.UniqueStr("L2Normalize_")
+    else:
+        op_conf.name = name
+    setattr(op_conf.l2_normalize_conf, "in", input.logical_blob_name)
+    setattr(op_conf.l2_normalize_conf, "square_x_sum", "square_x_sum")
+    setattr(op_conf.l2_normalize_conf, "out", "out")
+    if axis is None:
+        axis = -1
+    axis = axis if axis >= 0 else len(inputs.shape) + axis
+    setattr(op_conf.l2_normalize_conf, "axis", axis)
+    if epsilon is not None:
+        setattr(op_conf.l2_normalize_conf, "epsilon", epsilon)
+
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
     lbi.op_name = op_conf.name
