@@ -125,13 +125,20 @@ T GenInitialFan(VarianceNorm variance_norm, Blob* blob, const std::string& data_
 
 template<typename T>
 void XavierInitializer(const XavierInitializerConf& initializer_conf, uint32_t random_seed,
-                       Blob* blob) {
+                       Blob* blob, const std::string& data_format) {
   CHECK(blob->shape().elem_cnt());
   VarianceNorm variance_norm = static_cast<VarianceNorm>(initializer_conf.variance_norm());
-  T scale = std::sqrt(static_cast<T>(3)
-                      / GenInitialFan<T>(variance_norm, blob, initializer_conf.data_format()));
-  RngUniform<T>(blob->shape().elem_cnt(), static_cast<T>(-scale), static_cast<T>(scale),
-                random_seed, blob->mut_dptr<T>());
+  T scale = std::sqrt(static_cast<T>(initializer_conf.magnitude())
+                      / GenInitialFan<T>(variance_norm, blob, data_format));
+  if (initializer_conf.rnd_type() == RndType::kUniform) {
+    RngUniform<T>(blob->shape().elem_cnt(), static_cast<T>(-scale), static_cast<T>(scale),
+                  random_seed, blob->mut_dptr<T>());
+  } else if (initializer_conf.rnd_type() == RndType::kNormal) {
+    RngNormal<T>(blob->shape().elem_cnt(), ZeroVal<T>::value, static_cast<T>(scale), random_seed,
+                 blob->mut_dptr<T>());
+  } else {
+    UNIMPLEMENTED();
+  }
 }
 
 template<typename T>
