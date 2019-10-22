@@ -1,0 +1,38 @@
+#include "oneflow/core/kernel/sparse_softmax_cross_entropy_grad_kernel.h"
+#include "oneflow/core/kernel/sparse_cross_entropy_kernel.h"
+#include "oneflow/core/kernel/softmax_kernel.h"
+
+namespace oneflow {
+
+template<DeviceType device_type, typename T>
+void SparseSoftmaxCrossEntropyGradKernel<device_type, T>::ForwardDataContent(
+    const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const {
+  const Blob* dy_blob = BnInOp2Blob("dy");
+  const Blob* label_blob = BnInOp2Blob("label");
+  const Blob* prob_blob = BnInOp2Blob("prob");
+  Blob* dx_blob = BnInOp2Blob("dx");
+  const int64_t n = dx_blob->shape().At(0);
+  const int64_t w = dx_blob->shape().Count(1);
+  const int64_t lower_bound =
+      this->kernel_conf().sparse_softmax_cross_entropy_grad_conf().lower_bound();
+  T* dx = dx_blob->mut_dptr<T>();
+  KernelUtil<device_type, T>::Copy(ctx.device_ctx, n * w, prob_blob->dptr<T>(), 1, dx, 1);
+  SparseSoftmaxCrossEntropyGradKernelUtil<device_type, T, int32_t>::BackwardSub(
+      ctx.device_ctx, n, w, lower_bound, dy_blob->dptr<T>(), label_blob->dptr<int32_t>(), dx);
+}
+
+template<typename T, typename K>
+struct SparseSoftmaxCrossEntropyGradKernelUtil<DeviceType::kCPU, T, K> {
+  static void BackwardSub(DeviceCtx* ctx, const int64_t n, const int64_t w,
+                          const int64_t lower_bound, const T* dy, const K* label, T* in_diff) {
+    for (int64_t i = 0; i < n; ++i) {
+      const int64_t idx = label[i] - lower_bound;
+      if (idx >= 0 && idx < w) { in_diff[i * w + idx] = dy[i] * (in_diff[i * w + idx] - 1); }
+    }
+  }
+};
+
+ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kSparseSoftmaxCrossEntropyGradConf,
+                           SparseSoftmaxCrossEntropyGradKernel, FLOATING_DATA_TYPE_SEQ);
+
+}  // namespace oneflow
