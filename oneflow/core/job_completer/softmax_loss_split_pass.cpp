@@ -28,8 +28,8 @@ void SoftmaxLossSplitPass::Apply(const OpGraph& op_graph, JobBuilder* job_builde
   HashMap<std::string, LogicalBlobId> op_name2lbi;
   op_graph.ForEachNode([&](const OpNode* node) {
     if (node->op().op_conf().has_sparse_softmax_cross_entropy_conf()) {
-      //if (node->op().op_conf().sparse_softmax_cross_entropy_conf().depth() != 0) {
-      if (node->SbpParallel4BnInOp("prediction").has_split_parallel() && node->SbpParallel4BnInOp("prediction").split_parallel().axis()==1) {
+      if (node->SbpParallel4BnInOp("prediction").has_split_parallel()
+          && node->SbpParallel4BnInOp("prediction").split_parallel().axis() == 1) {
         const auto& sparse_softmax_cross_entropy_conf =
             node->op().op_conf().sparse_softmax_cross_entropy_conf();
 
