@@ -57,6 +57,9 @@ parser.add_argument(
     "-dn", "--data_part_num", type=int, default=8, required=False
 )
 parser.add_argument("-b", "--batch_size", type=int, default=8, required=False)
+parser.add_argument(
+    "--dynamic", default=False, action="store_true", required=False
+)
 
 g_args = parser.parse_args()
 g_trainable = True
@@ -251,8 +254,12 @@ def resnet50_network(labels, images):
             name="pool5",
         )
 
+        if g_args.dynamic:
+            pool5 = flow.dynamic_reshape(pool5, (pool5.shape[0], -1))
+        else:
+            pool5 = flow.reshape(pool5, (pool5.shape[0], -1))
         fc1001 = flow.layers.dense(
-            flow.dynamic_reshape(pool5, (pool5.shape[0], -1)),
+            pool5,
             units=1001,
             use_bias=True,
             kernel_initializer=flow.xavier_uniform_initializer(),
@@ -299,10 +306,12 @@ def mock_dataset():
     return {
         "def": {
             "images": flow.input_blob_def(
-                shape=images_shape, dtype=flow.float32, is_dynamic=True
+                shape=images_shape,
+                dtype=flow.float32,
+                is_dynamic=g_args.dynamic,
             ),
             "labels": flow.input_blob_def(
-                shape=labels_shape, dtype=flow.int32, is_dynamic=True
+                shape=labels_shape, dtype=flow.int32, is_dynamic=g_args.dynamic
             ),
         },
         "numpy": {
@@ -313,9 +322,14 @@ def mock_dataset():
         },
     }
 
+
 mock_dataset = mock_dataset()
+
+
 @flow.function
-def TrainNetMock(labels=mock_dataset["def"]["labels"], images=mock_dataset["def"]["images"]):
+def TrainNetMock(
+    labels=mock_dataset["def"]["labels"], images=mock_dataset["def"]["images"]
+):
     flow.config.train.primary_lr(0.0032)
     flow.config.train.model_update_conf(dict(naive_conf={}))
 
@@ -354,7 +368,13 @@ def main():
     fmt_str = "{:>12}  {:>12}  {:.11f}"
     print("{:>12}  {:>12}  {:>12}".format("iter", "loss type", "loss value"))
     for i in range(g_args.iter_num):
-        loss = TrainNetMock(mock_dataset["numpy"]["labels"], mock_dataset["numpy"]["images"]).get().mean()
+        loss = (
+            TrainNetMock(
+                mock_dataset["numpy"]["labels"], mock_dataset["numpy"]["images"]
+            )
+            .get()
+            .mean()
+        )
         print(fmt_str.format(i, "train loss:", loss))
 
 
