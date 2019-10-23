@@ -233,6 +233,10 @@ def resnet_stem(input):
 
 def resnet50(data_dir):
     (labels, images) = _data_load(data_dir)
+    return resnet50_network(labels, images)
+
+
+def resnet50_network(labels, images):
     images = flow.transpose(images, name="transpose", perm=[0, 3, 1, 2])
 
     with flow.deprecated.variable_scope("Resnet"):
@@ -248,7 +252,7 @@ def resnet50(data_dir):
         )
 
         fc1001 = flow.layers.dense(
-            flow.reshape(pool5, (pool5.shape[0], -1)),
+            flow.dynamic_reshape(pool5, (pool5.shape[0], -1)),
             units=1001,
             use_bias=True,
             kernel_initializer=flow.xavier_uniform_initializer(),
@@ -269,7 +273,7 @@ def _set_trainable(trainable):
     g_trainable = trainable
 
 
-@flow.function
+# @flow.function
 def TrainNet():
     flow.config.train.primary_lr(0.0032)
     flow.config.train.model_update_conf(dict(naive_conf={}))
@@ -280,10 +284,45 @@ def TrainNet():
     return loss
 
 
-@flow.function
+# @flow.function
 def evaluate():
     _set_trainable(False)
     return resnet50(g_args.eval_dir)
+
+
+def mock_dataset():
+    n = 8
+    images_shape = (n, 228, 228, 3)
+    labels_shape = (n,)
+    import numpy as np
+
+    return {
+        "def": {
+            "images": flow.input_blob_def(
+                shape=images_shape, dtype=flow.float32, is_dynamic=True
+            ),
+            "labels": flow.input_blob_def(
+                shape=labels_shape, dtype=flow.int32, is_dynamic=True
+            ),
+        },
+        "numpy": {
+            "images": np.random.randn(*images_shape).astype(np.float32),
+            "labels": np.random.randint(
+                low=0, high=2, size=labels_shape
+            ).astype(np.float32),
+        },
+    }
+
+mock_dataset = mock_dataset()
+@flow.function
+def TrainNetMock(labels=mock_dataset["def"]["labels"], images=mock_dataset["def"]["images"]):
+    flow.config.train.primary_lr(0.0032)
+    flow.config.train.model_update_conf(dict(naive_conf={}))
+
+    _set_trainable(True)
+    loss = resnet50_network(labels, images)
+    flow.losses.add_loss(loss)
+    return loss
 
 
 def main():
@@ -315,14 +354,8 @@ def main():
     fmt_str = "{:>12}  {:>12}  {:.11f}"
     print("{:>12}  {:>12}  {:>12}".format("iter", "loss type", "loss value"))
     for i in range(g_args.iter_num):
-        loss = TrainNet().get().mean()
+        loss = TrainNetMock(mock_dataset["numpy"]["labels"], mock_dataset["numpy"]["images"]).get().mean()
         print(fmt_str.format(i, "train loss:", loss))
-
-        if (i + 1) % 100 == 0:
-            eval = evaluate().get().mean()
-            print(fmt_str.format(i, "eval loss:", eval))
-
-            check_point.save(MODEL_SAVE + "_" + str(i))
 
 
 if __name__ == "__main__":
