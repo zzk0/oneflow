@@ -309,7 +309,7 @@ def mock_dataset():
             "images": np.random.randn(*images_shape).astype(np.float32),
             "labels": np.random.randint(
                 low=0, high=2, size=labels_shape
-            ).astype(np.float32),
+            ).astype(np.int32),
         },
     }
 
