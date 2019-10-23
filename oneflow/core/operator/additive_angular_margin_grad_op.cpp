@@ -1,20 +1,22 @@
-#include "oneflow/core/operator/arc_face_grad_op.h"
+#include "oneflow/core/operator/additive_angular_margin_grad_op.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
 #include "oneflow/core/common/balanced_splitter.h"
 
 namespace oneflow {
 
-void ArcFaceGradOp::InitFromOpConf() {
-  CHECK(op_conf().has_arc_face_grad_conf());
+void AdditiveAngularMarginGradOp::InitFromOpConf() {
+  CHECK(op_conf().has_additive_angular_margin_grad_conf());
   EnrollInputBn("dy");
   EnrollInputBn("label", false);
   EnrollInputBn("sin_theta_data", false);
   EnrollOutputBn("dx");
 }
 
-const PbMessage& ArcFaceGradOp::GetCustomizedConf() const { return op_conf().arc_face_grad_conf(); }
+const PbMessage& AdditiveAngularMarginGradOp::GetCustomizedConf() const {
+  return op_conf().additive_angular_margin_grad_conf();
+}
 
-Maybe<void> ArcFaceGradOp::InferBlobDescs(
+Maybe<void> AdditiveAngularMarginGradOp::InferBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx) const {
   const BlobDesc* dy = GetBlobDesc4BnInOp("dy");
@@ -31,7 +33,7 @@ Maybe<void> ArcFaceGradOp::InferBlobDescs(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> ArcFaceGradOp::GetSbpSignatures(
+Maybe<void> AdditiveAngularMarginGradOp::GetSbpSignatures(
     const std::function<Maybe<const BlobDesc*>(const std::string&)>& LogicalBlobDesc4Ibn,
     SbpSignatureList* sbp_sig_list) const {
   SbpSignatureBuilder()
@@ -50,27 +52,27 @@ Maybe<void> ArcFaceGradOp::GetSbpSignatures(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> ArcFaceGradOp::InferBatchAxis(
+Maybe<void> AdditiveAngularMarginGradOp::InferBatchAxis(
     std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {
   *BatchAxis4BnInOp("dx") = *BatchAxis4BnInOp("dy");
   return Maybe<void>::Ok();
 }
 
-void ArcFaceGradOp::VirtualGenKernelConf(
+void AdditiveAngularMarginGradOp::VirtualGenKernelConf(
     std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, KernelConf* kernel_conf, const OpContext* op_ctx,
     std::function<const BlobDesc&(const std::string&)> LogicalBlobDesc4BnInOp) const {
-  const int64_t dim = op_conf().arc_face_grad_conf().depth();
+  const int64_t dim = op_conf().additive_angular_margin_grad_conf().depth();
   if (dim > 0) {
     CHECK_GE(dim, parallel_ctx->parallel_num());
     BalancedSplitter bs(dim, parallel_ctx->parallel_num());
-    kernel_conf->mutable_arc_face_grad_conf()->set_lower_bound(
+    kernel_conf->mutable_additive_angular_margin_grad_conf()->set_lower_bound(
         bs.At(parallel_ctx->parallel_id()).begin());
   } else {
-    kernel_conf->mutable_arc_face_grad_conf()->set_lower_bound(0);
+    kernel_conf->mutable_additive_angular_margin_grad_conf()->set_lower_bound(0);
   }
 }
 
-REGISTER_OP(OperatorConf::kArcFaceGradConf, ArcFaceGradOp);
+REGISTER_OP(OperatorConf::kAdditiveAngularMarginGradConf, AdditiveAngularMarginGradOp);
 
 }  // namespace oneflow

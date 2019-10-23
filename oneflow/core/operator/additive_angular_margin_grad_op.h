@@ -1,15 +1,15 @@
-#ifndef ONEFLOW_CORE_OPERATOR_ARC_FACE_GRAD_OP_H_
-#define ONEFLOW_CORE_OPERATOR_ARC_FACE_GRAD_OP_H_
+#ifndef ONEFLOW_CORE_OPERATOR_ADDITIVE_ANGULAR_MARGIN_GRAD_OP_H_
+#define ONEFLOW_CORE_OPERATOR_ADDITIVE_ANGULAR_MARGIN_GRAD_OP_H_
 
 #include "oneflow/core/operator/operator.h"
 
 namespace oneflow {
 
-class ArcFaceGradOp final : public Operator {
+class AdditiveAngularMarginGradOp final : public Operator {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(ArcFaceGradOp);
-  ArcFaceGradOp() = default;
-  ~ArcFaceGradOp() override = default;
+  OF_DISALLOW_COPY_AND_MOVE(AdditiveAngularMarginGradOp);
+  AdditiveAngularMarginGradOp() = default;
+  ~AdditiveAngularMarginGradOp() override = default;
   void InitFromOpConf() override;
   const PbMessage& GetCustomizedConf() const override;
   Maybe<void> InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
@@ -31,4 +31,4 @@ class ArcFaceGradOp final : public Operator {
 
 }  // namespace oneflow
 
-#endif  // ONEFLOW_CORE_OPERATOR_ARC_FACE_GRAD_OP_H_
+#endif  // ONEFLOW_CORE_OPERATOR_ADDITIVE_ANGULAR_MARGIN_GRAD_OP_H_

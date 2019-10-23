@@ -395,14 +395,14 @@ def arcface(input, label, margin=None, depth=None, name=None):
         op_conf.name = id_util.UniqueStr("Arcface_")
     else:
         op_conf.name = name
-    setattr(op_conf.arc_face_conf, "in", input.logical_blob_name)
-    setattr(op_conf.arc_face_conf, "label", label.logical_blob_name)
-    setattr(op_conf.arc_face_conf, "sin_theta_data", "sin_theta_data")
-    setattr(op_conf.arc_face_conf, "out", "out")
+    setattr(op_conf.additive_angular_margin_conf, "in", input.logical_blob_name)
+    setattr(op_conf.additive_angular_margin_conf, "label", label.logical_blob_name)
+    setattr(op_conf.additive_angular_margin_conf, "sin_theta_data", "sin_theta_data")
+    setattr(op_conf.additive_angular_margin_conf, "out", "out")
     if margin is not None:
-        setattr(op_conf.arc_face_conf, "margin", margin)
+        setattr(op_conf.additive_angular_margin_conf, "margin", margin)
     assert depth is not None
-    setattr(op_conf.arc_face_conf, "depth", depth)
+    setattr(op_conf.additive_angular_margin_conf, "depth", depth)
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
     lbi.op_name = op_conf.name
