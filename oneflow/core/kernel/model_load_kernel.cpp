@@ -23,7 +23,7 @@ class ModelLoadKernel final : public KernelIf<DeviceType::kCPU> {
           GenLogicalBlobName(conf.variable_op_name(i), original_variable_conf.out());
       reader.Read(key, out_i);
       if (original_variable_conf.has_normalize_conf()) {
-        L2NormalizeKernelUtil<DeviceType::kCPU, float>::Normalize(
+        L2NormalizeKernelUtil<DeviceType::kCPU, float>::Forward(
             ctx.device_ctx, original_variable_conf.normalize_conf().axis(),
             original_variable_conf.normalize_conf().epsilon(), out_i, BnInOp2Blob("square_x_sum"),
             out_i);

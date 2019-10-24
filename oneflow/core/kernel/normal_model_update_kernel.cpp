@@ -26,7 +26,7 @@ void NormalMdUpdateKernel<device_type, T>::Forward(
               train_step_ptr, learning_rate_ptr, BnInOp2Blob);
   const auto& norm_conf = *GetMsgPtrFromPbMessage<NormalizeConf>(op_conf, "normalize_conf");
   if (&norm_conf != nullptr) {
-    L2NormalizeKernelUtil<device_type, T>::Normalize(
+    L2NormalizeKernelUtil<device_type, T>::Forward(
         ctx.device_ctx, norm_conf.axis(), norm_conf.epsilon(), BnInOp2Blob("model"),
         BnInOp2Blob("square_x_sum"), BnInOp2Blob("model"));
   }
