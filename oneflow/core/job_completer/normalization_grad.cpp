@@ -43,7 +43,7 @@ void GenerateBackwardOpConf(
     inv_variance.set_blob_name(rsqrt_conf->out());
     grad_conf->set_inv_variance(GenLogicalBlobName(inv_variance));
     if (dx_lbi != nullptr) {
-      //grad_conf->set_dx("dx");
+      // grad_conf->set_dx("dx");
       OperatorConf reshape_gamma_op;
       reshape_gamma_op.set_name("System-AutoGrad-" + op.op_name() + "-ReshapeGamma");
       ReshapeOpConf* reshape_gamma_op_conf = reshape_gamma_op.mutable_reshape_conf();
