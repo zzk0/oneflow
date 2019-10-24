@@ -11,11 +11,7 @@ __global__ void ComputeEntropyGpu(int64_t num_instances, int64_t num_classes,
                                   const int64_t lower_bound, const T* x, const K* labels, T* y) {
   CUDA_1D_KERNEL_LOOP(i, num_instances) {
     K label = labels[i] - lower_bound;
-    if (label >= 0 && label < num_classes) {
-      y[i] = -SafeLog(x[i * num_classes + label]);
-    } else {
-      y[i] = 0;
-    }
+    if (label >= 0 && label < num_classes) { y[i] = -SafeLog(x[i * num_classes + label]); }
   }
 }
 
@@ -28,8 +24,6 @@ __global__ void ComputeEntropyGpuHalf(int64_t num_instances, int64_t num_classes
     K label = labels[i] - lower_bound;
     if (label >= 0 && label < num_classes) {
       y[i] = __hneg(SafeLog<half>(x[i * num_classes + label]));
-    } else {
-      y[i] = 0;
     }
   }
 #else
@@ -39,26 +33,31 @@ __global__ void ComputeEntropyGpuHalf(int64_t num_instances, int64_t num_classes
 }
 
 template<typename T, typename K>
-__global__ void ComputeDiffGpu(int64_t num_instances, int64_t num_classes, const T* x,
-                               const K* labels, T* dx) {
+__global__ void ComputeDiffGpu(int64_t num_instances, int64_t num_classes,
+                               const int64_t lower_bound, const T* x, const K* labels, T* dx) {
   CUDA_1D_KERNEL_LOOP(i, num_instances) {
-    K label = labels[i];
-    assert(label >= 0);
-    assert(label < num_classes);
-    dx[i * num_classes + label] = -1 / MaxWithLogThreshold(x[i * num_classes + label]);
+    K label = labels[i] - lower_bound;
+    // assert(label >= 0);
+    // assert(label < num_classes);
+    if (label >= 0 && label < num_classes) {
+      dx[i * num_classes + label] = -1 / MaxWithLogThreshold(x[i * num_classes + label]);
+    }
   }
 }
 
 template<typename K>
-__global__ void ComputeDiffGpuHalf(int64_t num_instances, int64_t num_classes, const half* x,
-                                   const K* labels, half* dx) {
+__global__ void ComputeDiffGpuHalf(int64_t num_instances, int64_t num_classes,
+                                   const int64_t lower_bound, const half* x, const K* labels,
+                                   half* dx) {
 #if __CUDA_ARCH__ >= 530 || !defined(__CUDA_ARCH__)
   CUDA_1D_KERNEL_LOOP(i, num_instances) {
-    K label = labels[i];
-    assert(label >= 0);
-    assert(label < num_classes);
-    dx[i * num_classes + label] =
-        __hneg(__hdiv(__float2half(1.0), MaxWithLogThreshold<half>(x[i * num_classes + label])));
+    K label = labels[i] - lower_bound;
+    // assert(label >= 0);
+    // assert(label < num_classes);
+    if (label >= 0 && label < num_classes) {
+      dx[i * num_classes + label] =
+          __hneg(__hdiv(__float2half(1.0), MaxWithLogThreshold<half>(x[i * num_classes + label])));
+    }
   }
 #else
   printf("use half need nvcc arch >= 530");
@@ -67,26 +66,32 @@ __global__ void ComputeDiffGpuHalf(int64_t num_instances, int64_t num_classes, c
 }
 
 template<typename T, typename K>
-__global__ void ComputeDiffGpu(int64_t num_instances, int64_t num_classes, const T* x,
-                               const K* labels, const T* dy, T* dx) {
+__global__ void ComputeDiffGpu(int64_t num_instances, int64_t num_classes,
+                               const int64_t lower_bound, const T* x, const K* labels, const T* dy,
+                               T* dx) {
   CUDA_1D_KERNEL_LOOP(i, num_instances) {
-    K label = labels[i];
-    assert(label >= 0);
-    assert(label < num_classes);
-    dx[i * num_classes + label] = -dy[i] / MaxWithLogThreshold(x[i * num_classes + label]);
+    K label = labels[i] - lower_bound;
+    // assert(label >= 0);
+    // assert(label < num_classes);
+    if (label >= 0 && label < num_classes) {
+      dx[i * num_classes + label] = -dy[i] / MaxWithLogThreshold(x[i * num_classes + label]);
+    }
   }
 }
 
 template<typename K>
-__global__ void ComputeDiffGpuHalf(int64_t num_instances, int64_t num_classes, const half* x,
-                                   const K* labels, const half* dy, half* dx) {
+__global__ void ComputeDiffGpuHalf(int64_t num_instances, int64_t num_classes,
+                                   const int64_t lower_bound, const half* x, const K* labels,
+                                   const half* dy, half* dx) {
 #if __CUDA_ARCH__ >= 530 || !defined(__CUDA_ARCH__)
   CUDA_1D_KERNEL_LOOP(i, num_instances) {
-    K label = labels[i];
-    assert(label >= 0);
-    assert(label < num_classes);
-    dx[i * num_classes + label] =
-        __hneg(__hdiv(__float2half(dy[i]), MaxWithLogThreshold<half>(x[i * num_classes + label])));
+    K label = labels[i] - lower_bound;
+    // assert(label >= 0);
+    // assert(label < num_classes);
+    if (label >= 0 && label < num_classes) {
+      dx[i * num_classes + label] = __hneg(
+          __hdiv(__float2half(dy[i]), MaxWithLogThreshold<half>(x[i * num_classes + label])));
+    }
   }
 #else
   printf("use half need nvcc arch >= 530");
@@ -106,15 +111,16 @@ struct SparseCrossEntropyKernelUtil<DeviceType::kGPU, T, K> {
   }
 
   static void ComputeDiff(DeviceCtx* ctx, int64_t num_instances, int64_t num_classes, const T* x,
-                          const K* labels, T* dx) {
+                          const K* labels, T* dx, const int64_t lower_bound = 0) {
     ComputeDiffGpu<<<BlocksNum4ThreadsNum(num_instances), kCudaThreadsNumPerBlock, 0,
-                     ctx->cuda_stream()>>>(num_instances, num_classes, x, labels, dx);
+                     ctx->cuda_stream()>>>(num_instances, num_classes, lower_bound, x, labels, dx);
   }
 
   static void ComputeDiff(DeviceCtx* ctx, int64_t num_instances, int64_t num_classes, const T* x,
-                          const K* labels, const T* dy, T* dx) {
+                          const K* labels, const T* dy, T* dx, const int64_t lower_bound = 0) {
     ComputeDiffGpu<<<BlocksNum4ThreadsNum(num_instances), kCudaThreadsNumPerBlock, 0,
-                     ctx->cuda_stream()>>>(num_instances, num_classes, x, labels, dy, dx);
+                     ctx->cuda_stream()>>>(num_instances, num_classes, lower_bound, x, labels, dy,
+                                           dx);
   }
 };
 
@@ -130,18 +136,20 @@ struct SparseCrossEntropyKernelUtil<DeviceType::kGPU, float16, K> {
   }
 
   static void ComputeDiff(DeviceCtx* ctx, int64_t num_instances, int64_t num_classes,
-                          const float16* x, const K* labels, float16* dx) {
+                          const float16* x, const K* labels, float16* dx,
+                          const int64_t lower_bound = 0) {
     ComputeDiffGpuHalf<K>
         <<<BlocksNum4ThreadsNum(num_instances), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
-            num_instances, num_classes, reinterpret_cast<const half*>(x), labels,
+            num_instances, num_classes, lower_bound, reinterpret_cast<const half*>(x), labels,
             reinterpret_cast<half*>(dx));
   }
 
   static void ComputeDiff(DeviceCtx* ctx, int64_t num_instances, int64_t num_classes,
-                          const float16* x, const K* labels, const float16* dy, float16* dx) {
+                          const float16* x, const K* labels, const float16* dy, float16* dx,
+                          const int64_t lower_bound = 0) {
     ComputeDiffGpuHalf<K>
         <<<BlocksNum4ThreadsNum(num_instances), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
-            num_instances, num_classes, reinterpret_cast<const half*>(x), labels,
+            num_instances, num_classes, lower_bound, reinterpret_cast<const half*>(x), labels,
             reinterpret_cast<const half*>(x), reinterpret_cast<half*>(dx));
   }
 };

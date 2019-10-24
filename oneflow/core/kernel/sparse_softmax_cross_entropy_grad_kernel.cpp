@@ -4,6 +4,29 @@
 
 namespace oneflow {
 
+namespace {
+
+template<DeviceType device_type, typename T, typename K>
+void Backward(DeviceCtx* ctx, const int64_t lower_bound, const Blob* dy, const Blob* label,
+              const Blob* prob, Blob* dx) {
+  const int64_t n = dx->shape().At(0);
+  const int64_t w = dx->shape().Count(1);
+  T* dx_dptr = dx->mut_dptr<T>();
+  KernelUtil<device_type, T>::Copy(ctx, n * w, prob->dptr<T>(), 1, dx_dptr, 1);
+  SparseSoftmaxCrossEntropyGradKernelUtil<device_type, T, int32_t>::BackwardSub(
+      ctx, n, w, lower_bound, dy->dptr<T>(), label->dptr<int32_t>(), dx_dptr);
+}
+
+template<DeviceType device_type, typename T>
+struct SparseSoftmaxCrossEntropyUntil final {
+#define MAKE_SOFTMAX_CROSS_ENTROPY_SWITCH_ENTRY(func_name, K) func_name<device_type, T, K>
+  DEFINE_STATIC_SWITCH_FUNC(void, Backward, MAKE_SOFTMAX_CROSS_ENTROPY_SWITCH_ENTRY,
+                            MAKE_DATA_TYPE_CTRV_SEQ(INT_DATA_TYPE_SEQ));
+#undef MAKE_SOFTMAX_CROSS_ENTROPY_SWITCH_ENTRY
+};
+
+}  // namespace
+
 template<DeviceType device_type, typename T>
 void SparseSoftmaxCrossEntropyGradKernel<device_type, T>::ForwardDataContent(
     const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const {
@@ -11,14 +34,11 @@ void SparseSoftmaxCrossEntropyGradKernel<device_type, T>::ForwardDataContent(
   const Blob* label_blob = BnInOp2Blob("label");
   const Blob* prob_blob = BnInOp2Blob("prob");
   Blob* dx_blob = BnInOp2Blob("dx");
-  const int64_t n = dx_blob->shape().At(0);
-  const int64_t w = dx_blob->shape().Count(1);
   const int64_t lower_bound =
       this->kernel_conf().sparse_softmax_cross_entropy_grad_conf().lower_bound();
-  T* dx = dx_blob->mut_dptr<T>();
-  KernelUtil<device_type, T>::Copy(ctx.device_ctx, n * w, prob_blob->dptr<T>(), 1, dx, 1);
-  SparseSoftmaxCrossEntropyGradKernelUtil<device_type, T, int32_t>::BackwardSub(
-      ctx.device_ctx, n, w, lower_bound, dy_blob->dptr<T>(), label_blob->dptr<int32_t>(), dx);
+  SparseSoftmaxCrossEntropyUntil<device_type, T>::SwitchBackward(
+      SwitchCase(label_blob->data_type()), ctx.device_ctx, lower_bound, dy_blob, label_blob,
+      prob_blob, dx_blob);
 }
 
 template<typename T, typename K>

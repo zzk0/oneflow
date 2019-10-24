@@ -11,6 +11,7 @@ void Forward(DeviceCtx* ctx, const int64_t lower_bound, const Blob* prediction, 
   const int64_t num_instances = label->shape().elem_cnt();
   CHECK_EQ(prediction->shape().elem_cnt() % num_instances, 0);
   const int64_t num_classes = prediction->shape().elem_cnt() / num_instances;
+  Memset<device_type>(ctx, out->mut_dptr<T>(), 0, out->ByteSizeOfDataContentField());
   SparseCrossEntropyKernelUtil<device_type, T, K>::ComputeEntropy(
       ctx, num_instances, num_classes, prediction->dptr<T>(), label->dptr<K>(), out->mut_dptr<T>(),
       lower_bound);
