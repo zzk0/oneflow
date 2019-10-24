@@ -431,3 +431,20 @@ def l2_normalize(input, axis=None, epsilon=None, name=None):
     lbi.op_name = op_conf.name
     lbi.blob_name = "out"
     return remote_blob_util.RemoteBlob(lbi)
+
+@oneflow_export("nn.where")
+def where(condition, x, y, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    if name is None:
+        op_conf.name = id_util.UniqueStr("Where_")
+    else:
+        op_conf.name = name
+    setattr(op_conf.where_conf, "condition", condition.logical_blob_name)
+    setattr(op_conf.where_conf, "x", x.logical_blob_name)
+    setattr(op_conf.where_conf, "y", y.logical_blob_name)
+    setattr(op_conf.where_conf, "out", "out")
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
