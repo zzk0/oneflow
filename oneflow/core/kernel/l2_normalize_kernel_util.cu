@@ -1,4 +1,4 @@
-#include "oneflow/core/kernel/normalize_kernel_util.h"
+#include "oneflow/core/kernel/l2_normalize_kernel_util.h"
 #include "oneflow/core/kernel/kernel_util.h"
 #include <cub/cub.cuh>
 #include <math.h>
@@ -69,7 +69,7 @@ __global__ void L2NormalizeBackward(const int32_t n, const int32_t c, const int3
 }  // namespace
 
 template<typename T>
-struct NormalizeKernelUtil<kGPU, T> {
+struct L2NormalizeKernelUtil<kGPU, T> {
   static void Normalize(DeviceCtx* ctx, const int32_t axis, const float epsilon,
                         const Blob* in_blob, Blob* square_x_sum_blob, Blob* out_blob) {
     int32_t c = in_blob->shape().At(axis);
@@ -94,9 +94,9 @@ struct NormalizeKernelUtil<kGPU, T> {
   }
 };
 
-#define INSTANTIATE_NORMALIZE_KERNEL_UTIL_GPU(type_cpp, type_proto) \
-  template struct NormalizeKernelUtil<DeviceType::kGPU, type_cpp>;
-OF_PP_FOR_EACH_TUPLE(INSTANTIATE_NORMALIZE_KERNEL_UTIL_GPU, ARITHMETIC_DATA_TYPE_SEQ)
-#undef INSTANTIATE_NORMALIZE_KERNEL_UTIL_GPU
+#define INSTANTIATE_L2_NORMALIZE_KERNEL_UTIL_GPU(type_cpp, type_proto) \
+  template struct L2NormalizeKernelUtil<DeviceType::kGPU, type_cpp>;
+OF_PP_FOR_EACH_TUPLE(INSTANTIATE_L2_NORMALIZE_KERNEL_UTIL_GPU, ARITHMETIC_DATA_TYPE_SEQ)
+#undef INSTANTIATE_L2_NORMALIZE_KERNEL_UTIL_GPU
 
 }  // namespace oneflow

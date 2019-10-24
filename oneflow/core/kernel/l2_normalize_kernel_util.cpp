@@ -1,9 +1,9 @@
-#include "oneflow/core/kernel/normalize_kernel_util.h"
+#include "oneflow/core/kernel/l2_normalize_kernel_util.h"
 
 namespace oneflow {
 
 template<typename T>
-struct NormalizeKernelUtil<kCPU, T> {
+struct L2NormalizeKernelUtil<kCPU, T> {
   static void Normalize(DeviceCtx* ctx, const int32_t axis, const float epsilon,
                         const Blob* in_blob, Blob* square_x_sum_blob, Blob* out_blob) {
     const int32_t c = in_blob->shape().At(axis);
@@ -62,9 +62,9 @@ struct NormalizeKernelUtil<kCPU, T> {
   }
 };
 
-#define INSTANTIATE_NORMALIZE_KERNEL_UTIL_CPU(type_cpp, type_proto) \
-  template struct NormalizeKernelUtil<DeviceType::kCPU, type_cpp>;
-OF_PP_FOR_EACH_TUPLE(INSTANTIATE_NORMALIZE_KERNEL_UTIL_CPU, ARITHMETIC_DATA_TYPE_SEQ)
-#undef INSTANTIATE_NORMALIZE_KERNEL_UTIL_CPU
+#define INSTANTIATE_L2_NORMALIZE_KERNEL_UTIL_CPU(type_cpp, type_proto) \
+  template struct L2NormalizeKernelUtil<DeviceType::kCPU, type_cpp>;
+OF_PP_FOR_EACH_TUPLE(INSTANTIATE_L2_NORMALIZE_KERNEL_UTIL_CPU, ARITHMETIC_DATA_TYPE_SEQ)
+#undef INSTANTIATE_L2_NORMALIZE_KERNEL_UTIL_CPU
 
 }  // namespace oneflow

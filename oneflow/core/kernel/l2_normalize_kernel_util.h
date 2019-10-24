@@ -1,12 +1,12 @@
-#ifndef ONEFLOW_CORE_KERNEL_NORMALIZE_KERNEL_UTIL_H_
-#define ONEFLOW_CORE_KERNEL_NORMALIZE_KERNEL_UTIL_H_
+#ifndef ONEFLOW_CORE_KERNEL_L2_NORMALIZE_KERNEL_UTIL_H_
+#define ONEFLOW_CORE_KERNEL_L2_NORMALIZE_KERNEL_UTIL_H_
 
 #include "oneflow/core/kernel/kernel_util.h"
 
 namespace oneflow {
 
 template<DeviceType device_type, typename T>
-struct NormalizeKernelUtil final {
+struct L2NormalizeKernelUtil final {
  public:
   static void Normalize(DeviceCtx* ctx, const int32_t axis, const float epsilon,
                         const Blob* in_blob, Blob* square_x_sum_blob, Blob* out_blob);
@@ -17,4 +17,4 @@ struct NormalizeKernelUtil final {
 
 }  // namespace oneflow
 
-#endif  // ONEFLOW_CORE_KERNEL_NORMALIZE_KERNEL_UTIL_H_
+#endif  // ONEFLOW_CORE_KERNEL_L2_NORMALIZE_KERNEL_UTIL_H_

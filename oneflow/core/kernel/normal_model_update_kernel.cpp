@@ -1,4 +1,4 @@
-#include "oneflow/core/kernel/normalize_kernel_util.h"
+#include "oneflow/core/kernel/l2_normalize_kernel_util.h"
 #include "oneflow/core/kernel/normal_model_update_kernel.h"
 #include "oneflow/core/kernel/naive_model_update_kernel.h"
 #include "oneflow/core/kernel/momentum_model_update_kernel.h"
@@ -26,7 +26,7 @@ void NormalMdUpdateKernel<device_type, T>::Forward(
               train_step_ptr, learning_rate_ptr, BnInOp2Blob);
   const auto& norm_conf = *GetMsgPtrFromPbMessage<NormalizeConf>(op_conf, "normalize_conf");
   if (&norm_conf != nullptr) {
-    NormalizeKernelUtil<device_type, T>::Normalize(
+    L2NormalizeKernelUtil<device_type, T>::Normalize(
         ctx.device_ctx, norm_conf.axis(), norm_conf.epsilon(), BnInOp2Blob("model"),
         BnInOp2Blob("square_x_sum"), BnInOp2Blob("model"));
   }

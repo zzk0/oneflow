@@ -1,4 +1,4 @@
-#include "oneflow/core/kernel/normalize_kernel_util.h"
+#include "oneflow/core/kernel/l2_normalize_kernel_util.h"
 #include "oneflow/core/kernel/l2_normalize_grad_kernel.h"
 
 namespace oneflow {
@@ -6,7 +6,7 @@ namespace oneflow {
 template<DeviceType device_type, typename T>
 void L2NormalizeGradKernel<device_type, T>::ForwardDataContent(
     const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-  NormalizeKernelUtil<device_type, T>::NormalizeGrad(
+  L2NormalizeKernelUtil<device_type, T>::NormalizeGrad(
       ctx.device_ctx, this->op_conf().l2_normalize_grad_conf().axis(),
       this->op_conf().l2_normalize_grad_conf().epsilon(), BnInOp2Blob("y"), BnInOp2Blob("dy"),
       BnInOp2Blob("square_x_sum"), BnInOp2Blob("dx"));
