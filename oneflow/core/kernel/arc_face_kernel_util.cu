@@ -26,8 +26,8 @@ __global__ void ArcFaceForwardGpu(const int64_t batch_num, const T* in, const K*
     if (idx != -1) {
       sin_theta_data[i] = sqrt(1 - out[idx] * out[idx]);
       out[idx] = out[idx] * cos_m - sin_theta_data[i] * sin_m;
-      // sin_theta_data[i] = in[idx] / sin_theta_data[i];
-      sin_theta_data[i] = out[idx] / sin_theta_data[i];
+      sin_theta_data[i] = in[idx] / sin_theta_data[i];
+      //sin_theta_data[i] = out[idx] / sin_theta_data[i];
     }
   }
 }
