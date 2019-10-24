@@ -11,6 +11,7 @@ struct L2NormalizeKernelUtil<kCPU, T> {
     const int32_t d = in_blob->shape().Count(axis + 1);
     const T* in = in_blob->dptr<T>();
     T* square_x_sum = square_x_sum_blob->mut_dptr<T>();
+    Memset<DeviceType::kCPU>(ctx, square_x_sum, 0, square_x_sum_blob->ByteSizeOfDataContentField());
     T* out = out_blob->mut_dptr<T>();
 
     for (int32_t i = 0; i < n; i++) {

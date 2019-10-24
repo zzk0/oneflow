@@ -56,13 +56,10 @@ Maybe<void> ReduceMaxOp::GetSbpSignatures(
     const std::function<Maybe<const BlobDesc*>(const std::string&)>& LogicalBlobDesc4Ibn,
     SbpSignatureList* sbp_sig_list) const {
   int32_t num_axes = JUST(LogicalBlobDesc4Ibn("in"))->shape().NumAxes();
-  auto IsReducedAxis =
-      ReduceSbpUtil::MakePredicatorIsReducedAxis(op_conf().reduce_max_conf().axis(), num_axes);
-  int32_t num_reduced_axes = 0;
   FOR_RANGE(int64_t, i, 0, num_axes) {
     SbpSignatureBuilder()
         .Split(input_bns(), i)
-        .Split(output_bns(), op_conf().reduce_max_conf().keep_dims() ? i : i - num_reduced_axes)
+        .Split(output_bns(), i)
         .Build(sbp_sig_list->mutable_sbp_signature()->Add());
   }
   return Maybe<void>::Ok();
