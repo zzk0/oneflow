@@ -3,13 +3,15 @@ from __future__ import absolute_import
 import oneflow.python.framework.blob_desc as blob_desc
 import oneflow.python.framework.inter_user_job_util as inter_user_job_util
 import oneflow.python.framework.job_builder as job_builder
+import oneflow.python.framework.watch_scope_util as watch_scope_util
 import oneflow.core.common.data_type_pb2 as data_type_util
 import oneflow
 
 class RemoteBlob(blob_desc.BlobDesc):
-    def __init__(self, lbi):
-        blob_desc.BlobDesc.__init__(self, lbi)
+    def __init__(self, lbi, **kw):
+        blob_desc.BlobDesc.__init__(self, lbi, **kw)
         self.job_name_ = job_builder.GetCurCtxJobName()
+        watch_scope_util.TryWatchOnce(self)
 
     @property
     def static_shape(self): return job_builder.GetStaticShape(self.job_name_, self.lbn_)
@@ -24,17 +26,16 @@ class RemoteBlob(blob_desc.BlobDesc):
     def is_dynamic(self): return job_builder.IsDynamic(self.job_name_, self.lbn_)
     
     @property
+    def disable_boxing(self):
+        if self.disable_boxing_ is not None: return self.disable_boxing_
+        return job_builder.DisableBoxing(self.job_name_, self.lbn_)
+    
+    @property
     def num_of_lod_levels(self): return job_builder.GetNumOfLoDLevels(self.job_name_, self.lbn_)
 
     @property
     def parallel_conf(self):
         return job_builder.GetParallelConfFromProducerView(self.job_name_, self.lbn_)
-
-    def with_distribute(self, distribute):
-        oneflow.distribute.assert_is_valid_distribute(distribute)
-        ret = RemoteBlob(self.lbi_)
-        ret.distribute_ = distribute
-        return ret
 
     def pull(self):
         return inter_user_job_util.pull(self)
