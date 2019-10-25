@@ -16,7 +16,9 @@ class ReduceMaxMs1Stage0Op final : public Operator {
     EnrollOutputBn("out");
     EnrollTmpBn("fw_tmp");
   }
-  const PbMessage& GetCustomizedConf() const override {return op_conf().reduce_max_ms1_stage0_conf();}
+  const PbMessage& GetCustomizedConf() const override {
+    return op_conf().reduce_max_ms1_stage0_conf();
+  }
   Maybe<void> InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                              const ParallelContext* parallel_ctx) const override {
     const ReduceMaxMs1Stage0OpConf& conf = op_conf().reduce_max_ms1_stage0_conf();
