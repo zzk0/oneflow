@@ -4,6 +4,7 @@ import oneflow.python.framework.compile_context as compile_context
 import oneflow.python.framework.remote_blob as remote_blob_util
 import oneflow.python.framework.id_util as id_util
 import oneflow.core.operator.op_conf_pb2 as op_conf_util
+import oneflow.python.framework.distribute as distribute_util
 import oneflow.core.register.logical_blob_id_pb2 as logical_blob_id_util
 import oneflow
 from oneflow.python.oneflow_export import oneflow_export
@@ -301,17 +302,20 @@ def sparse_softmax_cross_entropy_loss(
         "name",
         name if name is not None else id_util.UniqueStr("SparseSoftmaxCrossEntropy_"),
     )
-    setattr(
-        op_conf.sparse_softmax_cross_entropy_conf,
-        "prediction",
-        logits.logical_blob_name,
-    )
-    setattr(
-        op_conf.sparse_softmax_cross_entropy_conf, "label", labels.logical_blob_name
-    )
-    setattr(op_conf.sparse_softmax_cross_entropy_conf, "depth", depth if depth is not None else 0)
-    setattr(op_conf.sparse_softmax_cross_entropy_conf, "prob", "prob")
-    setattr(op_conf.sparse_softmax_cross_entropy_conf, "out", "out")
+    if logits.distribute is distribute_util.split(1):
+        print("sparse_softmax_cross_entropy_ms1_conf")
+        setattr(op_conf.sparse_softmax_cross_entropy_ms1_conf, "prediction", logits.logical_blob_name)
+        setattr(op_conf.sparse_softmax_cross_entropy_ms1_conf, "label", labels.logical_blob_name)
+        assert depth is not None
+        setattr(op_conf.sparse_softmax_cross_entropy_ms1_conf, "depth", depth)
+        setattr(op_conf.sparse_softmax_cross_entropy_ms1_conf, "prob", "prob")
+        setattr(op_conf.sparse_softmax_cross_entropy_ms1_conf, "out", "out")
+    else:
+        print("sparse_softmax_cross_entropy_conf")
+        setattr(op_conf.sparse_softmax_cross_entropy_conf, "prediction", logits.logical_blob_name)
+        setattr(op_conf.sparse_softmax_cross_entropy_conf, "label", labels.logical_blob_name)
+        setattr(op_conf.sparse_softmax_cross_entropy_conf, "prob", "prob")
+        setattr(op_conf.sparse_softmax_cross_entropy_conf, "out", "out")
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
     lbi.op_name = op_conf.name
@@ -389,20 +393,32 @@ def dropout(x, noise_shape=None, seed=None, name=None, rate=None):
     return remote_blob_util.RemoteBlob(lbi)
 
 @oneflow_export("nn.arcface")
-def arcface(input, label, margin=None, depth=None, name=None):
+def arcface(input, label, margin=None, depth=None, name=None, ):
     op_conf = op_conf_util.OperatorConf()
     if name is None:
         op_conf.name = id_util.UniqueStr("Arcface_")
     else:
         op_conf.name = name
-    setattr(op_conf.additive_angular_margin_conf, "in", input.logical_blob_name)
-    setattr(op_conf.additive_angular_margin_conf, "label", label.logical_blob_name)
-    setattr(op_conf.additive_angular_margin_conf, "sin_theta_data", "sin_theta_data")
-    setattr(op_conf.additive_angular_margin_conf, "out", "out")
-    if margin is not None:
-        setattr(op_conf.additive_angular_margin_conf, "margin", margin)
-    assert depth is not None
-    setattr(op_conf.additive_angular_margin_conf, "depth", depth)
+
+    if input.distribute is distribute_util.split(1):
+        print("additive_angular_margin_ms1_conf")
+        setattr(op_conf.additive_angular_margin_ms1_conf, "in", input.logical_blob_name)
+        setattr(op_conf.additive_angular_margin_ms1_conf, "label", label.logical_blob_name)
+        setattr(op_conf.additive_angular_margin_ms1_conf, "sin_theta_data", "sin_theta_data")
+        setattr(op_conf.additive_angular_margin_ms1_conf, "out", "out")
+        if margin is not None:
+            setattr(op_conf.additive_angular_margin_ms1_conf, "margin", margin)
+        assert depth is not None
+        setattr(op_conf.additive_angular_margin_ms1_conf, "depth", depth)
+    else:
+        print("additive_angular_margin_conf")
+        setattr(op_conf.additive_angular_margin_conf, "in", input.logical_blob_name)
+        setattr(op_conf.additive_angular_margin_conf, "label", label.logical_blob_name)
+        setattr(op_conf.additive_angular_margin_conf, "sin_theta_data", "sin_theta_data")
+        setattr(op_conf.additive_angular_margin_conf, "out", "out")
+        if margin is not None:
+            setattr(op_conf.additive_angular_margin_conf, "margin", margin)
+
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
     lbi.op_name = op_conf.name
