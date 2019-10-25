@@ -22,7 +22,7 @@ void ReduceMaxKernel<device_type, T>::ForwardDataContent(
 
 ADD_DEFAULT_KERNEL_CREATOR_WITH_GPU_HALF(OperatorConf::kReduceMaxConf, ReduceMaxKernel,
                                          ARITHMETIC_DATA_TYPE_SEQ);
-ADD_DEFAULT_KERNEL_CREATOR_WITH_GPU_HALF(OperatorConf::kReduceMaxMs1Stage0Conf, ReduceMaxKernel,
+ADD_DEFAULT_KERNEL_CREATOR_WITH_GPU_HALF(OperatorConf::kDeviceReduceMaxConf, ReduceMaxKernel,
                                          ARITHMETIC_DATA_TYPE_SEQ);
 
 }  // namespace oneflow

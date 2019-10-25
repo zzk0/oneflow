@@ -33,7 +33,7 @@ void SparseSoftmaxCrossEntropyPass::Apply(const OpGraph& op_graph, JobBuilder* j
 
       OperatorConf reduce_max_stage0_op_conf;
       reduce_max_stage0_op_conf.set_name(node->op().op_name() + "-softmax_reduce_max_stage0");
-      auto* reduce_max_stage0_conf = reduce_max_stage0_op_conf.mutable_reduce_max_ms1_stage0_conf();
+      auto* reduce_max_stage0_conf = reduce_max_stage0_op_conf.mutable_device_reduce_max_conf();
       reduce_max_stage0_conf->set_in(sparse_softmax_cross_entropy_conf.prediction());
       reduce_max_stage0_conf->set_out("out");
       reduce_max_stage0_conf->add_axis(1);

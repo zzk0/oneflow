@@ -1,27 +1,24 @@
-#include "oneflow/core/kernel/kernel_util.h"
-#include "oneflow/core/operator/reduce_sbp_util.h"
+#include "oneflow/core/operator/operator.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
 
 namespace oneflow {
 
-class ReduceMaxMs1Stage0Op final : public Operator {
+class DeviceReduceMaxOp final : public Operator {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(ReduceMaxMs1Stage0Op);
-  ReduceMaxMs1Stage0Op() = default;
-  ~ReduceMaxMs1Stage0Op() = default;
+  OF_DISALLOW_COPY_AND_MOVE(DeviceReduceMaxOp);
+  DeviceReduceMaxOp() = default;
+  ~DeviceReduceMaxOp() = default;
 
   void InitFromOpConf() override {
-    CHECK(op_conf().has_reduce_max_ms1_stage0_conf());
+    CHECK(op_conf().has_device_reduce_max_conf());
     EnrollInputBn("in");
     EnrollOutputBn("out");
     EnrollTmpBn("fw_tmp");
   }
-  const PbMessage& GetCustomizedConf() const override {
-    return op_conf().reduce_max_ms1_stage0_conf();
-  }
+  const PbMessage& GetCustomizedConf() const override { return op_conf().device_reduce_max_conf(); }
   Maybe<void> InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                              const ParallelContext* parallel_ctx) const override {
-    const ReduceMaxMs1Stage0OpConf& conf = op_conf().reduce_max_ms1_stage0_conf();
+    const DeviceReduceMaxOpConf& conf = op_conf().device_reduce_max_conf();
     const BlobDesc* in_blob = GetBlobDesc4BnInOp("in");
     *GetBlobDesc4BnInOp("fw_tmp") = *in_blob;
     BlobDesc* out_blob = GetBlobDesc4BnInOp("out");
@@ -36,9 +33,10 @@ class ReduceMaxMs1Stage0Op final : public Operator {
     return Maybe<void>::Ok();
   }
 
+ private:
   Maybe<void> InferBatchAxis(
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
-    const auto& reduced_axes = op_conf().reduce_max_ms1_stage0_conf().axis();
+    const auto& reduced_axes = op_conf().device_reduce_max_conf().axis();
     HashSet<int64_t> conf_axes = {reduced_axes.begin(), reduced_axes.end()};
     if (BatchAxis4BnInOp("in")->has_value() && !conf_axes.empty()
         && conf_axes.find(BatchAxis4BnInOp("in")->value()) == conf_axes.end()) {
@@ -59,6 +57,6 @@ class ReduceMaxMs1Stage0Op final : public Operator {
   }
 };
 
-REGISTER_OP(OperatorConf::kReduceMaxMs1Stage0Conf, ReduceMaxMs1Stage0Op);
+REGISTER_OP(OperatorConf::kDeviceReduceMaxConf, DeviceReduceMaxOp);
 
 }  // namespace oneflow
