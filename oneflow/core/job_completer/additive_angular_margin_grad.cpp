@@ -11,10 +11,9 @@ void GenerateBackwardOpConf(
   CHECK(op.op_conf().has_additive_angular_margin_conf());
   if (DiffLbi4BnInOp("in") != nullptr) {
     OperatorConf additive_angular_margin_grad_op;
-    additive_angular_margin_grad_op.set_name("System-AutoGrad-" + op.op_name());
+    additive_angular_margin_grad_op.set_name(op.op_name() + "_grad");
     AdditiveAngularMarginGradOpConf* conf =
         additive_angular_margin_grad_op.mutable_additive_angular_margin_grad_conf();
-    conf->set_depth(op.op_conf().additive_angular_margin_conf().depth());
     conf->set_margin(op.op_conf().additive_angular_margin_conf().margin());
     conf->set_dy(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
     conf->set_label(GenLogicalBlobName(op.BnInOp2Lbi("label")));

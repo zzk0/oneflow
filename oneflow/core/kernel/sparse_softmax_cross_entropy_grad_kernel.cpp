@@ -54,5 +54,7 @@ struct SparseSoftmaxCrossEntropyGradKernelUtil<DeviceType::kCPU, T, K> {
 
 ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kSparseSoftmaxCrossEntropyGradConf,
                            SparseSoftmaxCrossEntropyGradKernel, FLOATING_DATA_TYPE_SEQ);
+ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kSparseSoftmaxCrossEntropyMs1GradConf,
+                           SparseSoftmaxCrossEntropyGradKernel, FLOATING_DATA_TYPE_SEQ);
 
 }  // namespace oneflow

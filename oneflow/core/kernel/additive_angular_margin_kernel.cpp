@@ -6,25 +6,32 @@ namespace oneflow {
 
 template<DeviceType device_type, typename T>
 const PbMessage& AdditiveAngularMarginKernel<device_type, T>::GetCustomizedOpConf() const {
-  return this->op_conf().additive_angular_margin_conf();
+  if (this->op_conf().has_additive_angular_margin_conf()) {
+    return this->op_conf().additive_angular_margin_conf();
+  } else if (this->op_conf().has_additive_angular_margin_ms1_conf()) {
+    return this->op_conf().additive_angular_margin_ms1_conf();
+  } else {
+    UNIMPLEMENTED();
+  }
 }
 
 template<DeviceType device_type, typename T>
 void AdditiveAngularMarginKernel<device_type, T>::ForwardDataContent(
     const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-  const float margin = this->op_conf().additive_angular_margin_conf().margin();
+  const float margin = GetValFromPbMessage<float>(this->GetCustomizedOpConf(), "margin");
   const int64_t lower_bound = this->kernel_conf().additive_angular_margin_conf().lower_bound();
-  const T cos_m = cos(margin);
-  const T sin_m = sqrt(1 - cos_m * cos_m);
   BnInOp2Blob("out")->CopyDataContentFrom(ctx.device_ctx, BnInOp2Blob("in"));
   Memset<device_type>(ctx.device_ctx, BnInOp2Blob("sin_theta_data")->mut_dptr<T>(), 0,
                       BnInOp2Blob("sin_theta_data")->ByteSizeOfDataContentField());
   AdditiveAngularMarginKernelUtil<device_type, T>::Forward(
-      ctx.device_ctx, BnInOp2Blob("in"), BnInOp2Blob("label"), lower_bound, cos_m, sin_m,
-      BnInOp2Blob("sin_theta_data"), BnInOp2Blob("out"));
+      ctx.device_ctx, BnInOp2Blob("in"), BnInOp2Blob("label"), lower_bound,
+      static_cast<T>(cos(margin)), static_cast<T>(sin(margin)), BnInOp2Blob("sin_theta_data"),
+      BnInOp2Blob("out"));
 }
 
 ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kAdditiveAngularMarginConf, AdditiveAngularMarginKernel,
+                           FLOATING_DATA_TYPE_SEQ);
+ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kAdditiveAngularMarginMs1Conf, AdditiveAngularMarginKernel,
                            FLOATING_DATA_TYPE_SEQ);
 
 }  // namespace oneflow

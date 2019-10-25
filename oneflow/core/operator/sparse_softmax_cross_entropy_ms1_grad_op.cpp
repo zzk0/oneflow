@@ -1,22 +1,22 @@
-#include "oneflow/core/operator/sparse_softmax_cross_entropy_grad_op.h"
+#include "oneflow/core/operator/sparse_softmax_cross_entropy_ms1_grad_op.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
 #include "oneflow/core/common/balanced_splitter.h"
 
 namespace oneflow {
 
-void SparseSoftmaxCrossEntropyGradOp::InitFromOpConf() {
-  CHECK(op_conf().has_sparse_softmax_cross_entropy_grad_conf());
+void SparseSoftmaxCrossEntropyMs1GradOp::InitFromOpConf() {
+  CHECK(op_conf().has_sparse_softmax_cross_entropy_ms1_grad_conf());
   EnrollInputBn("dy");
   EnrollInputBn("prob");
   EnrollInputBn("label", false);
   EnrollOutputBn("dx");
 }
 
-const PbMessage& SparseSoftmaxCrossEntropyGradOp::GetCustomizedConf() const {
-  return op_conf().sparse_softmax_cross_entropy_grad_conf();
+const PbMessage& SparseSoftmaxCrossEntropyMs1GradOp::GetCustomizedConf() const {
+  return op_conf().sparse_softmax_cross_entropy_ms1_grad_conf();
 }
 
-Maybe<void> SparseSoftmaxCrossEntropyGradOp::InferBlobDescs(
+Maybe<void> SparseSoftmaxCrossEntropyMs1GradOp::InferBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature,
     std::function<void(OpContext*)> EnrollOpCtx) const {
@@ -48,21 +48,30 @@ Maybe<void> SparseSoftmaxCrossEntropyGradOp::InferBlobDescs(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> SparseSoftmaxCrossEntropyGradOp::InferBatchAxis(
+Maybe<void> SparseSoftmaxCrossEntropyMs1GradOp::InferBatchAxis(
     std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {
   *BatchAxis4BnInOp("dx") = *BatchAxis4BnInOp("dy");
   return Maybe<void>::Ok();
 }
 
-Maybe<void> SparseSoftmaxCrossEntropyGradOp::GetSbpSignatures(
+Maybe<void> SparseSoftmaxCrossEntropyMs1GradOp::GetSbpSignatures(
     SbpSignatureList* sbp_sig_list) const {
-  SbpSignatureBuilder()
-      .Split(input_bns(), 0)
-      .Split(output_bns(), 0)
-      .Build(sbp_sig_list->mutable_sbp_signature()->Add());
+  SbpSignatureBuilder().Broadcast("dy").Split("prob", 1).Broadcast("label").Split("dx", 1).Build(
+      sbp_sig_list->mutable_sbp_signature()->Add());
   return Maybe<void>::Ok();
 }
 
-REGISTER_OP(OperatorConf::kSparseSoftmaxCrossEntropyGradConf, SparseSoftmaxCrossEntropyGradOp);
+void SparseSoftmaxCrossEntropyMs1GradOp::VirtualGenKernelConf(
+    std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+    const ParallelContext* parallel_ctx, KernelConf* kernel_conf) const {
+  const int64_t dim = op_conf().sparse_softmax_cross_entropy_ms1_grad_conf().depth();
+  CHECK_GE(dim, parallel_ctx->parallel_num());
+  BalancedSplitter bs(dim, parallel_ctx->parallel_num());
+  kernel_conf->mutable_sparse_softmax_cross_entropy_grad_conf()->set_lower_bound(
+      bs.At(parallel_ctx->parallel_id()).begin());
+}
+
+REGISTER_OP(OperatorConf::kSparseSoftmaxCrossEntropyMs1GradConf,
+            SparseSoftmaxCrossEntropyMs1GradOp);
 
 }  // namespace oneflow

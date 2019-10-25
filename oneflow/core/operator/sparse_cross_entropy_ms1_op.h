@@ -1,15 +1,15 @@
-#ifndef ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_OP_H_
-#define ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_OP_H_
+#ifndef ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_MS1_OP_H_
+#define ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_MS1_OP_H_
 
 #include "oneflow/core/operator/operator.h"
 
 namespace oneflow {
 
-class SparseCrossEntropyOp final : public Operator {
+class SparseCrossEntropyMs1Op final : public Operator {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(SparseCrossEntropyOp);
-  SparseCrossEntropyOp() = default;
-  ~SparseCrossEntropyOp() override = default;
+  OF_DISALLOW_COPY_AND_MOVE(SparseCrossEntropyMs1Op);
+  SparseCrossEntropyMs1Op() = default;
+  ~SparseCrossEntropyMs1Op() override = default;
 
   void InitFromOpConf() override;
   const PbMessage& GetCustomizedConf() const override;
@@ -24,8 +24,12 @@ class SparseCrossEntropyOp final : public Operator {
   }
 
   Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override;
+
+  void VirtualGenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+                            const ParallelContext* parallel_ctx,
+                            KernelConf* kernel_conf) const override;
 };
 
 }  // namespace oneflow
 
-#endif  // ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_OP_H_
+#endif  // ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_MS1_OP_H_

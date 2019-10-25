@@ -1,15 +1,15 @@
-#ifndef ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_OP_H_
-#define ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_OP_H_
+#ifndef ONEFLOW_CORE_OPERATOR_SPARSE_SOFTMAX_CROSS_ENTROPY_MS1_OP_H_
+#define ONEFLOW_CORE_OPERATOR_SPARSE_SOFTMAX_CROSS_ENTROPY_MS1_OP_H_
 
 #include "oneflow/core/operator/operator.h"
 
 namespace oneflow {
 
-class SparseCrossEntropyOp final : public Operator {
+class SparseSoftmaxCrossEntropyMs1Op final : public Operator {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(SparseCrossEntropyOp);
-  SparseCrossEntropyOp() = default;
-  ~SparseCrossEntropyOp() override = default;
+  OF_DISALLOW_COPY_AND_MOVE(SparseSoftmaxCrossEntropyMs1Op);
+  SparseSoftmaxCrossEntropyMs1Op() = default;
+  ~SparseSoftmaxCrossEntropyMs1Op() override = default;
 
   void InitFromOpConf() override;
   const PbMessage& GetCustomizedConf() const override;
@@ -19,13 +19,11 @@ class SparseCrossEntropyOp final : public Operator {
 
  private:
   Maybe<void> InferBatchAxis(
-      std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
-    return NaiveInferBatchAxis(BatchAxis4BnInOp);
-  }
+      std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override;
 
   Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override;
 };
 
 }  // namespace oneflow
 
-#endif  // ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_OP_H_
+#endif  // ONEFLOW_CORE_OPERATOR_SPARSE_SOFTMAX_CROSS_ENTROPY_MS1_OP_H_

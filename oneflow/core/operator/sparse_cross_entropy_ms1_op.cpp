@@ -1,20 +1,21 @@
-#include "oneflow/core/operator/sparse_cross_entropy_op.h"
+#include "oneflow/core/operator/sparse_cross_entropy_ms1_op.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
+#include "oneflow/core/common/balanced_splitter.h"
 
 namespace oneflow {
 
-void SparseCrossEntropyOp::InitFromOpConf() {
-  CHECK(op_conf().has_sparse_cross_entropy_conf());
+void SparseCrossEntropyMs1Op::InitFromOpConf() {
+  CHECK(op_conf().has_sparse_cross_entropy_ms1_conf());
   EnrollInputBn("prediction");
   EnrollInputBn("label", false);
   EnrollOutputBn("out");
 }
 
-const PbMessage& SparseCrossEntropyOp::GetCustomizedConf() const {
-  return op_conf().sparse_cross_entropy_conf();
+const PbMessage& SparseCrossEntropyMs1Op::GetCustomizedConf() const {
+  return op_conf().sparse_cross_entropy_ms1_conf();
 }
 
-Maybe<void> SparseCrossEntropyOp::InferBlobDescs(
+Maybe<void> SparseCrossEntropyMs1Op::InferBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature,
     std::function<void(OpContext*)> EnrollOpCtx) const {
@@ -45,14 +46,25 @@ Maybe<void> SparseCrossEntropyOp::InferBlobDescs(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> SparseCrossEntropyOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
+Maybe<void> SparseCrossEntropyMs1Op::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
   SbpSignatureBuilder()
-      .Split(input_bns(), 0)
-      .Split(output_bns(), 0)
+      .Split("prediction", 1)
+      .Broadcast("label")
+      .PartialSum("out")
       .Build(sbp_sig_list->mutable_sbp_signature()->Add());
   return Maybe<void>::Ok();
 }
 
-REGISTER_OP(OperatorConf::kSparseCrossEntropyConf, SparseCrossEntropyOp);
+void SparseCrossEntropyMs1Op::VirtualGenKernelConf(
+    std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+    const ParallelContext* parallel_ctx, KernelConf* kernel_conf) const {
+  const int64_t dim = op_conf().sparse_cross_entropy_ms1_conf().depth();
+  CHECK_GE(dim, parallel_ctx->parallel_num());
+  BalancedSplitter bs(dim, parallel_ctx->parallel_num());
+  kernel_conf->mutable_sparse_cross_entropy_conf()->set_lower_bound(
+      bs.At(parallel_ctx->parallel_id()).begin());
+}
+
+REGISTER_OP(OperatorConf::kSparseCrossEntropyMs1Conf, SparseCrossEntropyMs1Op);
 
 }  // namespace oneflow

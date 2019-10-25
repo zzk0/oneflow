@@ -1,20 +1,24 @@
-#include "oneflow/core/operator/sparse_cross_entropy_op.h"
+#include "oneflow/core/operator/sparse_softmax_cross_entropy_ms1_op.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
+#include "oneflow/core/register/runtime_blob_desc.h"
 
 namespace oneflow {
 
-void SparseCrossEntropyOp::InitFromOpConf() {
-  CHECK(op_conf().has_sparse_cross_entropy_conf());
+void SparseSoftmaxCrossEntropyMs1Op::InitFromOpConf() {
+  CHECK(op_conf().has_sparse_softmax_cross_entropy_ms1_conf());
   EnrollInputBn("prediction");
   EnrollInputBn("label", false);
+  EnrollTmpBn("fw_softmax_num");
+  EnrollTmpBn("fw_buf");
+  EnrollOutputBn("prob");
   EnrollOutputBn("out");
 }
 
-const PbMessage& SparseCrossEntropyOp::GetCustomizedConf() const {
-  return op_conf().sparse_cross_entropy_conf();
+const PbMessage& SparseSoftmaxCrossEntropyMs1Op::GetCustomizedConf() const {
+  return op_conf().sparse_softmax_cross_entropy_ms1_conf();
 }
 
-Maybe<void> SparseCrossEntropyOp::InferBlobDescs(
+Maybe<void> SparseSoftmaxCrossEntropyMs1Op::InferBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature,
     std::function<void(OpContext*)> EnrollOpCtx) const {
@@ -38,6 +42,21 @@ Maybe<void> SparseCrossEntropyOp::InferBlobDescs(
   FOR_RANGE(int64_t, i, 0, num_out_axes) {
     CHECK_EQ_OR_RETURN(pred_blob_desc->shape().At(i), label_blob_desc->shape().At(i));
   }
+  // 1D blob store tmp calculate result
+  BlobDesc* fw_tmp_blob_desc = GetBlobDesc4BnInOp("fw_softmax_num");
+  fw_tmp_blob_desc->mut_shape() = Shape({pred_blob_desc->shape().At(0)});
+  fw_tmp_blob_desc->set_data_type(pred_blob_desc->data_type());
+  // temp storage for RowMax etc.
+  BlobDesc* fw_buf_blob_desc = GetBlobDesc4BnInOp("fw_buf");
+  fw_buf_blob_desc->mut_shape() =
+      Shape({static_cast<int64_t>(RtBlobDesc(*pred_blob_desc).ByteSizeOfDataContentField())});
+  fw_buf_blob_desc->set_data_type(DataType::kChar);
+
+  // prob
+  BlobDesc* prob_blob_desc = GetBlobDesc4BnInOp("prob");
+  prob_blob_desc->mut_shape() = Shape(pred_blob_desc->shape());
+  prob_blob_desc->set_data_type(pred_blob_desc->data_type());
+  // out
   BlobDesc* out_blob_desc = GetBlobDesc4BnInOp("out");
   *out_blob_desc = *pred_blob_desc;
   out_blob_desc->mut_shape() = Shape(std::vector<int64_t>(
@@ -45,14 +64,23 @@ Maybe<void> SparseCrossEntropyOp::InferBlobDescs(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> SparseCrossEntropyOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
+Maybe<void> SparseSoftmaxCrossEntropyMs1Op::InferBatchAxis(
+    std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {
+  *BatchAxis4BnInOp("prob") = *BatchAxis4BnInOp("prediction");
+  *BatchAxis4BnInOp("out") = *BatchAxis4BnInOp("prediction");
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> SparseSoftmaxCrossEntropyMs1Op::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
   SbpSignatureBuilder()
-      .Split(input_bns(), 0)
-      .Split(output_bns(), 0)
+      .Split("prediction", 1)
+      .Broadcast("label")
+      .Split("prob", 1)
+      .PartialSum("out")
       .Build(sbp_sig_list->mutable_sbp_signature()->Add());
   return Maybe<void>::Ok();
 }
 
-REGISTER_OP(OperatorConf::kSparseCrossEntropyConf, SparseCrossEntropyOp);
+REGISTER_OP(OperatorConf::kSparseSoftmaxCrossEntropyMs1Conf, SparseSoftmaxCrossEntropyMs1Op);
 
 }  // namespace oneflow

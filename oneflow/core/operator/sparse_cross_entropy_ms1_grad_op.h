@@ -1,15 +1,15 @@
-#ifndef ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_GRAD_OP_H_
-#define ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_GRAD_OP_H_
+#ifndef ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_MS1_GRAD_OP_H_
+#define ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_MS1_GRAD_OP_H_
 
 #include "oneflow/core/operator/operator.h"
 
 namespace oneflow {
 
-class SparseCrossEntropyGradOp final : public Operator {
+class SparseCrossEntropyMs1GradOp final : public Operator {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(SparseCrossEntropyGradOp);
-  SparseCrossEntropyGradOp() = default;
-  ~SparseCrossEntropyGradOp() override = default;
+  OF_DISALLOW_COPY_AND_MOVE(SparseCrossEntropyMs1GradOp);
+  SparseCrossEntropyMs1GradOp() = default;
+  ~SparseCrossEntropyMs1GradOp() override = default;
 
   void InitFromOpConf() override;
   const PbMessage& GetCustomizedConf() const override;
@@ -23,8 +23,11 @@ class SparseCrossEntropyGradOp final : public Operator {
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
     return NaiveInferBatchAxis(BatchAxis4BnInOp);
   }
+  void VirtualGenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+                            const ParallelContext* parallel_ctx,
+                            KernelConf* kernel_conf) const override;
 };
 
 }  // namespace oneflow
 
-#endif  // ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_GRAD_OP_H_
+#endif  // ONEFLOW_CORE_OPERATOR_SPARSE_CROSS_ENTROPY_MS1_GRAD_OP_H_

@@ -45,5 +45,7 @@ void SparseSoftmaxCrossEntropyKernel<device_type, T>::ForwardDataContent(
 
 ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kSparseSoftmaxCrossEntropyConf,
                            SparseSoftmaxCrossEntropyKernel, FLOATING_DATA_TYPE_SEQ);
+ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kSparseSoftmaxCrossEntropyMs1Conf,
+                           SparseSoftmaxCrossEntropyKernel, FLOATING_DATA_TYPE_SEQ);
 
 }  // namespace oneflow

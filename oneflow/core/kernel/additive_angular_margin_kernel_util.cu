@@ -25,8 +25,8 @@ __global__ void AdditiveAngularMarginForwardGpu(const int64_t batch_num, const T
   CUDA_1D_KERNEL_LOOP(i, batch_num) {
     const int64_t idx = GetOffset<K>(i, label, labels_num, lower_bound);
     if (idx != -1) {
-      sin_theta_data[i] = sqrt(1 - out[idx] * out[idx]);
-      out[idx] = out[idx] * cos_m - sin_theta_data[i] * sin_m;
+      sin_theta_data[i] = sqrt(1 - in[idx] * in[idx]);
+      out[idx] = in[idx] * cos_m - sin_theta_data[i] * sin_m;
       // sin_theta_data[i] = in[idx] / sin_theta_data[i];
       sin_theta_data[i] = out[idx] / sin_theta_data[i];
     }
