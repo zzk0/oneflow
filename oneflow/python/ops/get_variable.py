@@ -5,6 +5,7 @@ import oneflow.python.framework.remote_blob as remote_blob_util
 import oneflow.python.framework.distribute as distribute_util
 import oneflow.core.operator.op_conf_pb2 as op_conf_util
 import oneflow.core.register.logical_blob_id_pb2 as logical_blob_id_util
+import oneflow.python.lib.core.pb_util as pb_util
 
 from oneflow.python.oneflow_export import oneflow_export
 
@@ -18,7 +19,10 @@ def get_variable(
     trainable=None,
     model_name=None,
     random_seed=None,
-    primary_lr=None,
+    learning_rate=None,
+    l1=None,
+    l2=None,
+    model_update_conf=None,
     normalize=None,
     norm_axis=None,
     norm_epsilon=None,
@@ -48,8 +52,15 @@ def get_variable(
             op_conf.variable_conf.split_axis.value = distribute.axis
         else:
             op_conf.variable_conf.split_axis.ClearField("value")
-        if primary_lr is not None:
-            op_conf.variable_conf.primary_lr = primary_lr
+        if learning_rate is not None:
+            op_conf.variable_conf.learning_rate = learning_rate
+        if l1 is not None:
+            op_conf.variable_conf.l1 = l1
+        if l2 is not None:
+            op_conf.variable_conf.l2 = l2
+        if model_update_conf is not None:
+            pb_util.PythonDict2PbMessage(model_update_conf, op_conf.variable_conf.model_update_conf)
+            
         if normalize is not None:
             if normalize:
                 op_conf.variable_conf.normalize_conf.axis = norm_axis
