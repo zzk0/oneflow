@@ -124,7 +124,6 @@ class DeconvOp : public Operator {
     CHECK_EQ_OR_RETURN(x_blob_desc->shape().NumAxes(), NDims() + 2);
 
     int64_t data_num = x_blob_desc->shape().At(0);
-    int64_t channels = x_blob_desc->shape().At(1);
     int32_t filters = conf.filters();
     std::vector<int64_t> out;
     GetOutAndPad(x_blob_desc->shape(), conf, &out, nullptr, nullptr);
@@ -136,12 +135,12 @@ class DeconvOp : public Operator {
     BlobDesc* y_blob_desc = GetBlobDesc4BnInOp("y");
     *y_blob_desc = *x_blob_desc;
     y_blob_desc->mut_shape() = Shape(y_shape);
-
     std::vector<int64_t> weight_shape(y_blob_desc->shape().dim_vec());
-    weight_shape[0] = channels;
     if (data_format == "channels_first") {
+      weight_shape[0] = x_blob_desc->shape().At(1);
       weight_shape[1] = filters;
     } else if (data_format == "channels_last") {
+      weight_shape[0] = x_blob_desc->shape().At(NDims() + 1);
       weight_shape[NDims() + 1] = filters;
     } else {
       UNIMPLEMENTED();
@@ -186,9 +185,9 @@ class DeconvOp : public Operator {
   void GenKernelConfWithCudnn(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                               KernelConf* kernel_conf, DeconvKernelConf* deconv_conf,
                               const OpContext* op_ctx) const {
-    // GetBlobDesc4BnInOp("x")->shape().ToProto(deconv_conf->mutable_in());
-    // GetBlobDesc4BnInOp("y")->shape().ToProto(deconv_conf->mutable_out());
-    // GetBlobDesc4BnInOp("filter")->shape().ToProto(deconv_conf->mutable_weight());
+    GetBlobDesc4BnInOp("x")->shape().ToProto(deconv_conf->mutable_in());
+    GetBlobDesc4BnInOp("y")->shape().ToProto(deconv_conf->mutable_out());
+    GetBlobDesc4BnInOp("filter")->shape().ToProto(deconv_conf->mutable_weight());
 
 #ifdef WITH_CUDA
     if (device_type() == DeviceType::kGPU) {

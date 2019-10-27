@@ -38,7 +38,7 @@ def test_deconv_2d_forward(dilation=1, padding=2, output_padding=2, stride=3):
     print(of_out[0].shape)
     # print(torch_out[0][0][0])
 
-def test_deconv_2d_forward_tf(dilation=1, padding='SAME', output_shape=3, stride=1):
+def test_deconv_2d_forward_tf(dilation=1, padding='SAME', output_shape=6, stride=2):
 
     x = np.random.randn(5, 4, 3, 3).astype(np.float32)
     @flow.function
@@ -46,7 +46,7 @@ def test_deconv_2d_forward_tf(dilation=1, padding='SAME', output_shape=3, stride
         weight = flow.get_variable(name="filter", shape=(
             4, 3, 2, 2), dtype=flow.float32, initializer=flow.ones_initializer())
         output = flow.nn.conv2d_transpose(input, weight, strides=stride, output_shape=[output_shape, output_shape], 
-                                          dilations=dilation, padding=padding, data_format="NCHW"),
+                                          dilations=dilation, padding=padding, data_format="NCHW")
         return output
 
     # oneflow output
