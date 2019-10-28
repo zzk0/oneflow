@@ -1,6 +1,6 @@
 #include "oneflow/core/job_completer/optimizer.h"
 #include "oneflow/core/graph/op_graph.h"
-#include "oneflow/core/job_completer/auto_learning_rate.h"
+#include "oneflow/core/job_completer/add_schedule_op.h"
 #include "oneflow/core/job/job.pb.h"
 
 namespace oneflow {
@@ -114,9 +114,11 @@ void ConstructMdUpdtOpConf(const VariableOp& op, const LogicalBlobId& diff_lbi_o
                             "Variable-Train-PrimaryLearningRate-Scheduler" + op.op_conf().name(),
                             op.op_conf().variable_conf().learning_rate())
             : train_conf.primary_lr_lbn();
+    const float l1 = op.op_conf().variable_conf().has_l1() ? op.op_conf().variable_conf().l1() : 0;
+    const float l2 = op.op_conf().variable_conf().has_l2() ? op.op_conf().variable_conf().l2() : 0;
     mdupdt_op_conf->set_learning_rate(primary_lr_lbn);
-    mdupdt_op_conf->set_l1(0);
-    mdupdt_op_conf->set_l2(0);
+    mdupdt_op_conf->set_l1(l1);
+    mdupdt_op_conf->set_l2(l2);
   }
 }
 
