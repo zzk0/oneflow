@@ -1659,6 +1659,12 @@ message NcclBoxingAllReduceOpConf {
   required LogicalBlobId lbi = 1;
 }
 
+message ZerosLikeOpConf {
+  required string like = 1;
+  required string out = 2;
+  optional DataType data_type = 3;
+}
+
 message OperatorConf {
   required string name = 1;
   optional bool trainable = 3 [default = true];
@@ -1823,6 +1829,7 @@ message OperatorConf {
     AdditiveAngularMarginMs1OpConf additive_angular_margin_ms1_conf = 320;
     AdditiveAngularMarginMs1GradOpConf additive_angular_margin_ms1_grad_conf = 321;
     DeviceReduceMaxOpConf device_reduce_max_conf = 322;
+    ZerosLikeOpConf zeros_like_conf = 323;
 
     // math op
     BroadcastAddOpConf broadcast_add_conf = 500;
