@@ -20,7 +20,12 @@ class L2NormalizeGradKernel final : public KernelIf<device_type> {
   }
 };
 
-ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kL2NormalizeGradConf, L2NormalizeGradKernel,
-                           FLOATING_DATA_TYPE_SEQ);
+#define REGISTER_L2_NORMALIZE_GRAD_KERNEL(dev, dtype)                                   \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kL2NormalizeGradConf, dev, dtype, \
+                                        L2NormalizeGradKernel<dev, dtype>)
+REGISTER_L2_NORMALIZE_GRAD_KERNEL(DeviceType::kGPU, float);
+REGISTER_L2_NORMALIZE_GRAD_KERNEL(DeviceType::kGPU, double);
+REGISTER_L2_NORMALIZE_GRAD_KERNEL(DeviceType::kCPU, float);
+REGISTER_L2_NORMALIZE_GRAD_KERNEL(DeviceType::kCPU, double);
 
 }  // namespace oneflow

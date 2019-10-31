@@ -1,5 +1,5 @@
 #include "oneflow/core/kernel/kernel.h"
-#include "oneflow/core/kernel/kernel_context.h"
+//#include "oneflow/core/kernel/kernel_context.h"
 
 namespace oneflow {
 
@@ -14,7 +14,7 @@ class ZerosLikeKernel final : public KernelIf<device_type> {
   void ForwardDataContent(const KernelCtx& ctx,
                           std::function<Blob*(const std::string&)> BnInOp2Blob) const override {
     Blob* out_blob = BnInOp2Blob("y");
-    Memset<device_type>(ctx.device_ctx, out_blob->mut_dptr<>(), 0,
+    Memset<device_type>(ctx.device_ctx, out_blob->mut_dptr(), 0,
                         out_blob->ByteSizeOfDataContentField());
   }
   const PbMessage& GetCustomizedOpConf() const override {
@@ -22,6 +22,9 @@ class ZerosLikeKernel final : public KernelIf<device_type> {
   }
 };
 
-ADD_DEVICE_TYPE_KERNEL_CREATOR(OperatorConf::kZerosLikeConf, ZerosLikeKernel);
+REGISTER_KERNEL_WITH_DEVICE(OperatorConf::kZerosLikeConf, DeviceType::kCPU,
+                            ZerosLikeKernel<DeviceType::kCPU>);
+REGISTER_KERNEL_WITH_DEVICE(OperatorConf::kZerosLikeConf, DeviceType::kGPU,
+                            ZerosLikeKernel<DeviceType::kGPU>);
 
 }  // namespace oneflow
