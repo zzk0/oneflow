@@ -28,14 +28,14 @@ class ReduceMaxKernel final : public KernelIf<device_type> {
   }
 };
 
-#define REGISTER_REDUCE_MAX_KERNEL(dtype)                                                            \
-  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kReduceMaxConf, DeviceType::kGPU, dtype,       \
-                                        ReduceMaxKernel<DeviceType::kGPU, dtype>)                    \
-  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kDeviceReduceMaxConf, DeviceType::kGPU, dtype, \
-                                        ReduceMaxKernel<DeviceType::kGPU, dtype>)                    \
-  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kReduceMaxConf, DeviceType::kCPU,              \
-                                        dtype, ReduceMaxKernel<DeviceType::kCPU, dtype>)             \
-  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kDeviceReduceMaxConf, DeviceType::kCPU,        \
+#define REGISTER_REDUCE_MAX_KERNEL(dtype)                                                      \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kReduceMaxConf, DeviceType::kGPU, dtype, \
+                                        ReduceMaxKernel<DeviceType::kGPU, dtype>)              \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kDeviceReduceMaxConf, DeviceType::kGPU,  \
+                                        dtype, ReduceMaxKernel<DeviceType::kGPU, dtype>)       \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kReduceMaxConf, DeviceType::kCPU, dtype, \
+                                        ReduceMaxKernel<DeviceType::kCPU, dtype>)              \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kDeviceReduceMaxConf, DeviceType::kCPU,  \
                                         dtype, ReduceMaxKernel<DeviceType::kCPU, dtype>)
 
 REGISTER_REDUCE_MAX_KERNEL(float);

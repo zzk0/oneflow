@@ -66,12 +66,10 @@ class SparseSoftmaxCrossEntropyGradGpuKernel final : public KernelIf<DeviceType:
     }
     const int64_t n = dx_blob->shape().At(0);
     const int64_t w = dx_blob->shape().Count(1);
-    T* dx_dptr = dx_blob->mut_dptr<T>();
-    KernelUtil<DeviceType::kGPU, T>::Copy(ctx.device_ctx, n * w, prob_blob->dptr<T>(), 1, dx_dptr,
-                                          1);
+    dx_blob->CopyDataContentFrom(ctx.device_ctx, prob_blob);
     SparseSoftmaxCrossEntropyGradBackwardSub<<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0,
                                                ctx.device_ctx->cuda_stream()>>>(
-        n, w, lower_bound, dy_blob->dptr<T>(), label_blob->dptr<K>(), dx_dptr);
+        n, w, lower_bound, dy_blob->dptr<T>(), label_blob->dptr<K>(), dx_blob->mut_dptr<T>());
   }
 };
 

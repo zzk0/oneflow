@@ -63,11 +63,9 @@ class SparseSoftmaxCrossEntropyGradCpuKernel final : public KernelIf<DeviceType:
     }
     const int64_t n = dx_blob->shape().At(0);
     const int64_t w = dx_blob->shape().Count(1);
-    T* dx_dptr = dx_blob->mut_dptr<T>();
-    KernelUtil<DeviceType::kCPU, T>::Copy(ctx.device_ctx, n * w, prob_blob->dptr<T>(), 1, dx_dptr,
-                                          1);
+    dx_blob->CopyDataContentFrom(ctx.device_ctx, prob_blob);
     BackwardSub(ctx.device_ctx, n, w, lower_bound, dy_blob->dptr<T>(), label_blob->dptr<K>(),
-                dx_dptr);
+                dx_blob->mut_dptr<T>());
   }
 };
 
