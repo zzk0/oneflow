@@ -28,9 +28,20 @@ class ReduceMaxKernel final : public KernelIf<device_type> {
   }
 };
 
-ADD_DEFAULT_KERNEL_CREATOR_WITH_GPU_HALF(OperatorConf::kReduceMaxConf, ReduceMaxKernel,
-                                         ARITHMETIC_DATA_TYPE_SEQ);
-ADD_DEFAULT_KERNEL_CREATOR_WITH_GPU_HALF(OperatorConf::kDeviceReduceMaxConf, ReduceMaxKernel,
-                                         ARITHMETIC_DATA_TYPE_SEQ);
+#define REGISTER_REDUCE_MAX_KERNEL(dtype)                                                            \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kReduceMaxConf, DeviceType::kGPU, dtype,       \
+                                        ReduceMaxKernel<DeviceType::kGPU, dtype>)                    \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kDeviceReduceMaxConf, DeviceType::kGPU, dtype, \
+                                        ReduceMaxKernel<DeviceType::kGPU, dtype>)                    \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kReduceMaxConf, DeviceType::kCPU,              \
+                                        dtype, ReduceMaxKernel<DeviceType::kCPU, dtype>)             \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kDeviceReduceMaxConf, DeviceType::kCPU,        \
+                                        dtype, ReduceMaxKernel<DeviceType::kCPU, dtype>)
+
+REGISTER_REDUCE_MAX_KERNEL(float);
+REGISTER_REDUCE_MAX_KERNEL(double);
+REGISTER_REDUCE_MAX_KERNEL(int8_t);
+REGISTER_REDUCE_MAX_KERNEL(int32_t);
+REGISTER_REDUCE_MAX_KERNEL(int64_t);
 
 }  // namespace oneflow

@@ -13,7 +13,7 @@ class ZerosLikeKernel final : public KernelIf<device_type> {
  private:
   void ForwardDataContent(const KernelCtx& ctx,
                           std::function<Blob*(const std::string&)> BnInOp2Blob) const override {
-    Blob* out_blob = BnInOp2Blob("y");
+    Blob* out_blob = BnInOp2Blob("out");
     Memset<device_type>(ctx.device_ctx, out_blob->mut_dptr(), 0,
                         out_blob->ByteSizeOfDataContentField());
   }
