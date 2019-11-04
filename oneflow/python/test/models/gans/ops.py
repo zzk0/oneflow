@@ -1,9 +1,7 @@
 import oneflow as flow
-import oneflow.python.framework.distribute as distribute_util
-from tensorflow.python.framework import ops
 import oneflow.python.framework.id_util as id_util
-
-
+import numpy as np
+    
 
 def deconv2d(input, output_shape,
              k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
@@ -15,7 +13,7 @@ def deconv2d(input, output_shape,
         id_util.UniqueStr(name + "-weight"),
         shape=weight_shape,
         dtype=input.dtype,
-        initializer=flow.random_uniform_initializer(),
+        initializer=flow.random_normal_initializer(stddev=0.02),
         trainable=trainable,
     )
 
@@ -26,7 +24,7 @@ def deconv2d(input, output_shape,
         name + "-bias",
         shape=(output_shape[-1],),
         dtype=input.dtype,
-        initializer=flow.random_uniform_initializer(),
+        initializer=flow.constant_initializer(0.0),
         trainable=trainable,
     )
     output = flow.nn.bias_add(output, bias, "NHWC")
@@ -40,7 +38,7 @@ def conv2d(input, output_dim,
     weight = flow.get_variable(name + "-weight",
                             shape=weight_shape,
                             dtype=input.dtype,
-                            initializer=flow.random_uniform_initializer(),
+                            initializer=flow.random_normal_initializer(stddev=0.02),
                             trainable=trainable,
                             )
 
@@ -51,7 +49,7 @@ def conv2d(input, output_dim,
         name + "-bias",
         shape=(output_dim,),
         dtype=input.dtype,
-        initializer=flow.random_uniform_initializer(),
+        initializer=flow.constant_initializer(0.0),
         trainable=trainable,
     )
     output = flow.nn.bias_add(output, bias, "NHWC")
@@ -66,7 +64,7 @@ def batch_norm(input, name=None, trainable=True):
         epsilon=1e-4,
         center=True,
         scale=True,
-        trainable=False,
+        trainable=trainable,
         name=name,
     )
 
@@ -93,7 +91,7 @@ def linear(input, units, name=None, trainable=True):
         name="{}-weight".format(name),
         shape=(units, inputs.static_shape[1]),
         dtype=inputs.dtype,
-        initializer=flow.random_uniform_initializer(),
+        initializer=flow.random_normal_initializer(stddev=0.02),
         trainable=trainable,
         model_name="weight",
     )
@@ -109,7 +107,7 @@ def linear(input, units, name=None, trainable=True):
         name="{}-bias".format(name),
         shape=(units,),
         dtype=inputs.dtype,
-        initializer=flow.random_uniform_initializer(),
+        initializer=flow.random_normal_initializer(),
         trainable=trainable,
         model_name="bias",
     )
@@ -134,6 +132,11 @@ if __name__ == "__main__":
     def test_conv2d(input=flow.input_blob_def((5, 6, 6, 8))):
         output = conv2d(input, output_dim=4)
         return output
+    
+    @flow.function
+    def test_lrelu(input=flow.input_blob_def((3,))):
+        output = lrelu(input)
+        return output
 
     flow.config.gpu_device_num(1)
     flow.config.default_data_type(flow.float32)
@@ -141,4 +144,7 @@ if __name__ == "__main__":
     check_point.init()
 
     # print(test_deconv2d(np.random.randn(5,3,3,4).astype(np.float32)).get().shape)
-    print(test_conv2d(np.random.randn(5,6,6,8).astype(np.float32)).get().shape)
+    # print(test_conv2d(np.random.randn(5,6,6,8).astype(np.float32)).get().shape)
+    inputs=np.random.randn(3).astype(np.float32)
+    print(inputs)
+    print(test_lrelu(inputs).get())

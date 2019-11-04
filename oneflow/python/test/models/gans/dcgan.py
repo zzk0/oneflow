@@ -95,13 +95,14 @@ if __name__ == "__main__":
 
     for i in range(5):
         z = np.random.randn(bs, 100).astype(np.float32)
-        image = np.random.randn(3, 64, 64, 3).astype(np.float32)
+        # image = np.random.randn(3, 64, 64, 3).astype(np.float32)
+        image = np.ones((3, 64, 64, 3)).astype(np.float32)
         label1 = np.ones((bs, 1)).astype(np.float32)
         label0 = np.zeros((bs, 1)).astype(np.float32)
         print("d_loss", train_discriminator(image, z, label1, label0).get().mean())
 
-    z = np.random.randn(bs, 100).astype(np.float32)
-    label1 = np.ones((bs, 1)).astype(np.float32)
-    print("g_loss:", train_generator(z, label1).get().mean())
+        z = np.random.randn(bs, 100).astype(np.float32)
+        label1 = np.ones((bs, 1)).astype(np.float32)
+        print("g_loss:", train_generator(z, label1).get().mean())
 
 
