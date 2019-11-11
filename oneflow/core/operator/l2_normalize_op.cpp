@@ -81,6 +81,12 @@ class L2NormalizeGradOp final : public Operator {
         .Split(input_bns(), 0)
         .Split(output_bns(), 0)
         .Build(sbp_sig_list->mutable_sbp_signature()->Add());
+    SbpSignatureBuilder()
+        .PartialSum("dy")
+        .Broadcast("y")
+        .Broadcast("square_x_sum")
+        .PartialSum("dx")
+        .Build(sbp_sig_list->mutable_sbp_signature()->Add());
     return Maybe<void>::Ok();
   }
 };

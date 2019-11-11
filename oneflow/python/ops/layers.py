@@ -235,9 +235,9 @@ def batch_normalization(
         "moving_variance",
         moving_variance.logical_blob_name,
     )
-    if beta:
+    if center:
         setattr(op_conf.normalization_conf, "beta", beta.logical_blob_name)
-    if gamma:
+    if scale:
         setattr(op_conf.normalization_conf, "gamma", gamma.logical_blob_name)
     if trainable:
         setattr(op_conf.normalization_conf, "mean", "mean")

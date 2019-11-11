@@ -9,47 +9,55 @@ void GenBnInDiffOpConfWhenTrainingFalse(
     std::vector<OperatorConf>* op_confs,
     const std::function<LogicalBlobId*(const std::string&)>& DiffLbi4BnInOp,
     const std::function<const BlobDesc&(const std::string&)>& LogicalBlobDesc4BnInOp) {
-  OperatorConf reshape_gamma_op;
-  reshape_gamma_op.set_name("System-AutoGrad-" + op.op_name() + "-ReshapeGamma");
-  ReshapeOpConf* reshape_gamma_op_conf = reshape_gamma_op.mutable_reshape_conf();
-  reshape_gamma_op_conf->set_out("out");
-  reshape_gamma_op_conf->set_in(GenLogicalBlobName(op.BnInOp2Lbi("gamma")));
+  OperatorConf reshape_inv_var_op;
+  reshape_inv_var_op.set_name("System-AutoGrad-" + op.op_name() + "-ReshapeInvVar");
+  ReshapeOpConf* reshape_inv_var_op_conf = reshape_inv_var_op.mutable_reshape_conf();
+  reshape_inv_var_op_conf->set_out("out");
+  reshape_inv_var_op_conf->set_in(inv_variance_op_conf.name() + "/out");
   const int32_t axis = op.op_conf().normalization_conf().axis();
   FOR_RANGE(size_t, i, 0, LogicalBlobDesc4BnInOp("in").shape().NumAxes()) {
     if (i != axis) {
-      reshape_gamma_op_conf->mutable_shape()->add_dim(1);
+      reshape_inv_var_op_conf->mutable_shape()->add_dim(1);
     } else {
-      reshape_gamma_op_conf->mutable_shape()->add_dim(
+      reshape_inv_var_op_conf->mutable_shape()->add_dim(
           LogicalBlobDesc4BnInOp("in").shape().At(axis));
     }
   }
-  op_confs->push_back(reshape_gamma_op);
-
-  OperatorConf reshape_inv_var_op;
-  reshape_inv_var_op.set_name("System-AutoGrad-" + op.op_name() + "-ReshapeInvVar");
-  ReshapeLikeOpConf* reshape_inv_var_op_conf = reshape_inv_var_op.mutable_reshape_like_conf();
-  reshape_inv_var_op_conf->set_x(inv_variance_op_conf.name() + "/out");
-  reshape_inv_var_op_conf->set_like(reshape_gamma_op.name() + "/out");
-  reshape_inv_var_op_conf->set_y("y");
   op_confs->push_back(reshape_inv_var_op);
-  OperatorConf broadcast_mul_gamma_op;
-  broadcast_mul_gamma_op.set_name("System-AutoGrad-" + op.op_name() + "-BroadcastMulGamma");
-  BroadcastMulOpConf* broadcast_mul_gamma_op_conf =
-      broadcast_mul_gamma_op.mutable_broadcast_mul_conf();
-  broadcast_mul_gamma_op_conf->set_a(reshape_gamma_op.name() + "/out");
-  broadcast_mul_gamma_op_conf->set_b(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
-  broadcast_mul_gamma_op_conf->set_out("out");
-  op_confs->push_back(broadcast_mul_gamma_op);
+
   OperatorConf broadcast_mul_inv_var_op;
   broadcast_mul_inv_var_op.set_name("System-AutoGrad-" + op.op_name() + "-BroadcastMulInvVar");
   BroadcastMulOpConf* broadcast_mul_inv_var_op_conf =
       broadcast_mul_inv_var_op.mutable_broadcast_mul_conf();
-  broadcast_mul_inv_var_op_conf->set_a(broadcast_mul_gamma_op.name() + "/out");
-  broadcast_mul_inv_var_op_conf->set_b(reshape_inv_var_op.name() + "/y");
+  broadcast_mul_inv_var_op_conf->set_a(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
+  broadcast_mul_inv_var_op_conf->set_b(reshape_inv_var_op.name() + "/out");
   broadcast_mul_inv_var_op_conf->set_out("out");
   op_confs->push_back(broadcast_mul_inv_var_op);
-  DiffLbi4BnInOp("in")->set_op_name(broadcast_mul_inv_var_op.name());
-  DiffLbi4BnInOp("in")->set_blob_name("out");
+
+  if (op.op_conf().normalization_conf().scale()) {
+    OperatorConf reshape_gamma_op;
+    reshape_gamma_op.set_name("System-AutoGrad-" + op.op_name() + "-ReshapeGamma");
+    ReshapeLikeOpConf* reshape_gamma_op_conf = reshape_gamma_op.mutable_reshape_like_conf();
+    reshape_gamma_op_conf->set_x(GenLogicalBlobName(op.BnInOp2Lbi("gamma")));
+    reshape_gamma_op_conf->set_like(reshape_inv_var_op.name() + "/out");
+    reshape_gamma_op_conf->set_y("y");
+    op_confs->push_back(reshape_gamma_op);
+
+    OperatorConf broadcast_mul_gamma_op;
+    broadcast_mul_gamma_op.set_name("System-AutoGrad-" + op.op_name() + "-BroadcastMulGamma");
+    BroadcastMulOpConf* broadcast_mul_gamma_op_conf =
+        broadcast_mul_gamma_op.mutable_broadcast_mul_conf();
+    broadcast_mul_gamma_op_conf->set_a(reshape_gamma_op.name() + "/y");
+    broadcast_mul_gamma_op_conf->set_b(broadcast_mul_inv_var_op.name() + "/out");
+    broadcast_mul_gamma_op_conf->set_out("out");
+    op_confs->push_back(broadcast_mul_gamma_op);
+
+    DiffLbi4BnInOp("in")->set_op_name(broadcast_mul_gamma_op.name());
+    DiffLbi4BnInOp("in")->set_blob_name("out");
+  } else {
+    DiffLbi4BnInOp("in")->set_op_name(broadcast_mul_inv_var_op.name());
+    DiffLbi4BnInOp("in")->set_blob_name("out");
+  }
 }
 
 void GenerateBackwardOpConf(

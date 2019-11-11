@@ -234,3 +234,46 @@ def concat(values,
     lbi.op_name = op_conf.name
     lbi.blob_name = "out"
     return remote_blob_util.RemoteBlob(lbi)
+
+@oneflow_export('split')
+def split(value,
+           axis,
+           num_split, 
+           name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("Split_"),
+    )
+    if isinstance(value, list):
+        raise NotImplementedError
+    setattr(op_conf.split_conf, "in", value.logical_blob_name)
+    lbis = []
+    for i in range(num_split):
+        op_conf.split_conf.out.extend(["out_"+str(i)])
+        lbi = logical_blob_id_util.LogicalBlobId()
+        lbi.op_name = op_conf.name
+        lbi.blob_name = "out_"+str(i)
+        lbis.append(lbi)
+
+    op_conf.split_conf.axis = axis
+    compile_context.CurJobAddOp(op_conf)
+    return tuple(map(lambda x: remote_blob_util.RemoteBlob(x), lbis))
+
+@oneflow_export("one_hot")
+def one_hot(indices, depth, dtype, name=None):
+    if name is None:
+        name = id_util.UniqueStr("OneHot_")
+    op_conf = op_conf_util.OperatorConf()
+    op_conf.name = name
+    setattr(op_conf.one_hot_conf, "data_type", dtype)
+    setattr(op_conf.one_hot_conf, "depth", depth)
+    setattr(op_conf.one_hot_conf, "indices", indices.logical_blob_name)
+    op_conf.one_hot_conf.out = "out"
+
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
