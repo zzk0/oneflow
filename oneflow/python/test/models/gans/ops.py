@@ -121,6 +121,25 @@ def linear(input, units, name=None, trainable=True):
     )
     return out
 
+def load_images(data_dir="/dataset/PNGS/PNG227/of_record_repeated"):
+    image_blob_conf = flow.data.BlobConf(
+    "encoded",
+    shape=(64, 64, 3),
+    dtype=flow.float,
+    codec=flow.data.ImageCodec([flow.data.ImagePreprocessor("bgr2rgb"),
+                                flow.data.ImageResizePreprocessor(64, 64)]),
+    preprocessors=[flow.data.NormByChannelPreprocessor((123.68, 116.78, 103.94))],
+    )
+
+    label_blob_conf = flow.data.BlobConf(
+    "class/label", shape=(), dtype=flow.int32, codec=flow.data.RawCodec()
+    )
+
+    return flow.data.decode_ofrecord(
+    data_dir, (label_blob_conf, image_blob_conf),
+    batch_size=8, data_part_num=8, name="decode"
+    )
+
 if __name__ == "__main__":
 
     @flow.function
@@ -138,6 +157,10 @@ if __name__ == "__main__":
         output = lrelu(input)
         return output
 
+    @flow.function
+    def test_load_images():
+        return load_images()
+
     flow.config.gpu_device_num(1)
     flow.config.default_data_type(flow.float32)
     check_point = flow.train.CheckPoint()
@@ -145,6 +168,7 @@ if __name__ == "__main__":
 
     # print(test_deconv2d(np.random.randn(5,3,3,4).astype(np.float32)).get().shape)
     # print(test_conv2d(np.random.randn(5,6,6,8).astype(np.float32)).get().shape)
-    inputs=np.random.randn(3).astype(np.float32)
-    print(inputs)
-    print(test_lrelu(inputs).get())
+    # inputs=np.random.randn(3).astype(np.float32)
+    # print(test_lrelu(inputs).get())
+    labels, images = test_load_images().get()
+    print(images.shape)
