@@ -265,6 +265,19 @@ message ReluGradOpConf {
   required string dx = 3;
 }
 
+message LeakyReluOpConf {
+  required string in = 1;
+  required string out = 2;
+  optional float alpha = 3 [default = 0.2];
+}
+
+message LeakyReluGradOpConf  {
+  required string x = 1;
+  required string dy = 2;
+  required string dx = 3;
+  required float alpha = 4;
+}
+
 message PReluOpConf {
   required string in = 1;
   required string out = 2;
@@ -1215,6 +1228,16 @@ message BroadcastDivGradOpConf {
   optional string temp_storage = 5 [default = "temp_storage"];
 }
 
+message BroadcastMaximumGradOpConf {
+  //  input
+  required string a = 1;
+  required string b = 2;
+  required string dy = 3;
+  //  output
+  required string da = 4;
+  required string db = 5;
+}
+
 message BroadcastEqualOpConf {
   required string a = 1;
   required string b = 2;
@@ -2081,6 +2104,9 @@ message OperatorConf {
     SleepOpConf sleep_conf = 333;
     LoDToDenseOpConf lod_to_dense_conf = 334;
     Dim0DynamicToFixedOpConf dim0_dynamic_to_fixed_conf = 335;
+    BroadcastMaximumGradOpConf broadcast_maximum_grad_conf = 336;
+    LeakyReluOpConf leaky_relu_conf = 337;
+    LeakyReluGradOpConf leaky_relu_grad_conf = 338;
 
     // math op
     BroadcastAddOpConf broadcast_add_conf = 500;

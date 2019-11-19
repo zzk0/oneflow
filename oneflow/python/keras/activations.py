@@ -23,6 +23,19 @@ def relu(x, alpha=0., max_value=None, threshold=0.):
     lbi.blob_name = "out"
     return remote_blob_util.RemoteBlob(lbi)
 
+@oneflow_export('keras.activations.leaky_relu')
+def leaky_relu(x, alpha=0.2):
+    op_conf = op_conf_util.OperatorConf()
+    op_conf.name = id_util.UniqueStr('LeakyRelu_')
+    setattr(op_conf.leaky_relu_conf, 'in', x.logical_blob_name)
+    op_conf.leaky_relu_conf.alpha = alpha
+    op_conf.leaky_relu_conf.out = "out"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+
 @oneflow_export('keras.activations.gelu')
 def gelu(x):
     op_conf = op_conf_util.OperatorConf()

@@ -68,14 +68,6 @@ def batch_norm(input, name=None, trainable=True):
         name=name,
     )
 
-def relu(input):
-    return flow.keras.activations.relu(input)
-
-def tanh(input):
-    return flow.keras.activations.tanh(input)
-
-def lrelu(input):
-    return flow.keras.activations.relu(input)
 
 def linear(input, units, name=None, trainable=True):
     name = name if name is not None else id_util.UniqueStr("BatchNorm_")
@@ -121,6 +113,15 @@ def linear(input, units, name=None, trainable=True):
     )
     return out
 
+def relu(input):
+    return flow.keras.activations.relu(input)
+
+def tanh(input):
+    return flow.keras.activations.tanh(input)
+
+def lrelu(input, alpha=0.2):
+    return flow.keras.activations.leaky_relu(input, alpha)
+
 def load_images(data_dir="/dataset/PNGS/PNG227/of_record_repeated"):
     image_blob_conf = flow.data.BlobConf(
     "encoded",
@@ -128,7 +129,8 @@ def load_images(data_dir="/dataset/PNGS/PNG227/of_record_repeated"):
     dtype=flow.float,
     codec=flow.data.ImageCodec([flow.data.ImagePreprocessor("bgr2rgb"),
                                 flow.data.ImageResizePreprocessor(64, 64)]),
-    preprocessors=[flow.data.NormByChannelPreprocessor((123.68, 116.78, 103.94))],
+    preprocessors=[flow.data.NormByChannelPreprocessor(mean_values=(127.5, 127.5, 127.5),
+                                                       std_values=(127.5, 127.5, 127.5))],
     )
 
     label_blob_conf = flow.data.BlobConf(
@@ -169,6 +171,11 @@ if __name__ == "__main__":
     # print(test_deconv2d(np.random.randn(5,3,3,4).astype(np.float32)).get().shape)
     # print(test_conv2d(np.random.randn(5,6,6,8).astype(np.float32)).get().shape)
     # inputs=np.random.randn(3).astype(np.float32)
+    # print(inputs)
     # print(test_lrelu(inputs).get())
     labels, images = test_load_images().get()
-    print(images.shape)
+    import matplotlib.pyplot as plt
+    print(images[1][0][:10])
+    print(np.max(images[1]))
+    plt.imsave("test.png", images[1]/(2*np.max(abs(images[1])))+0.5)
+    # print(images.shape)

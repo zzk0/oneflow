@@ -59,21 +59,22 @@ if __name__ == "__main__":
     @flow.function
     def train_generator(z=flow.input_blob_def((bs, 100)),
                         label1=flow.input_blob_def((bs, 1))):
-        flow.config.train.primary_lr(0.00001)
+        flow.config.train.primary_lr(0.0001)
         flow.config.train.model_update_conf(dict(naive_conf={}))
     
         g_out = generator(z, trainable=True)
         g_logits = discriminator(g_out, trainable=False)
         g_loss = flow.nn.sigmoid_cross_entropy_with_logits(label1, g_logits, name="Gloss_sigmoid_cross_entropy_with_logits")
+        g_loss = g_loss * -1
 
         flow.losses.add_loss(g_loss)
-        return g_loss
+        return g_loss, g_out
     
     @flow.function
     def train_discriminator(z=flow.input_blob_def((bs, 100)), 
                             label1=flow.input_blob_def((bs, 1)),
                             label0=flow.input_blob_def((bs, 1))):
-        flow.config.train.primary_lr(0.00001)
+        flow.config.train.primary_lr(0.0001)
         flow.config.train.model_update_conf(dict(naive_conf={}))
 
         g_out = generator(z, trainable=False)
@@ -86,35 +87,39 @@ if __name__ == "__main__":
 
         d_loss = d_loss_fake + d_loss_real
         flow.losses.add_loss(d_loss)
-        return d_loss
-    
-    @flow.function
-    def test_generator(z=flow.input_blob_def((bs, 100))):
-        g_out = generator(z, trainable=True)
-        return g_out
+        return d_loss, d_loss_fake, d_loss_real
 
     flow.config.gpu_device_num(1)
     flow.config.default_data_type(flow.float32)
     check_point = flow.train.CheckPoint()
     check_point.init()
 
-    for i in range(20000):
-        print(i,"th iter:")
-        for j in range(2):
+    for i in range(200):
+
+        for j in range(1):
             z = np.random.randn(bs, 100).astype(np.float32)
             label1 = np.ones((bs, 1)).astype(np.float32)
             label0 = np.zeros((bs, 1)).astype(np.float32)
-            print("d_loss", train_discriminator(z, label1, label0).get().mean())
+            d_loss, d_loss_fake, d_loss_real = train_discriminator(z, label1, label0).get()
+        print("dloss:", d_loss.mean())
+        # print("dloss_fake:", d_loss_fake.mean())
+        # print("dloss_real:", d_loss_real.mean())
 
-        z = np.random.randn(bs, 100).astype(np.float32)
-        label1 = np.ones((bs, 1)).astype(np.float32)
-        print("g_loss:", train_generator(z, label1).get().mean())
+        for j in range(2):
+            z = np.random.randn(bs, 100).astype(np.float32)
+            label1 = np.ones((bs, 1)).astype(np.float32)
+            g_loss, g_out = train_generator(z, label1).get()
+        print("gloss:", g_loss.mean())
+
         
-        if (i + 1) % 200 == 0:
-            check_point.save("./model_save-{}".format(str(datetime.now().strftime("%Y-%m-%d-%H:%M:%S")))+ str(i))
-            image = test_generator(z).get()[0]
-            plt.imsave("gout/test_{}.png".format(str(i)), image/2*np.max(abs(image))+0.5)
-    
+        if  (i + 1) % 10 == 0:
+            print(i + 1,"th epoch:")
+            # print("z:", z[0][:10])
+            img = g_out[1] / 2 + 0.5
+            plt.imsave("gout/test_{}.png".format(str(i+1)), img)
+        
+        # if (i + 1) % 10 == 0:
+        #     check_point.save("./model_save-{}".format(str(datetime.now().strftime("%Y-%m-%d-%H:%M:%S")))+ str(i))
 
     
     
