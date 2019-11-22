@@ -888,7 +888,7 @@ message ForeignOutputOpConf {
 }
 
 message ForeignWatchOpConf {
-  repeated string in = 1;
+  required string in = 1;
   required string handler_uuid = 2;
 }
 
@@ -944,6 +944,7 @@ message EncodeBytesList {
 
 message EncodeRaw {
   optional bool dim1_varying_length = 1 [default = false];
+  optional bool auto_zero_padding = 2 [default = false];
 }
 
 message EncodeJpeg {
@@ -1671,6 +1672,13 @@ message ZerosLikeOpConf {
   optional DataType data_type = 3;
 }
 
+message ParallelCastOpConf {
+  required string in = 1;
+  required string out = 2;
+  optional OptInt64 split_axis = 3;
+  optional OptInt64 gradient_split_axis = 4;
+}
+
 message OperatorConf {
   required string name = 1;
   optional bool trainable = 3 [default = true];
@@ -1835,6 +1843,7 @@ message OperatorConf {
     AdditiveAngularMarginMs1GradOpConf additive_angular_margin_ms1_grad_conf = 321;
     DeviceReduceMaxOpConf device_reduce_max_conf = 322;
     ZerosLikeOpConf zeros_like_conf = 323;
+    ParallelCastOpConf parallel_cast_conf = 324;
 
     // math op
     BroadcastAddOpConf broadcast_add_conf = 500;

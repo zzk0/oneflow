@@ -15,6 +15,7 @@
 #include "oneflow/core/job_completer/auto_train_step.h"
 #include "oneflow/core/job_completer/auto_learning_rate.h"
 #include "oneflow/core/job_completer/sparse_softmax_cross_entropy_pass.h"
+#include "oneflow/core/job_completer/add_lbi_diff_watcher.h"
 
 namespace oneflow {
 
@@ -367,6 +368,7 @@ void JobCompleter::Complete(Job* job) const {
     WithOpGraphAndMutJobBuilder(job, &SplitSparseSoftmaxCrossEntropy4ModelParallel);
     WithOpGraphAndMutJobBuilder(job, &MakeNcclTupleBroadcastReduceSequence);
     WithOpGraphAndMutJobBuilder(job, &RewriteBoxingWithAllReduce);
+    AddLbiDiffWatcherOpConfs(job);
     WithOpGraphAndMutJobBuilder(job, &MakeAllReduceSequence);
   }
   WithOpGraphAndMutJobBuilder(job, &DumpLogicalBlobDescAndSbpSignature);
