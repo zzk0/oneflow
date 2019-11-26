@@ -1,6 +1,7 @@
 #include "oneflow/core/operator/reduce_sbp_util.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
 #include "oneflow/core/operator/operator.h"
+#include "oneflow/core/register/dense_shape_view.h"
 
 namespace oneflow {
 
@@ -31,8 +32,8 @@ class ReduceMaxOp final : public Operator {
         out_blob->mut_shape() = Shape({1});
       }
     } else {
-      const std::vector<int64_t> axis_vec = {conf.axis().begin(), conf.axis().end()};
-      const Shape& reduced_shape = in_blob->shape().CreateReducedShape(axis_vec);
+      const AxisVector axis_vec = {conf.axis().begin(), conf.axis().end()};
+      const Shape& reduced_shape = CreateReducedShape(DenseShapeView(in_blob->shape()), axis_vec);
       if (conf.keep_dims()) {
         out_blob->mut_shape() = reduced_shape;
       } else {
@@ -89,8 +90,8 @@ class DeviceReduceMaxOp final : public Operator {
     if (conf.axis().empty()) {
       out_blob->mut_shape() = Shape::Ones(in_blob->shape().NumAxes());
     } else {
-      const std::vector<int64_t> axis_vec = {conf.axis().begin(), conf.axis().end()};
-      const Shape& reduced_shape = in_blob->shape().CreateReducedShape(axis_vec);
+      const AxisVector axis_vec = {conf.axis().begin(), conf.axis().end()};
+      const Shape& reduced_shape = CreateReducedShape(DenseShapeView(in_blob->shape()), axis_vec);
       out_blob->mut_shape() = reduced_shape;
     }
     return Maybe<void>::Ok();

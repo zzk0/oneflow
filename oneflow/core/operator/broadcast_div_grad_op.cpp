@@ -8,7 +8,7 @@ void BroadcastDivGradOp::InitFromOpConf() {
   EnrollInputBn("y");
   EnrollInputBn("dy");
   EnrollOutputBn("db");
-  EnrollTmpBn("temp_storage");
+  EnrollOutputBn("temp_storage");
 }
 
 const PbMessage& BroadcastDivGradOp::GetCustomizedConf() const {

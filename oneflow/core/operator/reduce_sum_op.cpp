@@ -2,6 +2,7 @@
 #include "oneflow/core/kernel/kernel_util.h"
 #include "oneflow/core/operator/reduce_sbp_util.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
+#include "oneflow/core/register/dense_shape_view.h"
 
 namespace oneflow {
 
@@ -32,8 +33,8 @@ Maybe<void> ReduceSumOp::InferBlobDescs(
       out_blob->mut_shape() = Shape({1});
     }
   } else {
-    const std::vector<int64_t> axis_vec = {conf.axis().begin(), conf.axis().end()};
-    const Shape& reduced_shape = in_blob->shape().CreateReducedShape(axis_vec);
+    const AxisVector axis_vec = {conf.axis().begin(), conf.axis().end()};
+    const Shape& reduced_shape = CreateReducedShape(DenseShapeView(in_blob->shape()), axis_vec);
     if (conf.keep_dims()) {
       out_blob->mut_shape() = reduced_shape;
     } else {
@@ -46,10 +47,13 @@ Maybe<void> ReduceSumOp::InferBlobDescs(
 Maybe<void> ReduceSumOp::InferBatchAxis(
     std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {
   const auto& reduced_axes = op_conf().reduce_sum_conf().axis();
+  const bool keep_dims = op_conf().reduce_sum_conf().keep_dims();
   HashSet<int64_t> conf_axes = {reduced_axes.begin(), reduced_axes.end()};
   if (BatchAxis4BnInOp("in")->has_value() && !conf_axes.empty()
       && conf_axes.find(BatchAxis4BnInOp("in")->value()) == conf_axes.end()) {
     *BatchAxis4BnInOp("out") = *BatchAxis4BnInOp("in");
+  } else if (conf_axes.empty() && keep_dims == false) {
+    BatchAxis4BnInOp("out")->set_value(0);
   } else {
     BatchAxis4BnInOp("out")->clear_value();
   }

@@ -288,5 +288,9 @@ def one_hot(indices, depth, dtype, name=None):
     setattr(op_conf.one_hot_conf, "depth", depth)
     setattr(op_conf.one_hot_conf, "indices", indices.logical_blob_name)
     op_conf.one_hot_conf.out = "out"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
     return remote_blob_util.RemoteBlob(lbi)
 

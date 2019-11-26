@@ -343,3 +343,89 @@ def square(x, name=None):
     lbi.op_name = op_conf.name
     lbi.blob_name = "out"
     return remote_blob_util.RemoteBlob(lbi)
+
+
+@oneflow_export("math.maximum")
+def broadcast_max(x, y, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("BroadcastMax_"),
+    )
+    op_conf.broadcast_max_conf.a = x.logical_blob_name
+    op_conf.broadcast_max_conf.b = y.logical_blob_name
+    op_conf.broadcast_max_conf.out = "out"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+    
+# only do argmax operation in the last dimension and set output int32_t data type for now
+# TODO: support argmax in arbitrary axis and allow user to specify output data type
+@oneflow_export("math.argmax")
+def argmax(input, axis=None, output_type=None, name=None):
+    assert axis is None and output_type is None
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf, "name", name if name is not None else id_util.UniqueStr("Argmax_")
+    )
+    setattr(op_conf.argmax_conf, "in", input.logical_blob_name)
+    setattr(op_conf.argmax_conf, "out", "out")
+    compile_context.CurJobAddOp(op_conf)
+    out_lbi = logical_blob_id_util.LogicalBlobId()
+    setattr(out_lbi, "op_name", op_conf.name)
+    setattr(out_lbi, "blob_name", "out")
+    return remote_blob_util.RemoteBlob(out_lbi)
+
+@oneflow_export("math.greater")
+def greater(x, y, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("BroadcastGreaterThan_"),
+    )
+    op_conf.broadcast_greater_than_conf.a = x.logical_blob_name
+    op_conf.broadcast_greater_than_conf.b = y.logical_blob_name
+    op_conf.broadcast_greater_than_conf.out = "out"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+
+@oneflow_export("math.greater_equal")
+def greater_equal(x, y, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("BroadcastGreaterEqual_"),
+    )
+    op_conf.broadcast_greater_equal_conf.a = x.logical_blob_name
+    op_conf.broadcast_greater_equal_conf.b = y.logical_blob_name
+    op_conf.broadcast_greater_equal_conf.out = "out"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+
+@oneflow_export("math.logical_and")
+def logical_and(x, y, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("BroadcastLogicalAnd_"),
+    )
+    op_conf.broadcast_logical_and_conf.a = x.logical_blob_name
+    op_conf.broadcast_logical_and_conf.b = y.logical_blob_name
+    op_conf.broadcast_logical_and_conf.out = "out"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)

@@ -20,7 +20,7 @@ class ReduceMaxKernel final : public KernelIf<device_type> {
     const Shape& reduced_shape =
         conf.axis().empty()
             ? Shape::Ones(in_blob->shape().NumAxes())
-            : in_blob->shape().CreateReducedShape({conf.axis().begin(), conf.axis().end()});
+            : CreateReducedShape(in_blob->shape(), {conf.axis().begin(), conf.axis().end()});
     NdarrayUtil<device_type, T>::ReduceMax(
         ctx.device_ctx, XpuVarNdarray<T>(reduced_shape, out_blob->mut_dptr<T>()),
         XpuVarNdarray<const T>(in_blob, in_blob->shape().NumAxes()),

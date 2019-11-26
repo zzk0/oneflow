@@ -1,6 +1,7 @@
 #include "oneflow/core/operator/reduce_mean_op.h"
 #include "oneflow/core/operator/reduce_sbp_util.h"
 #include "oneflow/core/kernel/kernel_util.h"
+#include "oneflow/core/register/dense_shape_view.h"
 
 namespace oneflow {
 
@@ -27,8 +28,8 @@ Maybe<void> ReduceMeanOp::InferBlobDescs(
       out_blob->mut_shape() = Shape({1});
     }
   } else {
-    const std::vector<int64_t> axis_vec = {conf.axis().begin(), conf.axis().end()};
-    const Shape& reduced_shape = in_blob->shape().CreateReducedShape(axis_vec);
+    const AxisVector axis_vec = {conf.axis().begin(), conf.axis().end()};
+    const Shape& reduced_shape = CreateReducedShape(DenseShapeView(in_blob->shape()), axis_vec);
     if (conf.keep_dims()) {
       out_blob->mut_shape() = reduced_shape;
     } else {
