@@ -1,5 +1,6 @@
 import oneflow as flow
 import oneflow.python.framework.id_util as id_util
+import os
 import numpy as np
     
 
@@ -122,9 +123,46 @@ def tanh(input):
 def lrelu(input, alpha=0.2):
     return flow.keras.activations.leaky_relu(input, alpha)
 
-def load_images(data_dir="/dataset/PNGS/PNG227/of_record_repeated"):
+def load_mnist(data_dir='./data', dataset_name='mnist'):
+    data_dir = os.path.join(data_dir, dataset_name)
+    
+    fd = open(os.path.join(data_dir,'train-images-idx3-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    trX = loaded[16:].reshape((60000,28,28,1)).astype(np.float)
+
+    fd = open(os.path.join(data_dir,'train-labels-idx1-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    trY = loaded[8:].reshape((60000)).astype(np.float)
+
+    fd = open(os.path.join(data_dir,'t10k-images-idx3-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    teX = loaded[16:].reshape((10000,28,28,1)).astype(np.float)
+
+    fd = open(os.path.join(data_dir,'t10k-labels-idx1-ubyte'))
+    loaded = np.fromfile(file=fd,dtype=np.uint8)
+    teY = loaded[8:].reshape((10000)).astype(np.float)
+
+    trY = np.asarray(trY)
+    teY = np.asarray(teY)
+    
+    X = np.concatenate((trX, teX), axis=0)
+    y = np.concatenate((trY, teY), axis=0).astype(np.int)
+    
+    seed = 547
+    np.random.seed(seed)
+    np.random.shuffle(X)
+    np.random.seed(seed)
+    np.random.shuffle(y)
+    
+    y_vec = np.zeros((len(y), 10), dtype=np.float)
+    for i, label in enumerate(y):
+      y_vec[i,y[i]] = 1.0
+    
+    return X/255., y_vec
+
+def load_images(data_dir="/dataset/mnist/of_mnist_repeat_1024"):
     image_blob_conf = flow.data.BlobConf(
-    "encoded",
+    "img_raw",
     shape=(64, 64, 3),
     dtype=flow.float,
     codec=flow.data.ImageCodec([flow.data.ImagePreprocessor("bgr2rgb"),
@@ -134,12 +172,12 @@ def load_images(data_dir="/dataset/PNGS/PNG227/of_record_repeated"):
     )
 
     label_blob_conf = flow.data.BlobConf(
-    "class/label", shape=(), dtype=flow.int32, codec=flow.data.RawCodec()
+    "label", shape=(), dtype=flow.int32, codec=flow.data.RawCodec()
     )
 
     return flow.data.decode_ofrecord(
-    data_dir, (label_blob_conf, image_blob_conf),
-    batch_size=8, data_part_num=8, name="decode"
+    data_dir, (label_blob_conf, image_blob_conf,),
+    batch_size=8, data_part_num=1, name="decode"
     )
 
 if __name__ == "__main__":
@@ -173,9 +211,13 @@ if __name__ == "__main__":
     # inputs=np.random.randn(3).astype(np.float32)
     # print(inputs)
     # print(test_lrelu(inputs).get())
-    labels, images = test_load_images().get()
-    import matplotlib.pyplot as plt
-    print(images[1][0][:10])
-    print(np.max(images[1]))
-    plt.imsave("test.png", images[1]/(2*np.max(abs(images[1])))+0.5)
+    # labels, images = test_load_images().get()
+    # import matplotlib.pyplot as plt
+    # print(images[1][0][:10])
+    # print(np.max(images[1]))
+    # plt.imsave("test.png", images[1]/(2*np.max(abs(images[1])))+0.5)
     # print(images.shape)
+
+    x, y = load_mnist()
+    print(x.shape)
+    print(y.shape)

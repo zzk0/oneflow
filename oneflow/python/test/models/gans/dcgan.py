@@ -1,26 +1,38 @@
 import oneflow as flow
 import numpy as np
+import math
 import oneflow.core.operator.op_conf_pb2 as op_conf_util
 from ops import *
 import matplotlib.pyplot as plt
 from datetime import datetime
 
+
+def conv_out_size_same(size, stride):
+  return int(math.ceil(float(size) / float(stride)))
+
 def generator(z, trainable=True):
+
+    s_h, s_w = (28, 28)
+    s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)
+    s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)
+    s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)
+    s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)
+
     n = z.static_shape[0]
-    h0 = linear(z, 64 * 8 * 4 * 4, trainable=trainable)
-    h0 = flow.reshape(h0, (n, 4, 4, 64 * 8))
+    h0 = linear(z, 64 * 8 * s_h16 * s_w16, trainable=trainable)
+    h0 = flow.reshape(h0, (n, s_h16, s_w16, 64 * 8))
     h0 = batch_norm(h0, trainable=trainable) # epsilon check fail
     h0 = relu(h0)
 
-    h1 = deconv2d(h0, [n, 8, 8, 64 * 4], trainable=trainable)
+    h1 = deconv2d(h0, [n, s_h8, s_w8, 64 * 4], trainable=trainable)
     h1 = batch_norm(h1, trainable=trainable)
     h1 = relu(h1)
 
-    h2 = deconv2d(h1, [n, 16, 16, 64 * 2], trainable=trainable)
+    h2 = deconv2d(h1, [n, s_h4, s_w4, 64 * 2], trainable=trainable)
     h2 = batch_norm(h2, trainable=trainable)
     h2 = relu(h2)
 
-    h3 = deconv2d(h2, [n, 32, 32, 64], trainable=trainable)
+    h3 = deconv2d(h2, [n, s_h2, s_w2, 64], trainable=trainable)
     h3 = batch_norm(h3, trainable=trainable)
     h3 = relu(h3)
 
@@ -54,11 +66,13 @@ def discriminator(image, trainable=True):
 
 if __name__ == "__main__":
 
-    bs = 8 # batch size
+    # config args to be aranged 
+    batch_size = 64
+    epoch_num = 1
 
     @flow.function
-    def train_generator(z=flow.input_blob_def((bs, 100)),
-                        label1=flow.input_blob_def((bs, 1))):
+    def train_generator(z=flow.input_blob_def((batch_size, 100)),
+                        label1=flow.input_blob_def((batch_size, 1))):
         flow.config.train.primary_lr(0.0001)
         flow.config.train.model_update_conf(dict(naive_conf={}))
     
@@ -71,9 +85,10 @@ if __name__ == "__main__":
         return g_loss, g_out
     
     @flow.function
-    def train_discriminator(z=flow.input_blob_def((bs, 100)), 
-                            label1=flow.input_blob_def((bs, 1)),
-                            label0=flow.input_blob_def((bs, 1))):
+    def train_discriminator(z=flow.input_blob_def((batch_size, 100)), 
+                            label1=flow.input_blob_def((batch_size, 1)),
+                            label0=flow.input_blob_def((batch_size, 1)),
+                            images=flow.input_blob_def((batch_size, 28, 28, 1))):
         flow.config.train.primary_lr(0.0001)
         flow.config.train.model_update_conf(dict(naive_conf={}))
 
@@ -81,7 +96,6 @@ if __name__ == "__main__":
         g_logits = discriminator(g_out, trainable=True)
         d_loss_fake = flow.nn.sigmoid_cross_entropy_with_logits(label0, g_logits, name="Dloss_fake_sigmoid_cross_entropy_with_logits")
 
-        _, images = load_images()
         d_logits = discriminator(images, trainable=True)
         d_loss_real = flow.nn.sigmoid_cross_entropy_with_logits(label1, d_logits, name="Dloss_real_sigmoid_cross_entropy_with_logits")
 
@@ -94,32 +108,37 @@ if __name__ == "__main__":
     check_point = flow.train.CheckPoint()
     check_point.init()
 
-    for i in range(200):
 
-        for j in range(1):
-            z = np.random.randn(bs, 100).astype(np.float32)
-            label1 = np.ones((bs, 1)).astype(np.float32)
-            label0 = np.zeros((bs, 1)).astype(np.float32)
-            d_loss, d_loss_fake, d_loss_real = train_discriminator(z, label1, label0).get()
-        print("dloss:", d_loss.mean())
-        # print("dloss_fake:", d_loss_fake.mean())
-        # print("dloss_real:", d_loss_real.mean())
+    x, _ = load_minst()
+    batch_num = len(x) // batch_size
 
-        for j in range(2):
-            z = np.random.randn(bs, 100).astype(np.float32)
-            label1 = np.ones((bs, 1)).astype(np.float32)
-            g_loss, g_out = train_generator(z, label1).get()
-        print("gloss:", g_loss.mean())
+    for epoch_idx in range(epoch_num):
+        for batch_idx in range(batch_num):
+            for j in range(1):
+                z = np.random.randn(batch_size, 100).astype(np.float32)
+                label1 = np.ones((batch_size, 1)).astype(np.float32)
+                label0 = np.zeros((batch_size, 1)).astype(np.float32)
+                images = x[batch_idx*batch_size:(batch_idx+1)*batch_size]
+                d_loss, d_loss_fake, d_loss_real = train_discriminator(z, label1, label0, images).get()
+            print("dloss:", d_loss.mean())
+            # print("dloss_fake:", d_loss_fake.mean())
+            # print("dloss_real:", d_loss_real.mean())
 
-        
-        if  (i + 1) % 10 == 0:
-            print(i + 1,"th epoch:")
-            # print("z:", z[0][:10])
-            img = g_out[1] / 2 + 0.5
-            plt.imsave("gout/test_{}.png".format(str(i+1)), img)
-        
-        # if (i + 1) % 10 == 0:
-        #     check_point.save("./model_save-{}".format(str(datetime.now().strftime("%Y-%m-%d-%H:%M:%S")))+ str(i))
+            for j in range(2):
+                z = np.random.randn(batch_size, 100).astype(np.float32)
+                label1 = np.ones((batch_size, 1)).astype(np.float32)
+                g_loss, g_out = train_generator(z, label1).get()
+            print("gloss:", g_loss.mean())
+
+            
+            # if  (i + 1) % 10 == 0:
+            #     print(i + 1,"th batch:")
+            #     # print("z:", z[0][:10])
+
+        # when each epochs finished
+        img = g_out[1] / 2 + 0.5
+        plt.imsave("gout/test_{}.png".format(str(epoch_idx+1)), img)
+        check_point.save("./model_save-{}".format(str(datetime.now().strftime("%Y-%m-%d-%H:%M:%S")))+ str(epoch_idx))
 
     
     
