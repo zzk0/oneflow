@@ -6,6 +6,11 @@ message ImageResize {
   required int32 height = 2;
 }
 
+message ImageRandomMethodResize {
+  required int32 width = 1;
+  required int32 height = 2;
+}
+
 message ImageMirror {
 }
 
@@ -64,5 +69,6 @@ message ImagePreprocess {
     ImageMirror mirror = 5;
     ImageBgr2Rgb bgr2rgb = 6;
     ImageCutout cutout = 7;
+    ImageRandomMethodResize random_method_resize = 8;
   }
 }

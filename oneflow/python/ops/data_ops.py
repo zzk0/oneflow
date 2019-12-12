@@ -52,6 +52,20 @@ class ImageResizePreprocessor(object):
         setattr(proto.resize, "height", self.height)
         return proto
 
+@oneflow_export("data.ImageRandomMethodResizePreprocessor")
+class ImageRandomMethodResizePreprocessor(object):
+    def __init__(self, width, height):
+        assert isinstance(width, int)
+        assert isinstance(height, int)
+
+        self.width = width
+        self.height = height
+
+    def to_proto(self, proto=None):
+        proto = proto or image_util.ImagePreprocess()
+        setattr(proto.random_method_resize, "width", self.width)
+        setattr(proto.random_method_resize, "height", self.height)
+        return proto
 
 @oneflow_export("data.ImageCropPreprocessor")
 class ImageCropPreprocessor(object):

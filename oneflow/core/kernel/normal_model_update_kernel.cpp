@@ -15,7 +15,8 @@ void NormalMdUpdateKernel<device_type, T>::VirtualKernelInit() {
   user_conf_ = *GetMsgPtrFromPbMessage<NormalModelUpdateOpUserConf>(op_conf, "user_conf");
   l1_ = static_cast<T>(GetValFromPbMessage<float>(op_conf, "l1"));
   l2_ = static_cast<T>(GetValFromPbMessage<float>(op_conf, "l2"));
-  const NormalizeConf* normalize_conf = GetMsgPtrFromPbMessage<NormalizeConf>(op_conf, "normalize_conf");
+  const NormalizeConf* normalize_conf =
+      GetMsgPtrFromPbMessage<NormalizeConf>(op_conf, "normalize_conf");
   if (normalize_conf != nullptr) {
     normalize_conf_.reset(new NormalizeConf());
     *(normalize_conf_.get()) = *normalize_conf;

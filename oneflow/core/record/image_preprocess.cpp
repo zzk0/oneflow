@@ -17,8 +17,26 @@ void ImagePreprocessImpl<PreprocessCase::kResize>::DoPreprocess(
   CHECK(preprocess_conf.has_resize());
   const ImageResize& conf = preprocess_conf.resize();
   cv::Mat dst;
-  // cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_LINEAR);
-  cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_NEAREST);
+  cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_LINEAR);
+  *image = dst;
+}
+
+void ImagePreprocessImpl<PreprocessCase::kRandomMethodResize>::DoPreprocess(
+    cv::Mat* image, const ImagePreprocess& preprocess_conf,
+    std::function<int32_t(void)> NextRandomInt) const {
+  CHECK(preprocess_conf.has_random_method_resize());
+  const ImageResize& conf = preprocess_conf.random_method_resize();
+  cv::Mat dst;
+  const int32_t method = NextRandomInt() % 4;
+  if (method == 0) {
+    cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_LINEAR);
+  } else if(method == 1) {
+    cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_NEAREST);
+  } else if(method == 2) {
+    cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_CUBIC);
+  } else {
+    cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_AREA);
+  }
   *image = dst;
 }
 

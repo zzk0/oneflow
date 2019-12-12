@@ -34,7 +34,8 @@ void GenerateDeviceBackwardOpConf(
     broadcast_like_op_conf->set_x(GenLogicalBlobName(*DiffLbi4BnInOp("out")));
     broadcast_like_op_conf->set_like(GenLogicalBlobName(op.BnInOp2Lbi("in")));
     broadcast_like_op_conf->set_y("y");
-    broadcast_like_op_conf->mutable_reduced_axis()->CopyFrom(op.op_conf().device_reduce_sum_conf().axis());
+    broadcast_like_op_conf->mutable_reduced_axis()->CopyFrom(
+        op.op_conf().device_reduce_sum_conf().axis());
     op_confs->push_back(broadcast_like_op);
     DiffLbi4BnInOp("in")->set_op_name(broadcast_like_op.name());
     DiffLbi4BnInOp("in")->set_blob_name("y");

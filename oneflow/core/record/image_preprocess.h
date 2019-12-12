@@ -35,6 +35,14 @@ class ImagePreprocessImpl<PreprocessCase::kResize> final : public ImagePreproces
 };
 
 template<>
+class ImagePreprocessImpl<PreprocessCase::kRandomMethodResize> final : public ImagePreprocessIf {
+ public:
+ private:
+  void DoPreprocess(cv::Mat* image, const ImagePreprocess& preprocess_conf,
+                    std::function<int32_t(void)> NextRandomInt) const override;
+};
+
+template<>
 class ImagePreprocessImpl<PreprocessCase::kCrop> final : public ImagePreprocessIf {
  public:
  private:
@@ -84,6 +92,7 @@ class ImagePreprocessImpl<PreprocessCase::kCutout> final : public ImagePreproces
 
 #define PREPROCESS_CASE_SEQ                                 \
   OF_PP_MAKE_TUPLE_SEQ(PreprocessCase::kResize)             \
+  OF_PP_MAKE_TUPLE_SEQ(PreprocessCase::kRandomMethodResize) \
   OF_PP_MAKE_TUPLE_SEQ(PreprocessCase::kMirror)             \
   OF_PP_MAKE_TUPLE_SEQ(PreprocessCase::kCrop)               \
   OF_PP_MAKE_TUPLE_SEQ(PreprocessCase::kCenterCrop)         \
