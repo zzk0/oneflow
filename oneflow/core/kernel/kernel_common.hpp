@@ -15,6 +15,11 @@ namespace oneflow{
         KernelUtil<device_type, double>::Addition(
                 device_ctx, out->shape().elem_cnt(), out->mut_dptr<double>(), in->template dptr<double>()...);
     }
+    template<DeviceType device_type, typename T, typename... Args>
+    inline std::enable_if_t<std::is_same<T, int32_t>::value> Addition(DeviceCtx* device_ctx, Blob* out, Args... in) {
+        KernelUtil<device_type, int32_t>::Addition(
+                device_ctx, out->shape().elem_cnt(), out->mut_dptr<int32_t>(), in->template dptr<int32_t>()...);
+    }
 
     template<DeviceType device_type, typename T, typename... Args>
     inline void Addition(...) {

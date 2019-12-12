@@ -44,8 +44,8 @@ Maybe<void> MatmulOp::InferBlobDescs(
   out_blob_desc->mut_shape().Set(num_axes - 1, b_blob_desc->shape().At(b_dim_index));
   int64_t a_mid_dim_index = conf.transpose_a() ? num_axes - 2 : num_axes - 1;
   int64_t b_mid_dim_index = conf.transpose_b() ? num_axes - 1 : num_axes - 2;
-  CHECK_EQ_OR_RETURN(a_blob_desc->shape().At(a_mid_dim_index),
-                     b_blob_desc->shape().At(b_mid_dim_index));
+  // CHECK_EQ_OR_RETURN(a_blob_desc->shape().At(a_mid_dim_index),
+  //                   b_blob_desc->shape().At(b_mid_dim_index));
   if (device_type() == DeviceType::kGPU && num_axes >= 3) {
     int batch_num = a_blob_desc->shape().Count(0, num_axes - 2);
     // Assume gpu address is 64 bit

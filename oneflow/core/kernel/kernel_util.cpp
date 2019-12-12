@@ -556,6 +556,58 @@ KU_INTEGRAL_METHOD InitializeWithConf(DeviceCtx* ctx, const InitializerConf& ini
     UNIMPLEMENTED();
   }
 }
+KU_INTEGRAL_METHOD MulByScalar(DeviceCtx* ctx, const int64_t n, const T* x, const T* y, T* z) {
+  for (int64_t i = 0; i < n; ++i) { z[i] = x[i] * y[0]; }
+}
+KU_INTEGRAL_METHOD Mul(DeviceCtx* ctx, const int64_t n, const T* x, const T* y, T* z) {
+  for (int64_t i = 0; i < n; ++i) { z[i] = x[i] * y[i]; }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0) {
+  for (int64_t i = 0; i != n; ++i) { out[i] = in_0[i]; }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1) {
+  for (int64_t i = 0; i != n; ++i) { out[i] = in_0[i] + in_1[i]; }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2) {
+  for (int64_t i = 0; i != n; ++i) { out[i] = in_0[i] + in_1[i] + in_2[i]; }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3) {
+  for (int64_t i = 0; i != n; ++i) { out[i] = in_0[i] + in_1[i] + in_2[i] + in_3[i]; }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4) {
+  for (int64_t i = 0; i != n; ++i) { out[i] = in_0[i] + in_1[i] + in_2[i] + in_3[i] + in_4[i]; }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4, const T* in_5) {
+  for (int64_t i = 0; i != n; ++i) {
+    out[i] = in_0[i] + in_1[i] + in_2[i] + in_3[i] + in_4[i] + in_5[i];
+  }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4, const T* in_5,
+                            const T* in_6) {
+  for (int64_t i = 0; i != n; ++i) {
+    out[i] = in_0[i] + in_1[i] + in_2[i] + in_3[i] + in_4[i] + in_5[i] + in_6[i];
+  }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4, const T* in_5,
+                            const T* in_6, const T* in_7) {
+  for (int64_t i = 0; i != n; ++i) {
+    out[i] = in_0[i] + in_1[i] + in_2[i] + in_3[i] + in_4[i] + in_5[i] + in_6[i] + in_7[i];
+  }
+}
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4, const T* in_5,
+                            const T* in_6, const T* in_7, const T* in_8) {
+  for (int64_t i = 0; i != n; ++i) {
+    out[i] =
+        in_0[i] + in_1[i] + in_2[i] + in_3[i] + in_4[i] + in_5[i] + in_6[i] + in_7[i] + in_8[i];
+  }
+}
 
 #define INSTANTIATE_KERNEL_UTIL(type_cpp, type_proto)                                \
   template struct CpuKernelUtilIf<type_cpp, KernelUtil<DeviceType::kCPU, type_cpp>>; \

@@ -217,6 +217,7 @@ def batch_normalization(
         trainable=trainable,
         distribute=distribute_util.broadcast(),
     )
+    print(name + "-beta", beta.shape)
 
     op_conf = op_conf_util.OperatorConf()
     setattr(op_conf, "name", name)

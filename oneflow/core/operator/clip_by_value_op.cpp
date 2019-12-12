@@ -40,6 +40,45 @@ class ClipByValueOp final : public Operator {
   }
 };
 
+class ClipByValueGradOp final : public Operator {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(ClipByValueGradOp);
+  ClipByValueGradOp() = default;
+  ~ClipByValueGradOp() = default;
+
+  void InitFromOpConf() override {
+    CHECK(op_conf().has_clip_by_value_grad_conf());
+    EnrollInputBn("dy");
+    EnrollInputBn("x");
+    EnrollOutputBn("dx");
+  }
+  const PbMessage& GetCustomizedConf() const override {
+    return this->op_conf().clip_by_value_grad_conf();
+  }
+  Maybe<void> InferBlobDescs(std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+                             const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature,
+                             std::function<void(OpContext*)> EnrollOpCtx) const override {
+    // input
+    const BlobDesc* in = GetBlobDesc4BnInOp("dy");
+    // output
+    *GetBlobDesc4BnInOp("dx") = *in;
+    return Maybe<void>::Ok();
+  }
+
+ private:
+  Maybe<void> InferBatchAxis(
+      std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
+    return NaiveInferBatchAxis(BatchAxis4BnInOp);
+  }
+
+  Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override {
+    SbpSignatureBuilder().Split("dy", 0).Split("x", 0).Split("dx", 0).Build(
+        sbp_sig_list->mutable_sbp_signature()->Add());
+    return Maybe<void>::Ok();
+  }
+};
+
 REGISTER_OP(OperatorConf::kClipByValueConf, ClipByValueOp);
+REGISTER_OP(OperatorConf::kClipByValueGradConf, ClipByValueGradOp);
 
 }  // namespace oneflow

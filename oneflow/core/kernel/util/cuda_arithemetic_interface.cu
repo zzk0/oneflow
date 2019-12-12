@@ -18,6 +18,11 @@ __global__ void ExpGpu(const int64_t n, const T* x, T* y) {
   CUDA_1D_KERNEL_LOOP(i, n) { y[i] = std::exp(x[i]); }
 }
 
+template<typename T>
+__global__ void PowGpu(const int64_t n, const float power, const T* x, T* y) {
+  CUDA_1D_KERNEL_LOOP(i, n) { y[i] = std::pow(x[i], power); }
+}
+
 template<int32_t NDIMS>
 __device__ int32_t GetXIndex(const int32_t* y_shape, const int32_t* x_strides, int32_t y_idx) {
   int32_t x_idx = 0;
@@ -112,6 +117,16 @@ void ArithemeticIf<DeviceType::kGPU>::Transpose(DeviceCtx* ctx, const int32_t nu
                                            reinterpret_cast<half*>(y));
 }
 
+void ArithemeticIf<DeviceType::kGPU>::Transpose(DeviceCtx* ctx, const int32_t num_axis,
+                                                const Shape& x_shape, const Shape& y_shape,
+                                                const PbRf<int32_t>& permutation,
+                                                const int64_t elem_cnt, const int32_t* x,
+                                                int32_t* y) {
+  TRANSPOSE_CHECK;
+  TransposeUtil<int32_t>::SwitchTransposeImpl(SwitchCase(num_axis), ctx, x_shape, y_shape,
+                                              permutation, elem_cnt, x, y);
+}
+
 #undef TRANSPOSE_CHECK
 
 void ArithemeticIf<DeviceType::kGPU>::Exp(DeviceCtx* ctx, const int64_t n, const float* x,
@@ -124,6 +139,18 @@ void ArithemeticIf<DeviceType::kGPU>::Exp(DeviceCtx* ctx, const int64_t n, const
                                           double* y) {
   ExpGpu<double>
       <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, x, y);
+}
+
+void ArithemeticIf<DeviceType::kGPU>::Pow(DeviceCtx* ctx, const int64_t n, const float power,
+                                          const float* x, float* y) {
+  PowGpu<float>
+      <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, power, x, y);
+}
+
+void ArithemeticIf<DeviceType::kGPU>::Pow(DeviceCtx* ctx, const int64_t n, const float power,
+                                          const double* x, double* y) {
+  PowGpu<double>
+      <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, power, x, y);
 }
 
 // create temporary host blob store initializer result

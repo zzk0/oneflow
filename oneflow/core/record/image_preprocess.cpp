@@ -17,7 +17,8 @@ void ImagePreprocessImpl<PreprocessCase::kResize>::DoPreprocess(
   CHECK(preprocess_conf.has_resize());
   const ImageResize& conf = preprocess_conf.resize();
   cv::Mat dst;
-  cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_LINEAR);
+  // cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_LINEAR);
+  cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_NEAREST);
   *image = dst;
 }
 

@@ -645,6 +645,81 @@ KU_INTEGRAL_METHOD Axpy(DeviceCtx* ctx, const int n, const T alpha, const T* x, 
       n, alpha, x, incx, y, incy);
 }
 
+KU_INTEGRAL_METHOD MulByScalar(DeviceCtx* ctx, const int64_t n, const T* x, const T* y, T* z) {
+  MulByScalarGpu<T>
+      <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, x, y, z);
+}
+
+KU_INTEGRAL_METHOD Mul(DeviceCtx* ctx, const int64_t n, const T* x, const T* y, T* z) {
+  MulGpu<T>
+      <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, x, y, z);
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0) {
+  gpu_add<T>
+      <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, out, in_0);
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1) {
+  if (out == in_0) {
+    gpu_assign_add<T>
+        <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, out, in_1);
+  } else {
+    gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+        n, out, in_0, in_1);
+  }
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2) {
+  if (out == in_0) {
+    gpu_assign_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+        n, out, in_1, in_2);
+  } else {
+    gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+        n, out, in_0, in_1, in_2);
+  }
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3) {
+  gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+      n, out, in_0, in_1, in_2, in_3);
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4) {
+  gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+      n, out, in_0, in_1, in_2, in_3, in_4);
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4, const T* in_5) {
+  gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+      n, out, in_0, in_1, in_2, in_3, in_4, in_5);
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4, const T* in_5,
+                            const T* in_6) {
+  gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+      n, out, in_0, in_1, in_2, in_3, in_4, in_5, in_6);
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4, const T* in_5,
+                            const T* in_6, const T* in_7) {
+  gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+      n, out, in_0, in_1, in_2, in_3, in_4, in_5, in_6, in_7);
+}
+
+KU_INTEGRAL_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
+                            const T* in_2, const T* in_3, const T* in_4, const T* in_5,
+                            const T* in_6, const T* in_7, const T* in_8) {
+  gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+      n, out, in_0, in_1, in_2, in_3, in_4, in_5, in_6, in_7, in_8);
+}
+
 #define INSTANTIATE_KERNEL_UTIL(type_cpp, type_proto)                                \
   template struct GpuKernelUtilIf<type_cpp, KernelUtil<DeviceType::kGPU, type_cpp>>; \
   template struct KernelUtil<DeviceType::kGPU, type_cpp>;

@@ -251,6 +251,20 @@ def exp(x, name=None):
     lbi.blob_name = "out"
     return remote_blob_util.RemoteBlob(lbi)
 
+@oneflow_export('math.pow')
+def pow(x, power, name=None):
+    assert power is not None
+    op_conf = op_conf_util.OperatorConf()
+    setattr(op_conf, "name", name if name is not None else id_util.UniqueStr('Pow_'))
+    setattr(op_conf.pow_conf, "in", x.logical_blob_name)
+    setattr(op_conf.pow_conf, "power", power)
+    setattr(op_conf.pow_conf, "out", "out")
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+
 @oneflow_export("math.unsorted_segment_sum", "unsorted_segment_sum")
 def unsorted_segment_sum(data, segment_ids, num_segments, name=None):
     if name is None: name = id_util.UniqueStr("UnsortedSegmentSum_")

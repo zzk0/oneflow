@@ -776,6 +776,16 @@ message ReduceSumOpConf {
   optional bool keep_dims = 5 [default = false];
 }
 
+message DeviceReduceSumOpConf {
+  oneof in_conf {
+    string in = 1; // For User
+    LogicalBlobId in_sys = 2; // For System
+  }
+  required string out = 3;
+  repeated int32 axis = 4;
+  optional bool keep_dims = 5 [default = false];
+}
+
 message ReduceMaxOpConf {
   required string in = 1;
   required string out = 2;
@@ -1689,6 +1699,17 @@ message ClipByValueOpConf {
   required string out = 4;
 }
 
+message ClipByValueGradOpConf {
+  // in
+  required string dy = 1;
+  required string x = 2;
+  // conf
+  optional float min_val = 3;
+  optional float max_val = 4;
+  // out
+  required string dx = 5;
+}
+
 message AnchorGenerateOpConf {
   // in
   required string images = 1;
@@ -1696,16 +1717,30 @@ message AnchorGenerateOpConf {
   required int32 feature_map_stride = 2;
   repeated float aspect_ratios = 3;
   repeated float anchor_scales = 4;
+  optional float base_anchor_height = 5 [default = 1];
+  optional float base_anchor_width = 6 [default = 1];  
+  optional float anchor_x_offset = 7 [default = 0];  
+  optional float anchor_y_offset = 8 [default = 0]; 
+  optional float anchor_x_stride = 9 [default = 0];  
+  optional float anchor_y_stride = 10 [default = 0]; 
   // out
-  required string anchors = 5;
+  required string anchors = 11;
 }
 
 message CalcIoUMatrixOpConf {
   // in
-  required string boxes1= 1;
-  required string boxes2= 2;
+  required string boxes1 = 1;
+  required string boxes2 = 2;
   // out
   required string iou_matrix = 3;
+}
+
+message BatchCalcIoUMatrixOpConf {
+  // in
+  required string batch_boxes1 = 1;
+  required string boxes2= 2;
+  // out
+  required string iou_matrix = 3;  
 }
 
 message ArgmaxOpConf {
@@ -1807,6 +1842,27 @@ message SmoothL1GradOpConf {
   optional float scale = 4 [default = 1.0];
   required string dy = 5;
   required string dx = 6;
+}
+
+message SigmoidCrossEntropyOpConf {
+  required string prediction = 1;
+  required string label = 2;
+  required string loss = 3;
+  required DataType label_type = 4;
+}
+
+message SigmoidCrossEntropyGradOpConf {
+  required string prediction = 1;
+  required string label = 2;
+  required string prediction_diff = 3;
+  required string loss_diff = 4;
+  required DataType label_type = 5;
+}
+
+message PowOpConf {
+  required string in = 1;
+  required float power = 2;
+  required string out = 3;
 }
 
 message OperatorConf {
@@ -1978,6 +2034,10 @@ message OperatorConf {
     ConstantLikeOpConf constant_like_conf = 326;
     SmoothL1OpConf smooth_l1_conf = 327;
     SmoothL1GradOpConf smooth_l1_grad_conf = 328;
+    SigmoidCrossEntropyOpConf sigmoid_cross_entropy_conf = 329;
+    SigmoidCrossEntropyGradOpConf sigmoid_cross_entropy_grad_conf = 330;
+    ClipByValueGradOpConf clip_by_value_grad_conf = 331;
+    DeviceReduceSumOpConf device_reduce_sum_conf = 332;
 
     // math op
     BroadcastAddOpConf broadcast_add_conf = 500;
@@ -1999,12 +2059,14 @@ message OperatorConf {
     BroadcastGreaterEqualOpConf broadcast_greater_equal_conf = 516;
     BroadcastLogicalAndOpConf broadcast_logical_and_conf = 517;
     BroadcastMaxOpConf broadcast_max_conf = 518;
+    PowOpConf pow_conf = 519;
 
 
     //detection op
     AnchorGenerateOpConf anchor_generate_conf = 601;
     CalcIoUMatrixOpConf calc_iou_matrix_conf = 602;
     BoxEncodeOpConf box_encode_conf = 603;
+    BatchCalcIoUMatrixOpConf batch_calc_iou_matrix_conf = 604;
 
     // mutable input op
     AxpyOpConf axpy_conf = 752;

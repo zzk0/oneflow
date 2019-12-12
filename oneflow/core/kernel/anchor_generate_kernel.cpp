@@ -26,44 +26,45 @@ class AnchorGenerateKernel final : public KernelIf<DeviceType::kCPU> {
     const int32_t feature_map_width = std::ceil(static_cast<float>(batch_width) / fm_stride);
     auto scales_vec = PbRf2StdVec(conf.anchor_scales());
     auto ratios_vec = PbRf2StdVec(conf.aspect_ratios());
-    const size_t num_anchors = GenerateAnchors(fm_stride, feature_map_height, feature_map_width,
-                                               scales_vec, ratios_vec, anchors->mut_dptr<T>());
+    const size_t num_anchors =
+        GenerateAnchors(fm_stride, feature_map_height, feature_map_width, conf.base_anchor_height(),
+                        conf.base_anchor_width(), conf.anchor_x_offset(), conf.anchor_y_offset(),
+                        conf.anchor_x_stride(), conf.anchor_y_stride(), scales_vec, ratios_vec,
+                        anchors->mut_dptr<T>());
     CHECK_LE(num_anchors, anchors->static_shape().At(0));
   }
 
   size_t GenerateAnchors(float feature_map_stride, int32_t feature_map_height,
-                         int32_t feature_map_width, const std::vector<float>& scales_vec,
-                         const std::vector<float>& ratios_vec, T* anchors_ptr) const {
-    const float base_ctr = 0.5 * (feature_map_stride - 1);
-    const size_t num_anchors = scales_vec.size() * ratios_vec.size();
+                         int32_t feature_map_width, float base_anchor_height,
+                         float base_anchor_width, float anchor_x_offset, float anchor_y_offset,
+                         float anchor_x_stride, float anchor_y_stride,
+                         const std::vector<float>& scales_vec, const std::vector<float>& ratios_vec,
+                         T* anchors_ptr) const {
+    const float base_x_ctr = anchor_x_offset;
+    const float base_y_ctr = anchor_y_offset;
+    const size_t num_anchors = scales_vec.size();
     std::vector<T> base_anchors_vec(num_anchors * 4);
 
-    int save_round_way = std::fegetround();
-    CHECK_EQ(std::fesetround(FE_TONEAREST), 0);
-    // scale first, ratio last
     FOR_RANGE(int32_t, i, 0, ratios_vec.size()) {
-      const int32_t wr =
-          std::nearbyint(std::sqrt(feature_map_stride * feature_map_stride / ratios_vec.at(i)));
-      const int32_t hr = std::nearbyint(wr * ratios_vec.at(i));
-      const float scale = scales_vec.at(i) / feature_map_stride;
-      const int32_t ws = wr * scale;
-      const int32_t hs = hr * scale;
+      const float ratio_sqrt = std::sqrt(ratios_vec.at(i));
+      const float height = scales_vec.at(i) / ratio_sqrt * base_anchor_height;
+      const float width = scales_vec.at(i) * ratio_sqrt * base_anchor_width;
+
       const int32_t cur_anchor_idx = i;
-      base_anchors_vec[cur_anchor_idx * 4 + 0] = base_ctr - 0.5 * (ws - 1);  // x1
-      base_anchors_vec[cur_anchor_idx * 4 + 1] = base_ctr - 0.5 * (hs - 1);  // y1
-      base_anchors_vec[cur_anchor_idx * 4 + 2] = base_ctr + 0.5 * (ws - 1);  // x2
-      base_anchors_vec[cur_anchor_idx * 4 + 3] = base_ctr + 0.5 * (hs - 1);  // y2
+      base_anchors_vec[cur_anchor_idx * 4 + 0] = base_y_ctr - 0.5 * height;  // y1
+      base_anchors_vec[cur_anchor_idx * 4 + 1] = base_x_ctr - 0.5 * width;   // x1
+      base_anchors_vec[cur_anchor_idx * 4 + 2] = base_y_ctr + 0.5 * height;  // y2
+      base_anchors_vec[cur_anchor_idx * 4 + 3] = base_x_ctr + 0.5 * width;   // x2
     }
-    std::fesetround(save_round_way);
 
     FOR_RANGE(int32_t, h, 0, feature_map_height) {
       FOR_RANGE(int32_t, w, 0, feature_map_width) {
         auto* cur_anchor_ptr = anchors_ptr + (h * feature_map_width + w) * num_anchors * 4;
         FOR_RANGE(int32_t, i, 0, num_anchors) {
-          cur_anchor_ptr[i * 4 + 0] = base_anchors_vec[i * 4 + 0] + w * feature_map_stride;  // x1
-          cur_anchor_ptr[i * 4 + 1] = base_anchors_vec[i * 4 + 1] + h * feature_map_stride;  // y1
-          cur_anchor_ptr[i * 4 + 2] = base_anchors_vec[i * 4 + 2] + w * feature_map_stride;  // x2
-          cur_anchor_ptr[i * 4 + 3] = base_anchors_vec[i * 4 + 3] + h * feature_map_stride;  // y2
+          cur_anchor_ptr[i * 4 + 0] = base_anchors_vec[i * 4 + 0] + h * anchor_y_stride;  // y1
+          cur_anchor_ptr[i * 4 + 1] = base_anchors_vec[i * 4 + 1] + w * anchor_x_stride;  // x1
+          cur_anchor_ptr[i * 4 + 2] = base_anchors_vec[i * 4 + 2] + h * anchor_y_stride;  // y2
+          cur_anchor_ptr[i * 4 + 3] = base_anchors_vec[i * 4 + 3] + w * anchor_x_stride;  // x2
         }
       }
     }

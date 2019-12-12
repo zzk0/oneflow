@@ -9,7 +9,12 @@ void TransposeKernel<device_type, T>::ForwardDataContent(
                             this->kernel_conf().transpose_conf().perm());
 }
 
-ADD_DEFAULT_KERNEL_CREATOR_WITH_GPU_HALF(OperatorConf::kTransposeConf, TransposeKernel,
-                                         FLOATING_DATA_TYPE_SEQ);
-
+#define REGISTER_TRANSPOSE_KERNEL(dev, dtype)                                     \
+  REGISTER_KERNEL_WITH_DEVICE_AND_DTYPE(OperatorConf::kTransposeConf, dev, dtype, \
+                                        TransposeKernel<dev, dtype>)
+REGISTER_TRANSPOSE_KERNEL(DeviceType::kGPU, int32_t);
+REGISTER_TRANSPOSE_KERNEL(DeviceType::kGPU, float);
+REGISTER_TRANSPOSE_KERNEL(DeviceType::kGPU, double);
+REGISTER_TRANSPOSE_KERNEL(DeviceType::kCPU, float);
+REGISTER_TRANSPOSE_KERNEL(DeviceType::kCPU, double);
 }  // namespace oneflow

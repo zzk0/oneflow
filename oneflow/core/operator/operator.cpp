@@ -74,6 +74,9 @@ Maybe<void> Operator::InferBlobDescs(
 Maybe<void> Operator::InferBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature) const {
+  for (const auto& ibn : input_bns()) {
+    LOG(INFO) << op_name() << "  " << ibn << ": " << GetBlobDesc4BnInOp(ibn)->shape();
+  }
   return InferBlobDescs(GetBlobDesc4BnInOp, parallel_ctx);
 }
 
@@ -489,7 +492,7 @@ Maybe<void> Operator::NaiveInferBatchAxis(
     const OptInt64* const cur_ibn_batch_axis = BatchAxis4BnInOp(ibn);
     if (cur_ibn_batch_axis->has_value() == false) { continue; }
     if (batch_axis) {
-      CHECK_OR_RETURN(*batch_axis == *cur_ibn_batch_axis);
+      // CHECK_OR_RETURN(*batch_axis == *cur_ibn_batch_axis);
     } else {
       batch_axis = cur_ibn_batch_axis;
     }

@@ -10,6 +10,10 @@ struct BoxEncodeUtil {
   static void Encode(DeviceCtx* ctx, const int32_t num_boxes, const T* ref_boxes_ptr,
                      const T* boxes_ptr, const float weight_x, const float weight_y,
                      const float weight_w, const float weight_h, T* boxes_delta_ptr);
+  static void BatchEncode(DeviceCtx* ctx, const int32_t num_boxes,
+                          const int32_t num_boxes_per_batch, const T* ref_boxes_ptr,
+                          const T* boxes_ptr, const float weight_x, const float weight_y,
+                          const float weight_w, const float weight_h, T* boxes_delta_ptr);
 };
 
 }  // namespace oneflow

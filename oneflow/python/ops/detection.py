@@ -101,6 +101,24 @@ def calc_iou_matrix(boxes1, boxes2, name=None):
     lbi.blob_name = "iou_matrix"
     return remote_blob_util.RemoteBlob(lbi)
 
+@oneflow_export("detection.batch_calc_iou_matrix")
+def batch_calc_iou_matrix(boxes1, boxes2, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("CalcIoUMatrix_"),
+    )
+    assert len(boxes1.shape) == 3
+    assert len(boxes2.shape) == 2
+    op_conf.batch_calc_iou_matrix_conf.batch_boxes1 = boxes1.logical_blob_name
+    op_conf.batch_calc_iou_matrix_conf.boxes2 = boxes2.logical_blob_name
+    op_conf.batch_calc_iou_matrix_conf.iou_matrix = "iou_matrix"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "iou_matrix"
+    return remote_blob_util.RemoteBlob(lbi)
 
 @oneflow_export("detection.box_encode")
 def box_encode(ref_boxes, boxes, regression_weights, name=None):
@@ -186,7 +204,7 @@ def level_map(
 
 @oneflow_export("detection.anchor_generate")
 def anchor_generate(
-    images, feature_map_stride, aspect_ratios, anchor_scales, name=None
+    images, feature_map_stride, aspect_ratios, anchor_scales, base_anchor_height=None, base_anchor_width=None, anchor_x_stride=None, anchor_y_stride=None, anchor_x_offset=None, anchor_y_offset=None, name=None
 ):
     op_conf = op_conf_util.OperatorConf()
     setattr(
@@ -202,6 +220,18 @@ def anchor_generate(
     op_conf.anchor_generate_conf.feature_map_stride = feature_map_stride
     op_conf.anchor_generate_conf.aspect_ratios.extend(aspect_ratios)
     op_conf.anchor_generate_conf.anchor_scales.extend(anchor_scales)
+    if base_anchor_height is not None:
+        op_conf.anchor_generate_conf.base_anchor_height = base_anchor_height
+    if base_anchor_width is not None:
+        op_conf.anchor_generate_conf.base_anchor_width = base_anchor_width
+    if anchor_x_offset is not None:
+        op_conf.anchor_generate_conf.anchor_x_offset = anchor_x_offset
+    if anchor_y_offset is not None:
+        op_conf.anchor_generate_conf.anchor_y_offset = anchor_y_offset
+    if anchor_x_stride is not None:
+        op_conf.anchor_generate_conf.anchor_x_stride = anchor_x_stride
+    if anchor_y_stride is not None:
+        op_conf.anchor_generate_conf.anchor_y_stride = anchor_y_stride
     op_conf.anchor_generate_conf.anchors = "anchors"
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
