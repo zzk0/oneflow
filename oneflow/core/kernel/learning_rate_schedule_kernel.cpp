@@ -183,7 +183,15 @@ void LearningRateScheduleKernel::ForwardDataContent(
   if (TriggerWarmup(conf, learning_rate, next_model_vid)) {
     learning_rate = GetWarmupLearningRate(conf.warmup_conf(), learning_rate, next_model_vid);
   } else if (conf.has_learning_rate_decay()) {
-    learning_rate = GetDecayedLearningRate(conf.learning_rate_decay(), learning_rate, train_step);
+    int64_t lr_step = train_step;
+    if (conf.has_warmup_conf()) {
+      if (conf.warmup_conf().has_constant_conf()) {
+        lr_step = train_step - conf.warmup_conf().constant_conf().warmup_batches();
+      } else if (conf.warmup_conf().has_linear_conf()) {
+        lr_step = train_step - conf.warmup_conf().linear_conf().warmup_batches();
+      }
+    }
+    learning_rate = GetDecayedLearningRate(conf.learning_rate_decay(), learning_rate, lr_step);
   }
   *BnInOp2Blob("out")->mut_dptr<float>() = learning_rate;
 }

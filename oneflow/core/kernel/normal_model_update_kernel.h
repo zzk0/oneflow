@@ -28,6 +28,7 @@ class NormalMdUpdateKernel : public KernelIf<device_type> {
   NormalModelUpdateOpUserConf user_conf_;
   T l1_;
   T l2_;
+  std::unique_ptr<NormalizeConf> normalize_conf_;
 };
 
 template<DeviceType device_type, typename T>
