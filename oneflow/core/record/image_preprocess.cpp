@@ -30,9 +30,9 @@ void ImagePreprocessImpl<PreprocessCase::kRandomMethodResize>::DoPreprocess(
   const int32_t method = NextRandomInt() % 4;
   if (method == 0) {
     cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_LINEAR);
-  } else if(method == 1) {
+  } else if (method == 1) {
     cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_NEAREST);
-  } else if(method == 2) {
+  } else if (method == 2) {
     cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_CUBIC);
   } else {
     cv::resize(*image, dst, cv::Size(conf.width(), conf.height()), 0, 0, cv::INTER_AREA);

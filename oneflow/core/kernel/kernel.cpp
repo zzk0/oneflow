@@ -111,25 +111,28 @@ void Kernel::Forward(const KernelCtx& ctx,
     if (kernel_conf_.need_do_col_num()) { ForwardColNum(ctx, BnInOp2Blob); }
   }
   if (kernel_conf_.parallel_id() == 0 || kernel_conf_.parallel_id() == 1) {
-    for(std::string bn: op_attribute().output_bns()) {
+    for (std::string bn : op_attribute().output_bns()) {
       const Blob* a = BnInOp2Blob(bn);
-      if(a!= nullptr && a->ByteSizeOfDataContentField()>0 && !a->blob_desc().is_body_disabled() &&(a->data_type() == DataType::kFloat) && op_conf().device_type() == DeviceType::kGPU && a->mem_case().has_device_cuda_mem()){
+      if (a != nullptr && a->ByteSizeOfDataContentField() > 0 && !a->blob_desc().is_body_disabled()
+          && (a->data_type() == DataType::kFloat) && op_conf().device_type() == DeviceType::kGPU
+          && a->mem_case().has_device_cuda_mem()) {
         char* host_raw_dptr = nullptr;
-        //std::cout<<op_conf().name()<<std::endl;
+        // std::cout<<op_conf().name()<<std::endl;
         CudaCheck(cudaMallocHost(&host_raw_dptr, a->ByteSizeOfDataContentField()));
-        Memcpy<DeviceType::kGPU>(ctx.device_ctx, host_raw_dptr,  a->dptr(),
+        Memcpy<DeviceType::kGPU>(ctx.device_ctx, host_raw_dptr, a->dptr(),
                                  a->ByteSizeOfDataContentField(), cudaMemcpyDeviceToHost);
         CudaCheck(cudaStreamSynchronize(ctx.device_ctx->cuda_stream()));
         float* data = reinterpret_cast<float*>(host_raw_dptr);
-        //for(int i = 0; i < 10; ++i) {
-        if (a->blob_desc().shape().elem_cnt()>=5){
-          LOG(INFO) <<" gpu: "<<kernel_conf_.parallel_id()<<" op: "<<op_conf().name()<<" "<<bn<<"  " << data[0]<<"  " << data[1]<<"  " << data[2]<<"  " << data[3]<<"  " << data[4];
+        // for(int i = 0; i < 10; ++i) {
+        if (a->blob_desc().shape().elem_cnt() >= 5) {
+          LOG(INFO) << " gpu: " << kernel_conf_.parallel_id() << " op: " << op_conf().name() << " "
+                    << bn << "  " << data[0] << "  " << data[1] << "  " << data[2] << "  "
+                    << data[3] << "  " << data[4];
         }
         CudaCheck(cudaFreeHost(host_raw_dptr));
       }
     }
   }
-
 }
 
 template<DeviceType device_type>
