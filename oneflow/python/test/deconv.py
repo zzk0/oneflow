@@ -61,12 +61,12 @@ def test_deconv_2d_forward_tf(dilation=1, padding='SAME', output_shape=6, stride
     sess = tf.Session()
     tf.global_variables_initializer().run(session=sess)
     tf_out = tf_out.eval(session=sess)
-    print(tf_out.shape)
+    print(type(of_out-tf_out))
 
-    if np.allclose(of_out, tf_out, atol=1e-3):
-        print("pass forward test!")
-    else:
-        print("failed")
+    # if np.allclose(of_out, tf_out, atol=1e-3):
+    #     print("pass forward test!")
+    # else:
+    #     print("failed")
 
 
 def test_deconv_2d_backward():

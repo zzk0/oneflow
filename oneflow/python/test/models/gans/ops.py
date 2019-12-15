@@ -1,17 +1,24 @@
 import oneflow as flow
 import oneflow.python.framework.id_util as id_util
+import oneflow.python.framework.distribute as distribute_util
+import oneflow.python.framework.compile_context as compile_context
+import oneflow.core.register.logical_blob_id_pb2 as logical_blob_id_util
+import oneflow.python.framework.remote_blob as remote_blob_util
+import oneflow.core.operator.op_conf_pb2 as op_conf_util
 import os
 import numpy as np
+from PIL import Image
     
 
 def deconv2d(input, output_shape,
              k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
-             name=None, trainable=True):
-    name = name if name is not None else id_util.UniqueStr("Deconv2d_")
+             name=None, trainable=True, reuse=False):
+    assert name is not None
+    name_ = name if reuse == False else name + "_reuse"
     # weight : [in_channels, height, width, out_channels]
     weight_shape = (input.static_shape[3], k_h, k_w, output_shape[3])
     weight = flow.get_variable(
-        id_util.UniqueStr(name + "-weight"),
+        name + "-weight",
         shape=weight_shape,
         dtype=input.dtype,
         initializer=flow.random_normal_initializer(stddev=0.02),
@@ -19,7 +26,7 @@ def deconv2d(input, output_shape,
     )
 
     output = flow.nn.conv2d_transpose(input, weight, strides=[d_h, d_w], output_shape=output_shape[-3:-1],
-                                      padding="SAME", data_format="NHWC")
+                                      padding="SAME", data_format="NHWC", name=name_)
     
     bias = flow.get_variable(
         name + "-bias",
@@ -33,8 +40,10 @@ def deconv2d(input, output_shape,
 
 def conv2d(input, output_dim, 
        k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
-       name=None, trainable=True):
-    name = name if name is not None else id_util.UniqueStr("Conv2d_")
+       name=None, trainable=True, reuse=False):
+    assert name is not None
+    name_ = name if reuse == False else name + "_reuse"
+
     weight_shape = (output_dim, k_h, k_w, input.static_shape[3])
     weight = flow.get_variable(name + "-weight",
                             shape=weight_shape,
@@ -44,7 +53,7 @@ def conv2d(input, output_dim,
                             )
 
     output = flow.nn.conv2d(input, weight, strides=[d_h, d_w], 
-                            padding="SAME", data_format="NHWC", name=name)
+                            padding="SAME", data_format="NHWC", name=name_)
 
     bias = flow.get_variable(
         name + "-bias",
@@ -56,22 +65,29 @@ def conv2d(input, output_dim,
     output = flow.nn.bias_add(output, bias, "NHWC")
     return output
 
-def batch_norm(input, name=None, trainable=True):
-    name = name if name is not None else id_util.UniqueStr("BatchNorm_")
-    return flow.layers.batch_normalization(
-        inputs=input,
-        axis=1,
-        momentum=0.9,
-        epsilon=1e-4,
-        center=True,
-        scale=True,
-        trainable=trainable,
-        name=name,
-    )
+# def batch_norm(input, name=None, trainable=True, reuse=False):
+#     assert name is not None
+#     name_ = name if reuse == False else name + "_reuse"
+#     return flow.layers.batch_normalization(
+#         inputs=input,
+#         axis=3,
+#         momentum=0.9,
+#         epsilon=1e-4,
+#         center=True,
+#         scale=True,
+#         trainable=trainable,
+#         name=name_,
+#     )
+
+def batch_norm(input, name=None, trainable=True, reuse=False):
+    # do nothing
+    return input
 
 
-def linear(input, units, name=None, trainable=True):
-    name = name if name is not None else id_util.UniqueStr("BatchNorm_")
+def linear(input, units, name=None, trainable=True, reuse=False):
+    assert name is not None
+    name_ = name if reuse == False else name + "_reuse"
+
     in_shape = input.static_shape
     in_num_axes = len(in_shape)
     assert in_num_axes >= 2
@@ -93,7 +109,7 @@ def linear(input, units, name=None, trainable=True):
         a=inputs,
         b=weight,
         transpose_b=True,
-        name="{}_matmul".format(name),
+        name=name_ + "matmul",
     )
 
     bias = flow.get_variable(
@@ -106,7 +122,7 @@ def linear(input, units, name=None, trainable=True):
     )
 
     out = flow.nn.bias_add(
-        out, bias, name="{}_bias_add".format(name)
+        out, bias, name=name_ + "_bias_add"
     )
 
     out = (
@@ -160,9 +176,9 @@ def load_mnist(data_dir='./data', dataset_name='mnist'):
     
     return X/255., y_vec
 
-def load_images(data_dir="/dataset/mnist/of_mnist_repeat_1024"):
+def load_images(data_dir="/dataset/PNGS/PNG227/of_record_repeated"):
     image_blob_conf = flow.data.BlobConf(
-    "img_raw",
+    "encoded",
     shape=(64, 64, 3),
     dtype=flow.float,
     codec=flow.data.ImageCodec([flow.data.ImagePreprocessor("bgr2rgb"),
@@ -172,52 +188,84 @@ def load_images(data_dir="/dataset/mnist/of_mnist_repeat_1024"):
     )
 
     label_blob_conf = flow.data.BlobConf(
-    "label", shape=(), dtype=flow.int32, codec=flow.data.RawCodec()
+    "class/label", shape=(), dtype=flow.int32, codec=flow.data.RawCodec()
     )
 
     return flow.data.decode_ofrecord(
     data_dir, (label_blob_conf, image_blob_conf,),
-    batch_size=8, data_part_num=1, name="decode"
+    batch_size=8, data_part_num=8, name="decode"
     )
+
 
 if __name__ == "__main__":
 
-    @flow.function
-    def test_deconv2d(input=flow.input_blob_def((5, 3, 3, 4))):
-        output = deconv2d(input, output_shape=[5, 6, 6, 8])
-        return output
+    # @flow.function
+    # def test_deconv2d(input=flow.input_blob_def((5, 3, 3, 4))):
+    #     output_shape = [5, 6, 6, 8]
+    #     output = deconv2d(input, output_shape=output_shape)
+    #     return output
 
-    @flow.function
-    def test_conv2d(input=flow.input_blob_def((5, 6, 6, 8))):
-        output = conv2d(input, output_dim=4)
-        return output
+    # @flow.function
+    # def test_deconv2d(input=flow.input_blob_def((5, 3, 3, 4))):
+    #     output_shape = [5, 6, 6, 8]
+    #     output = deconv2d(input, output_shape=output_shape)
+    #     return output
+
+    # @flow.function
+    # def test_conv2d(input=flow.input_blob_def((5, 6, 6, 8))):
+    #     output = conv2d(input, output_dim=4)
+    #     return output
     
-    @flow.function
-    def test_lrelu(input=flow.input_blob_def((3,))):
-        output = lrelu(input)
-        return output
+    # @flow.function
+    # def test_lrelu(input=flow.input_blob_def((3,))):
+    #     output = lrelu(input)
+    #     return output
 
     @flow.function
     def test_load_images():
         return load_images()
 
-    flow.config.gpu_device_num(1)
-    flow.config.default_data_type(flow.float32)
-    check_point = flow.train.CheckPoint()
-    check_point.init()
+    @flow.function
+    def test_sigmoid_cross_entropy_with_logits(logits=flow.input_blob_def((5, 3,)),
+                                               labels=flow.input_blob_def((5, 3))):
+        # logits = flow.keras.activations.sigmoid(logits)
+        of_out = flow.nn.sigmoid_cross_entropy_with_logits(labels, logits)             
+        return of_out
+    # flow.config.gpu_device_num(1)
+    # flow.config.default_data_type(flow.float32)
+    # check_point = flow.train.CheckPoint()
+    # check_point.init()
 
     # print(test_deconv2d(np.random.randn(5,3,3,4).astype(np.float32)).get().shape)
     # print(test_conv2d(np.random.randn(5,6,6,8).astype(np.float32)).get().shape)
     # inputs=np.random.randn(3).astype(np.float32)
     # print(inputs)
     # print(test_lrelu(inputs).get())
-    # labels, images = test_load_images().get()
-    # import matplotlib.pyplot as plt
-    # print(images[1][0][:10])
-    # print(np.max(images[1]))
-    # plt.imsave("test.png", images[1]/(2*np.max(abs(images[1])))+0.5)
-    # print(images.shape)
 
-    x, y = load_mnist()
-    print(x.shape)
-    print(y.shape)
+    # test load images
+    # labels, images = test_load_images().get()
+    # print(images)
+    # import matplotlib.pyplot as plt
+    # plt.imsave("test.png", images[1]/(2*np.max(abs(images[1])))+0.5)
+
+    # test load mnist
+    # images, y = load_mnist()
+    # images = np.squeeze(images)
+    # import matplotlib.pyplot as plt
+    # plt.imsave("test.png", images[1]/(2*np.max(abs(images[1])))+0.5)
+    # print(x.shape)
+    # print(y.shape)
+
+    # test sigmoid
+    logits = np.random.randn(5,3).astype(np.float32)
+    labels = np.zeros((5,3)).astype(np.float32)
+    of_out = test_sigmoid_cross_entropy_with_logits(logits, labels).get()
+    print("of_out:", of_out)
+    import tensorflow as tf
+    logits = tf.convert_to_tensor(logits)
+    labels = tf.convert_to_tensor(labels)
+    tf_out = tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=labels)
+    sess = tf.Session()
+    tf_out = tf_out.eval(session=sess)
+    print("tf_out:", tf_out)
+    print(tf_out-of_out)
