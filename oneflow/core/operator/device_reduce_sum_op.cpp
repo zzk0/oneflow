@@ -27,8 +27,7 @@ class DeviceReduceSumOp final : public Operator {
     *GetBlobDesc4BnInOp("fw_tmp") = *in_blob;
     BlobDesc* out_blob = GetBlobDesc4BnInOp("out");
     out_blob->set_data_type(in_blob->data_type());
-    out_blob->mut_shape() = {parallel_ctx->parallel_num()};
-    LOG(INFO) << "out_blob->mut_shape()" << parallel_ctx->parallel_num();
+    out_blob->mut_shape() = {in_blob->shape().At(0)};
     return Maybe<void>::Ok();
   }
 

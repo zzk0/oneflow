@@ -25,7 +25,7 @@ void ImagePreprocessImpl<PreprocessCase::kRandomMethodResize>::DoPreprocess(
     cv::Mat* image, const ImagePreprocess& preprocess_conf,
     std::function<int32_t(void)> NextRandomInt) const {
   CHECK(preprocess_conf.has_random_method_resize());
-  const ImageResize& conf = preprocess_conf.random_method_resize();
+  const ImageRandomMethodResize& conf = preprocess_conf.random_method_resize();
   cv::Mat dst;
   const int32_t method = NextRandomInt() % 4;
   if (method == 0) {
