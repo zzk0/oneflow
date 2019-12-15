@@ -11,7 +11,6 @@ import oneflow.python.framework.distribute as distribute_util
 from oneflow.python.oneflow_export import oneflow_export
 from functools import reduce
 import numpy as np
-import collections
 import oneflow
 
 @oneflow_export('input_blob_def')
@@ -21,13 +20,13 @@ class input_blob_def(blob_desc.BlobDesc):
                  is_dynamic = False,
                  num_of_lod_levels = 0,
                  batch_axis = 0,
-                 distribute = distribute_util.auto(),
-                 name = None):
+                 name = None,
+                 **kw):
         lbi = lbi_util.LogicalBlobId()
         if name is None: name = id_util.UniqueStr("Input_")
         lbi.op_name = name
         lbi.blob_name = "out"
-        blob_desc.BlobDesc.__init__(self,lbi)
+        blob_desc.BlobDesc.__init__(self, lbi, **kw)
         assert type(shape) is tuple
         for dim in shape: assert type(dim) is int
         self.shape_ = shape
@@ -38,7 +37,6 @@ class input_blob_def(blob_desc.BlobDesc):
             assert num_of_lod_levels <= len(shape)
         self.num_of_lod_levels_ = num_of_lod_levels
         self.batch_axis_ = batch_axis
-        self.distribute_ = distribute
 
     @property
     def static_shape(self): return self.shape_
@@ -57,9 +55,9 @@ class input_blob_def(blob_desc.BlobDesc):
 
     @property
     def num_of_lod_levels(self): return self.num_of_lod_levels_
-    
-    @property
-    def parallel_conf(self): return None
+
+    def parallel_conf(self):
+        TODO()
 
     def with_distribute(self, distribute):
         return input_blob_def(shape = self.shape_, dtype = self.dtype_,               \

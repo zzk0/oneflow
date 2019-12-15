@@ -7,6 +7,7 @@ import "oneflow/core/record/image.proto";
 import "oneflow/core/record/record.proto";
 import "oneflow/core/job/resource.proto";
 import "oneflow/core/register/logical_blob_id.proto";
+import "oneflow/core/data/data.proto";
 
 enum ActivationType {
   kNone = 0;
@@ -412,7 +413,8 @@ message SigmoidCrossEntropyGradOpConf {
   required string prediction = 1;
   required string label = 2;
   required string prediction_diff = 3;
-  required DataType label_type = 4;
+  required string loss_diff = 4;
+  required DataType label_type = 5;
 }
 
 message IdentityLossOpConf {
@@ -439,6 +441,16 @@ message DistributeSplitOpConf {
   required string in = 1;
   repeated string out = 2;
   required int32 axis = 3;
+}
+
+message DistributeCloneOpConf {
+  required string in = 1;
+  repeated string out = 2;
+}
+
+message DistributeAddOpConf {
+  repeated string in = 1;
+  required string out = 2;
 }
 
 message SplitLikeOpConf {
@@ -883,6 +895,7 @@ message EncodeBytesList {
 
 message EncodeRaw {
   optional bool dim1_varying_length = 1 [default = false];
+  optional bool auto_zero_padding = 2 [default = false];
 }
 
 message EncodeJpeg {
@@ -933,6 +946,18 @@ message BlobConf {
   optional int32 max_sequence_size = 4 [default = 1];
   required EncodeConf encode_case = 5;
   repeated PreprocessConf preprocess = 6;
+  repeated int32 variable_length_axes = 7;
+  optional DataSourceCase data_source = 8;
+  optional bool is_dynamic = 9 [default = false];
+}
+
+message DataLoadOpConf {
+  required int64 batch_size = 1;
+  optional string tick = 2;
+  required DatasetProto dataset = 3;
+  repeated BlobConf blobs = 4;
+  repeated DataTransformProto transforms = 5;
+  optional int32 batch_cache_size = 6 [default = 3];
 }
 
 message DecodeOFRecordOpConf {
@@ -992,20 +1017,26 @@ message NormalizationGradOpConf {
   required float epsilon = 10;
 }
 
-message DropoutOpConf {
-  required string in = 1;
+message RandomMaskLikeOpConf {
+  required string like = 1;
   required string out = 2;
   required double rate = 3;
   optional ShapeProto noise_shape = 4;
   optional int64 seed = 5;
-  optional string random_mask = 6 [default = "random_mask"];
+}
+
+message DropoutOpConf {
+  required string mask = 1;
+  required string in = 2;
+  required string out = 3;
+  required float scale = 4;
 }
 
 message DropoutGradOpConf {
-  required string random_mask = 1;
+  required string mask = 1;
   required string dy = 2;
   required string dx = 3;
-  required double rate = 4;
+  required float scale = 4;
 }
 
 message TransposeOpConf {
@@ -1318,6 +1349,12 @@ message DimSliceConf {
 }
 
 message SliceOpConf {
+  required string in = 1;
+  required string out = 2;
+  repeated DimSliceConf dim_slice_conf = 3;
+}
+
+message SliceV2OpConf {
   required string in = 1;
   required string out = 2;
   repeated DimSliceConf dim_slice_conf = 3;
@@ -1799,7 +1836,7 @@ message NonMaximumSuppressionOpConf {
   required string out = 2;
   // conf
   optional float nms_iou_threshold = 3 [default = 0.7];
-  optional int32 post_nms_top_n = 4 [default = 1000];
+  optional int32 post_nms_top_n = 4 [default = -1];
 }
 
 message DynamicReshapeOpConf {
@@ -1925,6 +1962,36 @@ message ArgmaxOpConf {
   required string out = 2;
 }
 
+message MaskrcnnSplitOpConf {
+  required string in = 1;
+  repeated string segm = 2;
+  repeated string out = 3;
+}
+
+message MasksCropAndResizeOpConf {
+  // input
+  required string masks = 1;
+  required string rois = 2;
+  // output
+  required string out = 3;
+  // conf
+  required int32 mask_height = 4;
+  required int32 mask_width = 5;
+}
+
+message ParallelCastOpConf {
+  required string in = 1;
+  required string out = 2;
+  optional OptInt64 split_axis = 3;
+  optional OptInt64 gradient_split_axis = 4;
+}
+
+message RandomLikeOpConf {
+  required string like = 1;
+  required string out = 2;
+  optional int64 random_seed = 3;
+}
+
 message OperatorConf {
   required string name = 1;
   optional bool trainable = 3 [default = true];
@@ -1937,7 +2004,8 @@ message OperatorConf {
     DecodeOFRecordOpConf decode_ofrecord_conf = 101;
     DecodeRandomOpConf decode_random_conf = 102;
     RecordLoadOpConf record_load_conf = 103;
-    CopyHdOpConf copy_hd_conf = 104;
+    DataLoadOpConf data_load_conf = 104;
+    CopyHdOpConf copy_hd_conf = 105;
     CopyCommNetOpConf copy_comm_net_conf = 106;
     ConcatOpConf concat_conf = 107;
     BoxingOpConf boxing_conf = 108;
@@ -1987,6 +2055,8 @@ message OperatorConf {
     NcclBoxingAllReduceOpConf nccl_boxing_all_reduce_conf = 154;
     DistributeConcatOpConf distribute_concat_conf = 155;
     DistributeSplitOpConf distribute_split_conf = 156;
+    DistributeCloneOpConf distribute_clone_conf = 157;
+    DistributeAddOpConf distribute_add_conf = 158;
     
     // domain op
     TupleIdentityOpConf tuple_identity_conf = 200;
@@ -2001,6 +2071,7 @@ message OperatorConf {
     MaxPooling2DOpConf max_pooling_2d_conf = 211;
     AveragePooling3DOpConf average_pooling_3d_conf = 212;
     MaxPooling3DOpConf max_pooling_3d_conf = 213;
+    RandomMaskLikeOpConf random_mask_like_conf = 214;
     LocalResponseNormalizationOpConf local_response_normalization_conf = 216;
     NormalizationOpConf normalization_conf = 217;
     DropoutOpConf dropout_conf = 218;
@@ -2104,9 +2175,10 @@ message OperatorConf {
     SleepOpConf sleep_conf = 333;
     LoDToDenseOpConf lod_to_dense_conf = 334;
     Dim0DynamicToFixedOpConf dim0_dynamic_to_fixed_conf = 335;
-    BroadcastMaximumGradOpConf broadcast_maximum_grad_conf = 336;
-    LeakyReluOpConf leaky_relu_conf = 337;
-    LeakyReluGradOpConf leaky_relu_grad_conf = 338;
+    ParallelCastOpConf parallel_cast_conf = 336;
+    SliceV2OpConf slice_v2_conf = 337;
+    LeakyReluOpConf leaky_relu_conf = 338;
+    LeakyReluGradOpConf leaky_relu_grad_conf = 339;
 
     // math op
     BroadcastAddOpConf broadcast_add_conf = 500;
@@ -2129,6 +2201,7 @@ message OperatorConf {
     ScalarMulOpConf scalar_mul_conf = 517;
     ReduceMaxOpConf reduce_max_conf = 518;
     ArgmaxOpConf argmax_conf = 519;
+    RandomLikeOpConf random_like_conf = 520;
 
     // detection op
     MaskrcnnPositiveNegativeSampleOpConf maskrcnn_positive_negative_sample_conf = 601;
@@ -2144,6 +2217,8 @@ message OperatorConf {
     NonMaximumSuppressionOpConf non_maximum_suppression_conf = 611;
     RoiAlignOpConf roi_align_conf = 612;
     RoiAlignGradOpConf roi_align_grad_conf = 613;
+    MaskrcnnSplitOpConf maskrcnn_split_conf = 614;
+    MasksCropAndResizeOpConf masks_crop_and_resize_conf = 615;
 
     // mutable input op
     AxpyOpConf axpy_conf = 752;

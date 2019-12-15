@@ -23,7 +23,7 @@ class LevelMapOp final : public Operator {
     BlobDesc* out = GetBlobDesc4BnInOp("out");
     *out = *in;
     out->mut_shape() =
-        Shape(std::vector<int64_t>(in->shape().dim_vec().begin(), in->shape().dim_vec().end() - 1));
+        Shape(DimVector(in->shape().dim_vec().begin(), in->shape().dim_vec().end() - 1));
     out->set_data_type(DataType::kInt32);
 
     return Maybe<void>::Ok();
@@ -37,6 +37,12 @@ class LevelMapOp final : public Operator {
   Maybe<void> InferBatchAxis(
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
     return NaiveInferBatchAxis(BatchAxis4BnInOp);
+  }
+
+  Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override {
+    SbpSignatureBuilder().Split("in", 0).Split("out", 0).Build(
+        sbp_sig_list->mutable_sbp_signature()->Add());
+    return Maybe<void>::Ok();
   }
 };
 

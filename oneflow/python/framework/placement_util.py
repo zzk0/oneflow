@@ -48,9 +48,9 @@ class PlacementScope(object):
     def __exit__(self, *args):
         assert self == placement_context.PlacementScopeStackPop()
 
-@oneflow_export('current_placement_scope.parallel_size')
-def cur_placement_scope_parallel_num():
-    return placement_context.PlacementScopeStackTop().parallel_size
+@oneflow_export('placement.current_scope')
+def cur_placement_scope():
+    return placement_context.PlacementScopeStackTop()
 
 @oneflow_export('fixed_placement')
 class FixedPlacementScope(PlacementScope):
@@ -92,25 +92,26 @@ def GetDefaultMachineDeviceIds(resource):
         raise NotImplementedError
 
 def GetGpuDefaultMachineDeviceIds(resource):
-    assert len(resource.machine) > 0
+    assert resource.machine_num > 0
     assert resource.HasField('gpu_device_num')
-    return ["%s:0-%s" % (m.id, resource.gpu_device_num - 1) for m in resource.machine]
+    return ["%s:0-%s" % (m_id, resource.gpu_device_num - 1) for m_id in range(resource.machine_num)]
 
 def GetCpuDefaultMachineDeviceIds(resource):
-    assert len(resource.machine) > 0
+    assert resource.machine_num > 0
     assert resource.HasField('cpu_device_num')
-    return ["%s:0-%s" % (m.id, resource.cpu_device_num - 1) for m in resource.machine]
+    return ["%s:0-%s" % (m_id, resource.gpu_device_num - 1) for m_id in range(resource.machine_num)]
 
 def _MakeMachineId2DeviceIdList(parallel_conf):
     parallel_conf_str = str(parallel_conf)
     if parallel_conf_str not in _parallel_conf_str2ofrecord:
-        of_record = c_api_util.GetMachine2DeviceIdListOFRecordFromParallelConf(parallel_conf)
-        _parallel_conf_str2ofrecord[parallel_conf_str] = of_record
+        ofrecord = c_api_util.GetMachine2DeviceIdListOFRecordFromParallelConf(parallel_conf)
+        _parallel_conf_str2ofrecord[parallel_conf_str] = \
+                {int(k) : list(v.int32_list.value) for k, v in ofrecord.feature.items()}
     return _parallel_conf_str2ofrecord[parallel_conf_str]
 
-def _GetParallelSize(ofrecord):
+def _GetParallelSize(key2list):
     size = 0
-    for k, v in ofrecord.feature.items(): size += len(v.int32_list.value)
+    for k, v in key2list.items(): size += len(v)
     return size
 
 _parallel_conf_str2ofrecord = {}

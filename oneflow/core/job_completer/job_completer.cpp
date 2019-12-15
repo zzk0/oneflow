@@ -322,6 +322,7 @@ void DumpLogicalBlobDescAndSbpSignature(const OpGraph& op_graph, JobBuilder* job
 }
 
 void MakeAllReduceSequence(const OpGraph& op_graph, JobBuilder* job_builder) {
+  if (GlobalJobDesc().disable_all_reduce_sequence()) { return; }
   AllReduceSequencePass().Apply(op_graph, job_builder);
 }
 
@@ -360,7 +361,7 @@ void JobCompleter::Complete(Job* job) const {
     WithOpGraphAndMutJobBuilder(job, &GenerateOpConf4Trainning);
     WithOpGraphAndMutJobBuilder(job, &MakeNcclTupleBroadcastReduceSequence);
     WithOpGraphAndMutJobBuilder(job, &RewriteBoxingWithAllReduce);
-    AddLbiDiffWatherOpConfs(job);
+    AddLbiDiffWatcherOpConfs(job);
     WithOpGraphAndMutJobBuilder(job, &MakeAllReduceSequence);
   }
   WithOpGraphAndMutJobBuilder(job, &DumpLogicalBlobDescAndSbpSignature);

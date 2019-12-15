@@ -41,7 +41,8 @@ class TopKOp final : public Operator {
     const int32_t instance_size = in->shape().dim_vec().back();
     const int32_t k = op_conf().top_k_conf().k();
     CHECK_GE_OR_RETURN(k, 1);
-    CHECK_LE_OR_RETURN(k, instance_size);
+    // temp solution: we allow k > instance_size
+    // CHECK_LE_OR_RETURN(k, instance_size);
     if (device_type() == DeviceType::kCPU) {
       if (k > 1) {
         // tmp: indices
@@ -75,7 +76,7 @@ class TopKOp final : public Operator {
     // output
     BlobDesc* out = GetBlobDesc4BnInOp("out");
     *out = *in;
-    out->mut_shape().Set(in->shape().NumAxes() - 1, k);
+    out->mut_shape().Set(in->shape().NumAxes() - 1, std::min(k, instance_size));
     out->set_data_type(DataType::kInt32);
 
     return Maybe<void>::Ok();
@@ -95,6 +96,11 @@ class TopKOp final : public Operator {
       auto* top_k_op_ctx = static_cast<const TopKOpCtx*>(op_ctx);
       kernel_conf->mutable_top_k_conf()->set_temp_storage_bytes(top_k_op_ctx->temp_storage_bytes_);
     }
+  }
+  Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override {
+    SbpSignatureBuilder().Split("in", 0).Split("out", 0).Build(
+        sbp_sig_list->mutable_sbp_signature()->Add());
+    return Maybe<void>::Ok();
   }
 };
 

@@ -112,6 +112,18 @@ __global__ void ReluBackwardGpu(const int n, const T* y, const T* dy, T* dx) {
 }
 
 template<typename T>
+__global__ void gpu_assign_add(const int64_t n, T* out, const T* in_1) {
+  CUDA_1D_KERNEL_LOOP(i, n) {
+    if (in_1[i]) { out[i] += in_1[i]; }
+  }
+}
+
+template<typename T>
+__global__ void gpu_assign_add(const int64_t n, T* out, const T* in_1, const T* in_2) {
+  CUDA_1D_KERNEL_LOOP(i, n) { out[i] += in_1[i] + in_2[i]; }
+}
+
+template<typename T>
 __global__ void gpu_add(const int64_t n, T* out, const T* in_0) {
   CUDA_1D_KERNEL_LOOP(i, n) { out[i] = in_0[i]; }
 }
@@ -236,7 +248,7 @@ __global__ void TransposeGpu(const Int32Array<NDIMS> y_shape, const Int32Array<N
 }
 
 template<int32_t NDIMS, typename T>
-void Transpose(DeviceCtx* ctx, const Shape& x_shape, const Shape& y_shape,
+void Transpose(DeviceCtx* ctx, const DenseShapeView& x_shape, const DenseShapeView& y_shape,
                const PbRf<int32_t>& permutation, const int64_t elem_cnt, const T* x, T* y) {
   CHECK_LE(y_shape.elem_cnt(), GetMaxVal<int32_t>());
   Int32Array<NDIMS> y_shape_struct;
@@ -376,8 +388,8 @@ KU_IF_METHOD RowSum(DeviceCtx* ctx, const int64_t row_num, const int64_t col_num
   MatrixRowReduce<T, ReduceCoreAdd>(ctx, row_num, col_num, x, y, temp_storage, temp_storage_bytes);
 }
 
-KU_IF_METHOD Transpose(DeviceCtx* ctx, const int32_t num_axis, const Shape& x_shape,
-                       const Shape& y_shape, const PbRf<int32_t>& permutation,
+KU_IF_METHOD Transpose(DeviceCtx* ctx, const int32_t num_axis, const DenseShapeView& x_shape,
+                       const DenseShapeView& y_shape, const PbRf<int32_t>& permutation,
                        const int64_t elem_cnt, const T* x, T* y) {
   CHECK_LE(y_shape.elem_cnt(), GetMaxVal<int32_t>());
   CHECK_EQ(num_axis, y_shape.NumAxes());
@@ -564,14 +576,24 @@ KU_FLOATING_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in
       <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, out, in_0);
 }
 KU_FLOATING_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1) {
-  gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
-      n, out, in_0, in_1);
+  if (out == in_0) {
+    gpu_assign_add<T>
+        <<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(n, out, in_1);
+  } else {
+    gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+        n, out, in_0, in_1);
+  }
 }
 
 KU_FLOATING_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
                             const T* in_2) {
-  gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
-      n, out, in_0, in_1, in_2);
+  if (out == in_0) {
+    gpu_assign_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+        n, out, in_1, in_2);
+  } else {
+    gpu_add<T><<<BlocksNum4ThreadsNum(n), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+        n, out, in_0, in_1, in_2);
+  }
 }
 
 KU_FLOATING_METHOD Addition(DeviceCtx* ctx, const int64_t n, T* out, const T* in_0, const T* in_1,
@@ -638,7 +660,7 @@ __device__ float gpu_atomic_add(float* address, float val) {
   return atomicAdd(address, val);
 }
 
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700 && CUDA_VERSION >= 10000
 template<>
 __device__ half gpu_atomic_add(half* address, half val) {
   return atomicAdd(address, val);
