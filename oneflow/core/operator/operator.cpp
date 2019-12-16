@@ -298,10 +298,6 @@ void Operator::GenKernelConf(
     data_type = GetDataTypeFromBnInOpVec(GetBlobDesc4BnInOp, input_bns());
   }
   kernel_conf->set_data_type(data_type);
-  if (parallel_ctx != NULL) {
-    int64_t parallel_id = parallel_ctx->parallel_id();
-    kernel_conf->set_parallel_id(parallel_id);
-  }
   VirtualGenKernelConf(GetBlobDesc4BnInOp, parallel_ctx, kernel_conf, op_ctx,
                        LogicalBlobDesc4BnInOp);
 }
