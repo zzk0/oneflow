@@ -389,7 +389,7 @@ void OpGraph::InitEdges() {
     for (const auto& obn : op_node->op().output_bns()) {
       const auto& lbi = op_node->op().BnInOp2Lbi(obn);
       CHECK(lbi2producer.emplace(lbi, op_node).second);
-      auto lbi2obn = producer_op_name2lbi2obn[op_node->op().op_name()];
+      auto& lbi2obn = producer_op_name2lbi2obn[op_node->op().op_name()];
       if (!lbi2obn) { lbi2obn.reset(new HashMap<LogicalBlobId, std::string>()); }
       CHECK(lbi2obn->emplace(lbi, obn).second);
     }
