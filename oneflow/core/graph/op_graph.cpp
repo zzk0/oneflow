@@ -403,7 +403,7 @@ void OpGraph::InitEdges() {
     for (const auto& ibn : op_node->op().input_bns()) {
       const LogicalBlobId& lbi = op_node->op().BnInOp2Lbi(ibn);
       producer_op_name2lbis[lbi.op_name()].insert(lbi);
-      consumer_lbi2ibns[lbi].push_back(ibn);
+      (*consumer_lbi2ibns)[lbi].push_back(ibn);
     }
     for (const auto& pair : producer_op_name2lbis) {
       std::shared_ptr<std::vector<LogicalBlobId>> lbis(
