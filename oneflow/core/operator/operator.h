@@ -6,13 +6,14 @@
 #include "oneflow/core/common/preprocessor.h"
 #include "oneflow/core/common/protobuf.h"
 #include "oneflow/core/common/auto_registration_factory.h"
+#include "oneflow/core/common/symbol.h"
 #include "oneflow/core/job/parallel_desc.h"
 #include "oneflow/core/job/sbp_parallel.h"
-#include "oneflow/core/kernel/kernel.pb.h"
-#include "oneflow/core/operator/op_conf.pb.h"
+#include "oneflow/core/operator/op_conf_util.h"
 #include "oneflow/core/register/blob_desc.h"
 #include "oneflow/core/job/job_builder.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
+#include "oneflow/core/kernel/kernel.pb.h"
 
 namespace oneflow {
 
@@ -158,6 +159,8 @@ class Operator {
   const JobDesc& job_desc() const { return *job_desc_; }
 
   void ForEachBnInOp(std::function<void(const std::string&)>) const;
+
+  virtual Symbol<OperatorConf> GetOpConfWithoutOpNameAndLbn() const;
 
  protected:
   virtual Maybe<void> GetSbpSignatures(
@@ -352,16 +355,7 @@ inline OpBlobArg GenOpBlobArg(const std::string& op_name, const std::string& bn_
   return oba;
 }
 
-inline LogicalBlobId GenLogicalBlobId(const std::string& lbn) {
-  LogicalBlobId lbi;
-  size_t pos = lbn.find('/');
-  CHECK_NE(pos, std::string::npos);
-  lbi.set_op_name(lbn.substr(0, pos));
-  std::string blob_name_with_split_hit = lbn.substr(pos + 1);
-  size_t split_pos = blob_name_with_split_hit.rfind(':');
-  lbi.set_blob_name(blob_name_with_split_hit.substr(0, split_pos));
-  return lbi;
-}
+LogicalBlobId GenLogicalBlobId(const std::string& lbn);
 
 inline std::string GenLogicalBlobName(const std::string& op_name, const std::string& blob_name) {
   return op_name + "/" + blob_name;
@@ -374,22 +368,8 @@ inline std::string GenLogicalBlobName(const LogicalBlobId& lbi) {
   return GenLogicalBlobName(lbi.op_name(), lbi.blob_name());
 }
 
-inline Maybe<bool> GetSbpParallelInLbnOrNothing(const std::string& lbn_with_split_hint,
-                                                SbpParallel* sbp) {
-  size_t pos = lbn_with_split_hint.rfind(':');
-  if (pos == std::string::npos || pos == lbn_with_split_hint.length() - 1) { return false; }
-  std::string split_hint = lbn_with_split_hint.substr(pos + 1);
-  if (split_hint[0] == 'S') {
-    std::string axis_str = split_hint.substr(1);
-    OF_CHECK(IsStrInt(axis_str));
-    sbp->mutable_split_parallel()->set_axis(oneflow_cast<int64_t>(axis_str));
-  } else if (split_hint[0] == 'B') {
-    sbp->mutable_broadcast_parallel();
-  } else {
-    return Error::CheckFailed() << "split hint only support 'S' or 'B', but get:" << split_hint[0];
-  }
-  return true;
-}
+Maybe<bool> GetSbpParallelInLbnOrNothing(const std::string& lbn, SbpParallel* sbp);
+Maybe<bool> ParseDisableBoxingFlag(const std::string& lbn_with_hint, bool* disable_boxing);
 
 Maybe<void> InferOpSbpSignature(
     const Operator& op, const SbpSignature& sbp_sig_conf, const ParallelDesc& parallel_desc,
@@ -397,6 +377,21 @@ Maybe<void> InferOpSbpSignature(
     std::function<const OptInt64&(const LogicalBlobId&)> GetBatchAxis4Lbi,
     SbpSignature* sbp_sig_to_infer);
 
+bool operator==(const OperatorConf& lhs, const OperatorConf& rhs);
+
 }  // namespace oneflow
+
+namespace std {
+
+template<>
+struct hash<oneflow::OperatorConf> final {
+  size_t operator()(const oneflow::OperatorConf& op_conf) {
+    std::string serialized;
+    op_conf.SerializeToString(&serialized);
+    return std::hash<std::string>()(serialized);
+  }
+};
+
+}  // namespace std
 
 #endif  // ONEFLOW_CORE_OPERATOR_OPERATOR_H_

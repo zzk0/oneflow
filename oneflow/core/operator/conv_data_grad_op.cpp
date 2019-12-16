@@ -59,16 +59,21 @@ Maybe<void> ConvDataGradOp::InferBlobDescs(
   dx->CopyMetaFrom(*x_like);
   if (DevIsGpuAndEnableCudnn()) {
 #ifdef WITH_CUDA
-    ConvOpCtx* conv_op_ctx = new ConvOpCtx();
-    EnrollOpCtx(conv_op_ctx);
-    CHECK_OR_RETURN(Global<CudnnConvCtxCache>::Get()->FindCudnnConvAlgoCtxWithConfig(
-        *x_like, *dy, *filter, conv_conf, cudnn_buf_limit_byte(),
-        &conv_op_ctx->cudnn_conv_algo_ctx));
-    CHECK_OR_RETURN(conv_op_ctx->cudnn_conv_algo_ctx.bwd_data_algo_found);
+    size_t bwd_data_cudnn_buf_size = cudnn_buf_limit_byte();
+    if (!dx->is_dynamic()) {
+      CudnnConvAlgoCtx cudnn_conv_algo_ctx;
+      CHECK_OR_RETURN(Global<CudnnConvCtxCache>::Get()->FindCudnnConvAlgoCtxWithConfig(
+          *x_like, *dy, *filter, conv_conf, cudnn_buf_limit_byte(), &cudnn_conv_algo_ctx));
+      CHECK_OR_RETURN(cudnn_conv_algo_ctx.bwd_data_algo_found)
+          << "cudnn conv data grad algo: " << cudnn_conv_algo_ctx.bwd_data_algo
+          << " alog_workspace_size: " << cudnn_conv_algo_ctx.bwd_data_ws_size
+          << " max_workspace_size: " << bwd_data_cudnn_buf_size;
+      bwd_data_cudnn_buf_size = cudnn_conv_algo_ctx.bwd_data_ws_size;
+    }
+    bwd_data_cudnn_buf_size = std::max(size_t(1), bwd_data_cudnn_buf_size);
     BlobDesc* cudnn_buf = GetBlobDesc4BnInOp("buf");
     cudnn_buf->set_data_type(DataType::kChar);
-    size_t buf_size = std::max(size_t(1), conv_op_ctx->cudnn_conv_algo_ctx.bwd_data_ws_size);
-    cudnn_buf->mut_shape() = Shape({static_cast<int64_t>(buf_size)});
+    cudnn_buf->mut_shape() = Shape({static_cast<int64_t>(bwd_data_cudnn_buf_size)});
 #else
     UNIMPLEMENTED_THEN_RETURN();
 #endif
@@ -76,23 +81,7 @@ Maybe<void> ConvDataGradOp::InferBlobDescs(
     UNIMPLEMENTED_THEN_RETURN();
   }
   return Maybe<void>::Ok();
-}
-
-void ConvDataGradOp::VirtualGenKernelConf(
-    std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, KernelConf* kernel_conf, const OpContext* op_ctx) const {
-  if (DevIsGpuAndEnableCudnn()) {
-#ifdef WITH_CUDA
-    const ConvOpCtx* conv_op_ctx = dynamic_cast<const ConvOpCtx*>(op_ctx);
-    kernel_conf->mutable_conv_data_grad_conf()->set_cudnn_bwd_data_algo(
-        conv_op_ctx->cudnn_conv_algo_ctx.bwd_data_algo);
-#else
-    UNIMPLEMENTED();
-#endif  // WITH_CUDA
-  } else {
-    UNIMPLEMENTED();
-  }
-}
+}  // namespace oneflow
 
 Maybe<void> ConvDataGradOp::InferBatchAxis(
     std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {

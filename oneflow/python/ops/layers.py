@@ -81,7 +81,11 @@ def dense(
         out = flow.nn.bias_add(
             out, bias, name="{}_bias_add".format(name_prefix)
         )
-    out = activation(out) if activation is not None else out
+    out = (
+        activation(out, name="{}_activation".format(name_prefix))
+        if activation is not None
+        else out
+    )
     out = (
         flow.reshape(out, in_shape[:-1] + (units,)) if in_num_axes > 2 else out
     )
@@ -121,6 +125,8 @@ def conv2d(
         initializer=kernel_initializer
         if kernel_initializer is not None
         else flow.constant_initializer(0),
+        trainable=trainable,
+        model_name="weight",
     )
     output = flow.nn.conv2d(
         inputs, weight, strides, padding, data_format, dilation_rate, name
@@ -133,10 +139,14 @@ def conv2d(
             initializer=bias_initializer
             if bias_initializer is not None
             else flow.constant_initializer(0),
+            trainable=trainable,
+            model_name="bias",
         )
-        output = flow.nn.bias_add(output, bias, data_format)
+        output = flow.nn.bias_add(
+            output, bias, data_format, name=name_prefix + "-bias_add"
+        )
     if activation is not None:
-        activation(output)
+        output = activation(output, name=name_prefix + "-activation")
 
     return output
 

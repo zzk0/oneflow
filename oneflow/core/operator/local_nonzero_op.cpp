@@ -41,7 +41,6 @@ class LocalNonzeroOp final : public Operator {
     const int32_t elem_cnt = in->shape().elem_cnt();
     // output
     BlobDesc* out = GetBlobDesc4BnInOp("out");
-    *out = *in;
     out->mut_shape() = Shape({elem_cnt, in->shape().NumAxes()});
     out->set_data_type(DataType::kInt32);
     // nnz
@@ -58,7 +57,6 @@ class LocalNonzeroOp final : public Operator {
     const int32_t elem_cnt = in->shape().elem_cnt();
     // output
     BlobDesc* out = GetBlobDesc4BnInOp("out");
-    *out = *in;
     out->mut_shape() = Shape({elem_cnt, in->shape().NumAxes()});
     out->set_data_type(DataType::kInt32);
     // nnz
@@ -85,7 +83,7 @@ class LocalNonzeroOp final : public Operator {
 
       OF_CHECK_GT(out_tmp_bytes, 0) << "out_tmp_bytes should be greater than zero.";
       BlobDesc* out_tmp = GetBlobDesc4BnInOp("out_tmp");
-      out_tmp->mut_shape() = Shape(std::vector<int64_t>{static_cast<int64_t>(out_tmp_bytes)});
+      out_tmp->mut_shape() = Shape(DimVector{static_cast<int64_t>(out_tmp_bytes)});
       out_tmp->set_data_type(DataType::kChar);
     }
     return Maybe<void>::Ok();
@@ -102,6 +100,17 @@ class LocalNonzeroOp final : public Operator {
   Maybe<void> InferBatchAxis(
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
     for (const std::string& obn : output_bns()) { BatchAxis4BnInOp(obn)->set_value(0); }
+    return Maybe<void>::Ok();
+  }
+
+  Maybe<void> GetSbpSignatures(
+      const std::function<Maybe<const BlobDesc*>(const std::string&)>& LogicalBlobDesc4Ibn,
+      SbpSignatureList* sbp_sig_list) const override {
+    SbpSignatureBuilder()
+        .Split("in", 0)
+        .Split("out", 0)
+        .Broadcast("num_nonzero")
+        .Build(sbp_sig_list->mutable_sbp_signature()->Add());
     return Maybe<void>::Ok();
   }
 };

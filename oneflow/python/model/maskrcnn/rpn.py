@@ -8,7 +8,7 @@ def _Conv2d(
     filters,
     kernel_size,
     name,
-    activation=flow.keras.activations.sigmoid,
+    activation=None,
     weight_name=None,
     bias_name=None,
 ):
@@ -22,6 +22,10 @@ def _Conv2d(
         dilation_rate=[1, 1],
         activation=activation,
         use_bias=True,
+        kernel_initializer=flow.random_normal_initializer(
+            mean=0.0, stddev=0.01
+        ),
+        bias_initializer=flow.constant_initializer(0),
         name=name,
         weight_name=weight_name,
         bias_name=bias_name,
@@ -36,15 +40,17 @@ class RPNHead(object):
     def build(self, features):
         with flow.deprecated.variable_scope("rpn-head"):
 
-            def piece_slice_with_bw(inputs, output_size, name=None):
-                assert inputs.shape[0] == output_size
-                ret = []
-                for i in range(output_size):
-                    indices = flow.constant(i, dtype=flow.int32)
-                    output = flow.local_gather(inputs, indices)
-                    output = flow.squeeze(output, [0])
-                    ret.append(output)
-                return ret
+            def split_to_instances(inputs, name):
+                return [
+                    flow.squeeze(
+                        flow.local_gather(
+                            inputs, flow.constant(i, dtype=flow.int32)
+                        ),
+                        [0],
+                        name="{}_split{}".format(name, i),
+                    )
+                    for i in range(inputs.shape[0])
+                ]
 
             # list (wrt. fpn layers) of list (wrt. images) of [H_i * W_i * A, 4]
             bbox_pred_list = []
@@ -72,6 +78,7 @@ class RPNHead(object):
                     ),
                     perm=[0, 2, 3, 1],
                 )
+
                 bbox_preds = flow.transpose(
                     _Conv2d(
                         x,
@@ -84,22 +91,22 @@ class RPNHead(object):
                     perm=[0, 2, 3, 1],
                 )
 
-                cls_logit_list.append(
-                    [
-                        flow.dynamic_reshape(x, shape=[-1])
-                        for x in piece_slice_with_bw(
-                            cls_logits, self.cfg.TRAINING_CONF.IMG_PER_GPU
-                        )
-                    ]
-                )
-                bbox_pred_list.append(
-                    [
-                        flow.dynamic_reshape(x, shape=[-1, 4])
-                        for x in piece_slice_with_bw(
-                            bbox_preds, self.cfg.TRAINING_CONF.IMG_PER_GPU
-                        )
-                    ]
-                )
+                cls_logit_per_image_list = [
+                    flow.dynamic_reshape(x, shape=[-1])
+                    for x in split_to_instances(
+                        cls_logits, name="cls_logits_layer_{}".format(layer_i)
+                    )
+                ]
+                cls_logit_list.append(cls_logit_per_image_list)
+
+                bbox_pred_per_image_list = [
+                    flow.dynamic_reshape(x, shape=[-1, 4])
+                    for x in split_to_instances(
+                        bbox_preds, name="bbox_preds_layer_{}".format(layer_i)
+                    )
+                ]
+                bbox_pred_list.append(bbox_pred_per_image_list)
+
         return cls_logit_list, bbox_pred_list
 
 
@@ -139,12 +146,13 @@ class RPNLoss(object):
             for _, tup in enumerate(zip(*cls_logit_list)):
                 cls_logit_wrt_img_list += [flow.concat(list(tup), axis=0)]
 
-            anchors = flow.concat(anchors_list, axis=0)  # # anchors: [M, 4]
+            anchors = flow.concat(anchors_list, axis=0, name="anchors_concated")
+
             for img_idx, gt_boxes in enumerate(gt_boxes_list):
                 with flow.deprecated.variable_scope("matcher"):
                     rpn_matcher = Matcher(
-                        self.cfg.RPN.POSITIVE_OVERLAP_THRESHOLD,
-                        self.cfg.RPN.NEGATIVE_OVERLAP_THRESHOLD,
+                        self.cfg.MODEL.RPN.FG_IOU_THRESHOLD,
+                        self.cfg.MODEL.RPN.BG_IOU_THRESHOLD,
                     )
                     matched_indices = rpn_matcher.build(anchors, gt_boxes, True)
 
@@ -152,7 +160,9 @@ class RPNLoss(object):
                 # CHECK_POINT: matched_indices
                 matched_indices = flow.where(
                     flow.detection.identify_outside_anchors(
-                        anchors, image_size_list[img_idx], tolerance=0.0
+                        anchors,
+                        image_size_list[img_idx],
+                        tolerance=self.cfg.MODEL.RPN.STRADDLE_THRESH,
                     ),
                     flow.constant_like(matched_indices, int(-2)),
                     matched_indices,
@@ -173,12 +183,18 @@ class RPNLoss(object):
                     axis=[1],
                 )
 
+                if self.cfg.MODEL.RPN.RANDOM_SAMPLE:
+                    rand_pos_inds = flow.detection.random_perm_like(pos_inds)
+                    rand_neg_inds = flow.detection.random_perm_like(neg_inds)
+                    pos_inds = flow.local_gather(pos_inds, rand_pos_inds)
+                    neg_inds = flow.local_gather(neg_inds, rand_neg_inds)
+
                 # CHECK_POINT: sampled_pos_inds, sampled_neg_inds
                 sampled_pos_inds, sampled_neg_inds = flow.detection.pos_neg_sampler(
                     pos_inds,
                     neg_inds,
-                    total_subsample_num=self.cfg.RPN.SUBSAMPLE_NUM_PER_IMG,
-                    pos_fraction=self.cfg.RPN.FOREGROUND_FRACTION,
+                    total_subsample_num=self.cfg.MODEL.RPN.BATCH_SIZE_PER_IMAGE,
+                    pos_fraction=self.cfg.MODEL.RPN.POSITIVE_FRACTION,
                 )
 
                 sampled_bbox_target_list.append(
@@ -191,10 +207,10 @@ class RPNLoss(object):
                         ),
                         flow.local_gather(anchors, sampled_pos_inds),
                         regression_weights={
-                            "weight_x": self.cfg.RPN.WEIGHT_X,
-                            "weight_y": self.cfg.RPN.WEIGHT_Y,
-                            "weight_h": self.cfg.RPN.WEIGHT_H,
-                            "weight_w": self.cfg.RPN.WEIGHT_W,
+                            "weight_x": 1.0,
+                            "weight_y": 1.0,
+                            "weight_h": 1.0,
+                            "weight_w": 1.0,
                         },
                     )
                 )
@@ -225,62 +241,63 @@ class RPNLoss(object):
             )
             total_sample_cnt = flow.cast(total_sample_cnt, flow.float)
 
-            bbox_loss = (
-                flow.math.reduce_sum(
-                    flow.detection.smooth_l1(
-                        flow.concat(
-                            sampled_bbox_pred_list, axis=0
-                        ),  # CHECK_POINT: bbox_pred
-                        flow.concat(
-                            sampled_bbox_target_list, axis=0
-                        ),  # CHECK_POINT: bbox_target
-                        beta=1.0 / 9.0,
-                    )
-                )
-                / total_sample_cnt
+            bbox_loss = flow.math.reduce_sum(
+                flow.detection.smooth_l1(
+                    flow.concat(
+                        sampled_bbox_pred_list, axis=0, name="bbox_pred"
+                    ),  # CHECK_POINT: bbox_pred
+                    flow.concat(
+                        sampled_bbox_target_list, axis=0, name="bbox_target"
+                    ),  # CHECK_POINT: bbox_target
+                    beta=1.0 / 9.0,
+                ),
+                name="box_reg_loss",
+            )
+            bbox_loss_mean = flow.math.divide(
+                bbox_loss, total_sample_cnt, name="box_reg_loss_mean"
             )
 
-            cls_loss = (
-                flow.math.reduce_sum(
-                    flow.nn.sigmoid_cross_entropy_with_logits(
-                        flow.concat(
-                            sampled_cls_label_list, axis=0
-                        ),  # CHECK_POINT: cls label
-                        flow.concat(
-                            sampled_cls_logit_list, axis=0
-                        ),  # CHECK_POINT: cls logit
-                    )
-                )
-                / total_sample_cnt
+            cls_loss = flow.math.reduce_sum(
+                flow.nn.sigmoid_cross_entropy_with_logits(
+                    flow.concat(
+                        sampled_cls_label_list, axis=0, name="cls_label"
+                    ),  # CHECK_POINT: cls label
+                    flow.concat(
+                        sampled_cls_logit_list, axis=0, name="cls_logit"
+                    ),  # CHECK_POINT: cls logit
+                ),
+                name="objectness_loss",
             )
-        return bbox_loss, cls_loss
+            cls_loss_mean = flow.math.divide(
+                cls_loss, total_sample_cnt, name="objectness_loss_mean"
+            )
 
-
-def safe_top_k(inputs, k):
-    assert len(inputs.shape) == 1
-    if inputs.shape[0] < k:
-        return flow.math.top_k(inputs, inputs.shape[0])
-    else:
-        return flow.math.top_k(inputs, k)
+        return bbox_loss_mean, cls_loss_mean
 
 
 class RPNProposal(object):
-    def __init__(self, cfg):
+    def __init__(self, cfg, is_train):
         self.cfg = cfg
-        if cfg.TRAINING:
-            self.top_n_per_fm = cfg.RPN.TOP_N_PER_FM_TRAIN
-            self.nms_top_n = cfg.RPN.NMS_TOP_N_TRAIN
-            self.top_n_per_img = cfg.RPN.TOP_N_PER_IMG_TRAIN
-        else:
-            self.top_n_per_fm = cfg.RPN.TOP_N_PER_FM_TEST
-            self.nms_top_n = cfg.RPN.NMS_TOP_N_TEST
-            self.top_n_per_img = cfg.RPN.TOP_N_PER_IMG_TEST
+        self.is_train = is_train
 
-    # anchors_list: list of [num_anchors_i, 4] wrt. fpn layers
+        if is_train:
+            self.top_n_per_fm = cfg.MODEL.RPN.PRE_NMS_TOP_N_TRAIN
+            self.nms_top_n = cfg.MODEL.RPN.POST_NMS_TOP_N_TRAIN
+            self.top_n_per_img = cfg.MODEL.RPN.FPN_POST_NMS_TOP_N_TRAIN
+        else:
+            self.top_n_per_fm = cfg.MODEL.RPN.PRE_NMS_TOP_N_TEST
+            self.nms_top_n = cfg.MODEL.RPN.POST_NMS_TOP_N_TEST
+            self.top_n_per_img = cfg.MODEL.RPN.FPN_POST_NMS_TOP_N_TEST
+
+    # args:
+    # anchors: list of [num_anchors_i, 4] wrt. fpn layers
     # image_size_list: list of [2,] wrt. images
     # gt_boxes_list: list of [num_gt_boxes, 4] wrt. images
     # bbox_pred_list: list (wrt. fpn layers) of list (wrt. images) of [H_i * W_i * A, 4]
     # cls_logit_list: list (wrt. fpn layer) of list (wrt. images) of [H_i * W_i * A]
+    #
+    # outputs:
+    # proposals: list of [R, 4] wrt. images
     def build(
         self,
         anchors,
@@ -290,43 +307,65 @@ class RPNProposal(object):
         resized_gt_boxes_list,
     ):
         with flow.deprecated.variable_scope("rpn-postprocess"):
-            cls_logit_list = list(zip(*cls_logit_list))
-            bbox_pred_list = list(zip(*bbox_pred_list))
-
             proposals = []
             for img_idx in range(len(image_size_list)):
                 proposal_list = []
                 score_list = []
-                for layer_i in range(len(cls_logit_list[0])):
-                    pre_nms_top_k_inds = safe_top_k(
-                        cls_logit_list[img_idx][layer_i], k=self.top_n_per_fm
+                for layer_i in range(len(cls_logit_list)):
+                    # cls_probs = flow.keras.activations.sigmoid(
+                    #     cls_logit_list[layer_i][img_idx],
+                    #     name="img{}_layer{}_cls_probs".format(img_idx, layer_i),
+                    # )
+                    cls_probs = cls_logit_list[layer_i][img_idx]
+                    pre_nms_top_k_inds = flow.math.top_k(
+                        cls_probs,
+                        k=self.top_n_per_fm,
+                        name="img{}_layer{}_topk_inds".format(img_idx, layer_i),
                     )
                     score_per_layer = flow.local_gather(
-                        cls_logit_list[img_idx][layer_i], pre_nms_top_k_inds
+                        cls_probs, pre_nms_top_k_inds
                     )
                     proposal_per_layer = flow.detection.box_decode(
-                        flow.local_gather(anchors[layer_i], pre_nms_top_k_inds),
                         flow.local_gather(
-                            bbox_pred_list[img_idx][layer_i], pre_nms_top_k_inds
+                            anchors[layer_i],
+                            pre_nms_top_k_inds,
+                            name="img{}_layer{}_anchors".format(
+                                img_idx, layer_i
+                            ),
+                        ),
+                        flow.local_gather(
+                            bbox_pred_list[layer_i][img_idx],
+                            pre_nms_top_k_inds,
+                            name="img{}_layer{}_box_delta".format(
+                                img_idx, layer_i
+                            ),
                         ),
                         regression_weights={
-                            "weight_x": self.cfg.RPN.WEIGHT_X,
-                            "weight_y": self.cfg.RPN.WEIGHT_Y,
-                            "weight_h": self.cfg.RPN.WEIGHT_H,
-                            "weight_w": self.cfg.RPN.WEIGHT_W,
+                            "weight_x": 1.0,
+                            "weight_y": 1.0,
+                            "weight_h": 1.0,
+                            "weight_w": 1.0,
                         },
+                        name="img{}_layer{}_box_decode".format(
+                            img_idx, layer_i
+                        ),
                     )
 
                     # clip to img
                     proposal_per_layer = flow.detection.clip_to_image(
-                        proposal_per_layer, image_size_list[img_idx]
+                        proposal_per_layer,
+                        image_size_list[img_idx],
+                        name="img{}_layer{}_box_clipped".format(
+                            img_idx, layer_i
+                        ),
                     )
 
                     # remove small boxes
                     indices = flow.squeeze(
                         flow.local_nonzero(
                             flow.detection.identify_non_small_boxes(
-                                proposal_per_layer, min_size=0.0
+                                proposal_per_layer,
+                                min_size=self.cfg.MODEL.RPN.MIN_SIZE,
                             )
                         ),
                         axis=[1],
@@ -335,7 +374,11 @@ class RPNProposal(object):
                         score_per_layer, indices
                     )
                     proposal_per_layer = flow.local_gather(
-                        proposal_per_layer, indices
+                        proposal_per_layer,
+                        indices,
+                        name="img{}_layer{}_box_pre_nms".format(
+                            img_idx, layer_i
+                        ),
                     )
 
                     # NMS
@@ -343,11 +386,12 @@ class RPNProposal(object):
                         flow.local_nonzero(
                             flow.detection.nms(
                                 proposal_per_layer,
-                                nms_iou_threshold=self.cfg.RPN.NMS_THRESH,
+                                nms_iou_threshold=self.cfg.MODEL.RPN.NMS_THRESH,
                                 post_nms_top_n=self.nms_top_n,
                             )
                         ),
                         axis=[1],
+                        name="img{}_layer{}_nms".format(img_idx, layer_i),
                     )
                     score_per_layer = flow.local_gather(
                         score_per_layer, indices
@@ -364,14 +408,35 @@ class RPNProposal(object):
 
                 proposal_in_one_img = flow.local_gather(
                     proposal_in_one_img,
-                    safe_top_k(score_in_one_img, k=self.top_n_per_img),
+                    flow.math.top_k(score_in_one_img, k=self.top_n_per_img),
                 )
-                if self.cfg.TRAINING is True:
+
+                if self.is_train is True:
+                    assert resized_gt_boxes_list is not None
                     proposal_in_one_img = flow.concat(
                         [proposal_in_one_img, resized_gt_boxes_list[img_idx]],
                         axis=0,
+                        name="img{}_proposals".format(img_idx),
                     )
 
                 proposals.append(proposal_in_one_img)
 
             return proposals
+
+
+def gen_anchors(image, anchor_strides, anchor_sizes, aspect_ratios):
+    if not isinstance(anchor_strides, (tuple, list)):
+        anchor_strides = [anchor_strides]
+
+    assert len(anchor_strides) == len(anchor_sizes)
+    anchors = [
+        flow.detection.anchor_generate(
+            images=image,
+            feature_map_stride=stride,
+            aspect_ratios=aspect_ratios,
+            anchor_scales=sizes_per_stride,
+        )
+        for stride, sizes_per_stride in zip(anchor_strides, anchor_sizes)
+    ]
+
+    return anchors

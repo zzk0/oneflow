@@ -2,9 +2,9 @@ import oneflow as flow
 
 
 class FPN(object):
-    def __init__(self):
-        self.inner_channels = 256
-        self.layer_channels = 256
+    def __init__(self, cfg):
+        self.inner_channels = cfg.MODEL.RESNETS.BACKBONE_OUT_CHANNELS
+        self.layer_channels = cfg.MODEL.RESNETS.BACKBONE_OUT_CHANNELS
 
     def build(self, features):
         layers = range(len(features))
@@ -46,6 +46,14 @@ class FPN(object):
             data_format="NCHW",
             strides=[1, 1],
             dilation_rate=[1, 1],
+            kernel_initializer=flow.kaiming_initializer(
+                shape=(self.inner_channels, x.static_shape[1]) + (1, 1),
+                distribution="random_uniform",
+                mode="fan_in",
+                nonlinearity="leaky_relu",
+                negative_slope=1.0
+            ),
+            bias_initializer=flow.constant_initializer(0),
             name=name,
         )
 
@@ -63,6 +71,14 @@ class FPN(object):
             data_format="NCHW",
             strides=[1, 1],
             dilation_rate=[1, 1],
+            kernel_initializer=flow.kaiming_initializer(
+                shape=(self.layer_channels, x.static_shape[1]) + (3, 3),
+                distribution="random_uniform",
+                mode="fan_in",
+                nonlinearity="leaky_relu",
+                negative_slope=1.0
+            ),
+            bias_initializer=flow.constant_initializer(0),
             name=name,
         )
 

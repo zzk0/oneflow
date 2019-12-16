@@ -19,6 +19,9 @@ class SqueezeOp final : public Operator {
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
     return NaiveInferBatchAxis(BatchAxis4BnInOp);
   }
+  Maybe<void> GetSbpSignatures(
+      const std::function<Maybe<const BlobDesc*>(const std::string&)>& LogicalBlobDesc4Ibn,
+      SbpSignatureList* sbp_sig_list) const override;
 };
 
 void SqueezeOp::InitFromOpConf() {
@@ -33,7 +36,7 @@ Maybe<void> SqueezeOp::InferBlobDescs(
   BlobDesc* in = GetBlobDesc4BnInOp("in");
   BlobDesc* out = GetBlobDesc4BnInOp("out");
   *out = *in;
-  std::vector<int64_t> dim_vec = in->shape().dim_vec();
+  DimVector dim_vec = in->shape().dim_vec();
   for (const auto& idx : PbRf2StdVec(op_conf().squeeze_conf().axis())) {
     CHECK_LT_OR_RETURN(idx, dim_vec.size());
     CHECK_EQ_OR_RETURN(dim_vec[idx], 1);
@@ -41,6 +44,21 @@ Maybe<void> SqueezeOp::InferBlobDescs(
   }
   dim_vec.erase(std::remove(dim_vec.begin(), dim_vec.end(), -1), dim_vec.end());
   out->mut_shape() = Shape(dim_vec);
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> SqueezeOp::GetSbpSignatures(
+    const std::function<Maybe<const BlobDesc*>(const std::string&)>& LogicalBlobDesc4Ibn,
+    SbpSignatureList* sbp_sig_list) const {
+  auto squeeze_axes_vec = PbRf2StdVec(op_conf().squeeze_conf().axis());
+  auto squeeze_dim0_iter = std::find(squeeze_axes_vec.begin(), squeeze_axes_vec.end(), 0);
+  if (squeeze_dim0_iter == squeeze_axes_vec.end()) {
+    SbpSignatureBuilder().Split("in", 0).Split("out", 0).Build(
+        sbp_sig_list->mutable_sbp_signature()->Add());
+  } else {
+    SbpSignatureBuilder().Split("in", 0).Broadcast("out").Build(
+        sbp_sig_list->mutable_sbp_signature()->Add());
+  }
   return Maybe<void>::Ok();
 }
 

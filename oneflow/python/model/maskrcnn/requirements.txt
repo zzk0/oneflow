@@ -1,1 +1,4 @@
 yacs
+tqdm
+pandas
+statistics

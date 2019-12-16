@@ -23,6 +23,7 @@ class NonMaximumSuppressionOp final : public Operator {
       std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override {
     return NaiveInferBatchAxis(BatchAxis4BnInOp);
   }
+  Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override;
 };
 
 void NonMaximumSuppressionOp::InitFromOpConf() {
@@ -46,6 +47,7 @@ Maybe<void> NonMaximumSuppressionOp::InferBlobDescs(
   fw_tmp_blob_desc->set_data_type(DataType::kInt64);
   // out
   BlobDesc* out_blob_desc = GetBlobDesc4BnInOp("out");
+  out_blob_desc->set_is_dynamic(in_blob_desc->is_dynamic());
   out_blob_desc->mut_shape() = Shape({num_boxes});
   out_blob_desc->set_data_type(DataType::kInt8);
   return Maybe<void>::Ok();
@@ -55,6 +57,12 @@ void NonMaximumSuppressionOp::VirtualGenKernelConf(
     std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp, const ParallelContext*,
     KernelConf* kernel_conf, const OpContext* op_ctx) const {
   kernel_conf->set_data_type(GetBlobDesc4BnInOp("in")->data_type());
+}
+
+Maybe<void> NonMaximumSuppressionOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
+  SbpSignatureBuilder().Split("in", 0).Split("out", 0).Build(
+      sbp_sig_list->mutable_sbp_signature()->Add());
+  return Maybe<void>::Ok();
 }
 
 REGISTER_OP(OperatorConf::kNonMaximumSuppressionConf, NonMaximumSuppressionOp);
