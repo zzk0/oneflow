@@ -1259,16 +1259,6 @@ message BroadcastDivGradOpConf {
   optional string temp_storage = 5 [default = "temp_storage"];
 }
 
-message BroadcastMaximumGradOpConf {
-  //  input
-  required string a = 1;
-  required string b = 2;
-  required string dy = 3;
-  //  output
-  required string da = 4;
-  required string db = 5;
-}
-
 message BroadcastEqualOpConf {
   required string a = 1;
   required string b = 2;

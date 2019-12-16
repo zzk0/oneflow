@@ -78,19 +78,19 @@ def discriminator(image, trainable=True, reuse=False):
 if __name__ == "__main__":
 
 
-    # @flow.function
-    # def train_generator(z=flow.input_blob_def((batch_size, 100)),
-    #                     label1=flow.input_blob_def((batch_size, 1))):
-    #     flow.config.train.primary_lr(0.0001)
-    #     flow.config.train.model_update_conf(dict(naive_conf={}))
+    @flow.function
+    def train_generator(z=flow.input_blob_def((batch_size, 100)),
+                        label1=flow.input_blob_def((batch_size, 1))):
+        flow.config.train.primary_lr(0.0001)
+        flow.config.train.model_update_conf(dict(naive_conf={}))
     
-    #     g_out = generator(z, trainable=False)
-    #     g_logits = discriminator(g_out, trainable=False)
-    #     g_loss = flow.nn.sigmoid_cross_entropy_with_logits(label1, g_logits, name="Gloss_sigmoid_cross_entropy_with_logits")
-    #     g_loss = flow.math.reduce_mean(g_loss)
+        g_out = generator(z, trainable=True)
+        g_logits = discriminator(g_out, trainable=False)
+        g_loss = flow.nn.sigmoid_cross_entropy_with_logits(label1, g_logits, name="Gloss_sigmoid_cross_entropy_with_logits")
+        g_loss = flow.math.reduce_mean(g_loss)
 
-    #     flow.losses.add_loss(g_loss)
-    #     return g_loss, g_out
+        flow.losses.add_loss(g_loss)
+        return g_loss, g_out
     
     @flow.function
     def train_discriminator(z=flow.input_blob_def((batch_size, 100)),
@@ -100,26 +100,17 @@ if __name__ == "__main__":
         flow.config.train.primary_lr(0.0001)
         flow.config.train.model_update_conf(dict(naive_conf={}))
 
-        d_loss = linear(z, 1, trainable=False, name="d_linear", reuse=False)
+        g_out = generator(z, trainable=False)
+        g_logits = discriminator(g_out, trainable=True)
+        d_loss_fake = flow.nn.sigmoid_cross_entropy_with_logits(label0, g_logits, name="Dloss_fake_sigmoid_cross_entropy_with_logits")
+
+        d_logits = discriminator(images, trainable=True, reuse=True)
+        d_loss_real = flow.nn.sigmoid_cross_entropy_with_logits(label1, d_logits, name="Dloss_real_sigmoid_cross_entropy_with_logits")
+        d_loss = d_loss_fake + d_loss_real
+        d_loss = flow.math.reduce_mean(d_loss)
         flow.losses.add_loss(d_loss)
     
-        return d_loss
-
-    # @flow.function
-    # def test_generator(z=flow.input_blob_def((batch_size, 100)),
-    #                    label1=flow.input_blob_def((batch_size, 1))):
-    #     flow.config.train.primary_lr(0.0001)
-    #     flow.config.train.model_update_conf(dict(naive_conf={}))
-    
-    #     g_out = generator(z, trainable=False)
-    #     linear(h4, 1, trainable=trainable, name="d_linear", reuse=reuse)
-    #     # g_logits = discriminator(g_out, trainable=False)
-    #     # g_loss = flow.nn.sigmoid_cross_entropy_with_logits(label1, g_logits, name="Gloss_sigmoid_cross_entropy_with_logits")
-    #     # g_loss = flow.math.reduce_mean(g_loss)
-
-    #     flow.losses.add_loss(g_loss)
-    #     return g_loss, g_out
-
+        return d_loss, d_loss_fake, d_loss_real
 
     flow.config.gpu_device_num(1)
     flow.config.default_data_type(flow.float32)
@@ -131,38 +122,33 @@ if __name__ == "__main__":
     x, _ = load_mnist()
     batch_num = len(x) // batch_size
 
-    z = np.random.normal(0, 1, size=(batch_size, 100)).astype(np.float32)
     for epoch_idx in range(epoch_num):
         for batch_idx in range(batch_num):
             # fake_images = np.random.randn(batch_size, 28, 28, 1).astype(np.float32)
-            label1 = np.ones((batch_size, 1)).astype(np.float32)
-            label0 = np.zeros((batch_size, 1)).astype(np.float32)
-            images = x[batch_idx*batch_size:(batch_idx+1)*batch_size].astype(np.float32)
-            d_loss = train_discriminator(z, images, label1, label0).get()
-            # g_loss, g_out = train_generator(z, label1).get()
-            # for j in range(1):
-            #     z = np.random.normal(0, 1, size=(batch_size, 100)).astype(np.float32)
-            #     label1 = np.ones((batch_size, 1)).astype(np.float32)
-            #     label0 = np.zeros((batch_size, 1)).astype(np.float32)
-            #     images = x[batch_idx*batch_size:(batch_idx+1)*batch_size].astype(np.float32)
-            #     d_loss, d_loss_fake, d_loss_real = train_discriminator(z, images, label1, label0).get()
 
-            # for j in range(2):
-            #     z = np.random.normal(0,1,size=(batch_size, 100)).astype(np.float32)
-            #     label1 = np.ones((batch_size, 1)).astype(np.float32)
-            #     g_loss, g_out = train_generator(z, label1).get()
+            for j in range(1):
+                z = np.random.normal(0, 1, size=(batch_size, 100)).astype(np.float32)
+                label1 = np.ones((batch_size, 1)).astype(np.float32)
+                label0 = np.zeros((batch_size, 1)).astype(np.float32)
+                images = x[batch_idx*batch_size:(batch_idx+1)*batch_size].astype(np.float32)
+                d_loss, d_loss_fake, d_loss_real = train_discriminator(z, images, label1, label0).get()
+
+            for j in range(2):
+                z = np.random.normal(0,1,size=(batch_size, 100)).astype(np.float32)
+                label1 = np.ones((batch_size, 1)).astype(np.float32)
+                g_loss, g_out = train_generator(z, label1).get()
 
 
             if  (batch_idx + 1) % 10 == 0:
                 print(batch_idx + 1, "th batch:")
                 print("d_loss:", d_loss.mean())
-                # print("dloss_real:", d_loss_real.mean())
-                # print("dloss_fake:", d_loss_fake.mean())
-                # print("gloss:", g_loss)
+                print("dloss_real:", d_loss_real.mean())
+                print("dloss_fake:", d_loss_fake.mean())
+                print("gloss:", g_loss.mean())
             
-            # if  (batch_idx + 1) % 100 == 0:
-            #     img = np.squeeze(g_out[0]) / 2 + 0.5
-            #     plt.imsave("gout/test_{}_{}.png".format(str(epoch_idx + 1), str(batch_idx + 1)), img)
+            if  (batch_idx + 1) % 100 == 0:
+                img = np.squeeze(g_out[0]) / 2 + 0.5
+                plt.imsave("gout/test_{}_{}.png".format(str(epoch_idx + 1), str(batch_idx + 1)), img)
 
-        # when each epochs finished
-        # check_point.save("./model_save-{}".format(str(datetime.now().strftime("%Y-%m-%d-%H:%M:%S")))+ str(epoch_idx))
+        # when a epoch finished
+        check_point.save("./model_save-{}".format(str(datetime.now().strftime("%Y-%m-%d-%H:%M:%S")))+ str(epoch_idx))

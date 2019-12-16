@@ -17,7 +17,7 @@ class CudnnDeconvDesc final {
   CudnnDeconvDesc() = delete;
   ~CudnnDeconvDesc();
 
-  CudnnDeconvDesc(const DataType&, const DenseShapeView&, const ConvConf&);
+  CudnnDeconvDesc(const DataType&, const DenseShapeView&, const DeconvOpConf&);
 
   const cudnnConvolutionDescriptor_t& Get() const { return val_; }
 
