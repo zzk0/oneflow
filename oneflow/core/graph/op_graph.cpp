@@ -186,12 +186,12 @@ const OpNode& OpNode::ProducerOpNode4Lbi(const LogicalBlobId& lbi) const {
 }
 
 OpNode* OpNode::MutSrcNode4InputLbi(const LogicalBlobId& lbi) const {
-  for (OpEdge* edge : in_edges()) {
-    for (const LogicalBlobId& edge_lbi : edge->lbis()) {
-      if (lbi == edge_lbi) { return edge->src_node(); }
-    }
+  auto it = lbi2source_node_.find(lbi);
+  if (it == lbi2source_node_.end()) {
+    return nullptr;
+  } else {
+    return it->second;
   }
-  return nullptr;
 }
 
 bool OpNode::IsTimeShapeIdentity() const {
@@ -335,6 +335,15 @@ const ParallelDesc& OpNode::BlobParallelDesc4Obn(const std::string& obn) const {
   return obn2blob_parallel_desc_.at(obn);
 }
 
+void OpNode::InitLbi2SourceNode() {
+  for (OpEdge* edge : in_edges()) {
+    for (const LogicalBlobId& lbi : edge->lbis()) {
+      CHECK(lbi2source_node_->emplace(lbi, edge->src_node()).second);
+    }
+  }
+  return nullptr;
+}
+
 void OpNode::InferBlobParallelDesc() {
   auto ParallelDesc4Obn = [&](const std::string& obn) -> ParallelDesc* {
     auto iter = obn2blob_parallel_desc_.find(obn);
@@ -357,6 +366,7 @@ void OpGraph::Init(const Job& job) {
   InitEdges();
   InitProducerOpName2CtrlConsumerOpNames(job);
   CheckIsDAG();
+  ForEachNode([](OpNode* node) { node->InitLbi2SourceNode() });
   InferTimeShape();
   InferLogicalBlobDesc(job);
   ForEachEdge([](OpEdge* edge) { edge->InitDistributeHierarchyInfo(); });
