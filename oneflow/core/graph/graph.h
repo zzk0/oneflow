@@ -444,7 +444,7 @@ void Graph<NodeType, EdgeType>::TopoForEachNode(
       });
       if (is_ready && has_queued.count(out) == 0) {
         queue.push(out);
-        has_queued[out] = true;
+        has_queued.insert(out);
       }
     });
   }
