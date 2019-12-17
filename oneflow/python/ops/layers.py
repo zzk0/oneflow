@@ -172,6 +172,8 @@ def batch_normalization(
     moving_variance_initializer=None,
     trainable=False,
     is_training=True,
+    beta_model_name="weight",
+    gamma_model_name="weight",
     name=None,
 ):
     assert axis >= -len(inputs.shape) and axis < len(inputs.shape)
@@ -188,6 +190,7 @@ def batch_normalization(
             initializer=beta_initializer or flow.zeros_initializer(),
             trainable=trainable,
             distribute=distribute_util.broadcast(),
+            model_name=beta_model_name,
         )
 
     if scale:
@@ -198,6 +201,7 @@ def batch_normalization(
             initializer=gamma_initializer or flow.ones_initializer(),
             trainable=trainable,
             distribute=distribute_util.broadcast(),
+            model_name=gamma_model_name,
         )
 
     moving_mean = flow.get_variable(
@@ -217,7 +221,6 @@ def batch_normalization(
         trainable=trainable,
         distribute=distribute_util.broadcast(),
     )
-    print(name + "-beta", beta.shape)
 
     op_conf = op_conf_util.OperatorConf()
     setattr(op_conf, "name", name)
