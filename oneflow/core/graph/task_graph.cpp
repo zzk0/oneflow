@@ -461,12 +461,14 @@ void TaskGraph::GetSafeInplaceOpBlobArgList(
   auto IsLbiAllConsumersReachable =
       MakePredicatorIsLbiAllConsumersReachable(TaskNode4SoleOpName, IsOpNameDataOrCtrlReachable);
   InplaceLbiGraph origin_graph(inplace_obas, Op4OpName);
-  origin_graph.ToDotWithFilePath(
-      JoinPath("dot", "InplaceLbiGraph", GlobalJobDesc().job_name() + "_origin.dot"));
   origin_graph.ComputeSafeInplaceObns(safe_obas, IsLbiAllConsumersReachable);
-  InplaceLbiGraph(*safe_obas, Op4OpName)
-      .ToDotWithFilePath(
-          JoinPath("dot", "InplaceLbiGraph", GlobalJobDesc().job_name() + "_safe.dot"));
+  if (Global<ResourceDesc>::Get()->debug_mode()) {
+    origin_graph.ToDotWithFilePath(
+        JoinPath("dot", "InplaceLbiGraph", GlobalJobDesc().job_name() + "_origin.dot"));
+    InplaceLbiGraph(*safe_obas, Op4OpName)
+        .ToDotWithFilePath(
+            JoinPath("dot", "InplaceLbiGraph", GlobalJobDesc().job_name() + "_safe.dot"));
+  }
 }
 
 void TaskGraph::SetTaskRegstInplaceInfo(const OpBlobArgList& obas,
