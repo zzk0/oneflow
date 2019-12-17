@@ -341,7 +341,6 @@ void OpNode::InitLbi2SourceNode() {
       CHECK(lbi2source_node_.emplace(lbi, edge->src_node()).second);
     }
   }
-  return nullptr;
 }
 
 void OpNode::InferBlobParallelDesc() {
@@ -366,7 +365,7 @@ void OpGraph::Init(const Job& job) {
   InitEdges();
   InitProducerOpName2CtrlConsumerOpNames(job);
   CheckIsDAG();
-  ForEachNode([](OpNode* node) { node->InitLbi2SourceNode() });
+  ForEachNode([](OpNode* node) { node->InitLbi2SourceNode(); });
   InferTimeShape();
   InferLogicalBlobDesc(job);
   ForEachEdge([](OpEdge* edge) { edge->InitDistributeHierarchyInfo(); });
