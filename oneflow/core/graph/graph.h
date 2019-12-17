@@ -426,11 +426,11 @@ void Graph<NodeType, EdgeType>::TopoForEachNode(
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachInNode,
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachOutNode,
     const std::function<void(NodeType*)>& Handler) const {
-  HashMap<NodeType*, bool> has_queued;
+  HashSet<NodeType*> has_queued;
   std::queue<NodeType*> queue;
   for (NodeType* start : starts) {
     queue.push(start);
-    has_queued[start] = true;
+    has_queued.insert(start);
     ForEachInNode(start, [&](NodeType*) { LOG(FATAL) << "not a source"; });
   }
   while (!queue.empty()) {
@@ -440,9 +440,9 @@ void Graph<NodeType, EdgeType>::TopoForEachNode(
     ForEachOutNode(cur_node, [&](NodeType* out) {
       bool is_ready = true;
       ForEachInNode(out, [&](NodeType* in) {
-        if (is_ready && !has_queued[in]) { is_ready = false; }
+        if (is_ready && has_queued.count(in) == 0) { is_ready = false; }
       });
-      if (is_ready && !has_queued[out]) {
+      if (is_ready && has_queued.count(out) == 0) {
         queue.push(out);
         has_queued[out] = true;
       }
