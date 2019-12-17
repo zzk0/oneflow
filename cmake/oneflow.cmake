@@ -138,6 +138,7 @@ RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
 
 oneflow_add_library(of_protoobj ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(of_protoobj ${oneflow_third_party_libs})
+target_link_libraries(of_protoobj profiler)
 add_dependencies(of_protoobj make_pyproto_dir)
 
 # cc obj lib

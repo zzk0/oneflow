@@ -21,6 +21,7 @@
 #include "oneflow/core/job/plan_util.h"
 #include "oneflow/core/operator/interface_op_util.h"
 #include "oneflow/core/job/critical_section_desc.h"
+#include <gperftools/profiler.h>
 
 namespace std {
 
@@ -138,8 +139,10 @@ void CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_complete
     LOG(INFO) << "compile time: " << GetCurTime() - start;
     complete_plan =
         Improver().GenAndInferMemBlockIdOnly(*Global<AvailableMemDesc>::Get(), naive_plan);
-    TeePersistentLogStream::Create("naive_plan")->Write(naive_plan);
-    TeePersistentLogStream::Create("complete_plan")->Write(complete_plan);
+    if (Global<ResourceDesc>::Get()->debug_mode()) {
+      TeePersistentLogStream::Create("naive_plan_job")->Write(naive_plan);
+      TeePersistentLogStream::Create("complete_plan_job")->Write(complete_plan);
+    }
     LOG(INFO) << "push_pull_plan:" << GetCurTime() - start;
   }
   if (job_desc.enable_experiment_run()) {
@@ -153,13 +156,18 @@ void CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_complete
     { Runtime experiment_run(complete_plan, job_desc.piece_num_of_experiment_phase(), true); }
     // Improve
     if (Global<MachineCtx>::Get()->IsThisMachineMaster()) {
-      TeePersistentLogStream::Create("available_mem_desc")->Write(*Global<AvailableMemDesc>::Get());
+      if (Global<ResourceDesc>::Get()->debug_mode()) {
+        TeePersistentLogStream::Create("available_mem_desc")
+            ->Write(*Global<AvailableMemDesc>::Get());
+      }
       CHECK_GT(Global<AvailableMemDesc>::Get()->machine_amd_size(), 0);
       *improved_plan = Improver().Improve(
           *Global<AvailableMemDesc>::Get(), naive_plan,
           JoinPath(FLAGS_log_dir, ActEventLogger::experiment_act_event_bin_filename()));
       OF_BARRIER();
-      TeePersistentLogStream::Create("improved_plan")->Write(*improved_plan);
+      if (Global<ResourceDesc>::Get()->debug_mode()) {
+        TeePersistentLogStream::Create("improved_plan")->Write(*improved_plan);
+      }
     }
   } else {
     *improved_plan = complete_plan;
@@ -804,12 +812,16 @@ void CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan) {
     }
     LinkMainPlan(plan, main_plan, identity_tick_op_names);
     PlanUtil::CleanUselessMemBlockAndCheckValid(plan);
-    TeePersistentLogStream::Create("merged_plan")->Write(*plan);
+    if (Global<ResourceDesc>::Get()->debug_mode()) {
+      TeePersistentLogStream::Create("merged_plan")->Write(*plan);
+    }
     PlanUtil::ToDotFile(*plan, "/dot/merged_plan.dot");
     PushPlan("merged_plan", *plan);
   } else {
     PullPlan("merged_plan", plan);
-    TeePersistentLogStream::Create("merged_plan")->Write(*plan);
+    if (Global<ResourceDesc>::Get()->debug_mode()) {
+      TeePersistentLogStream::Create("merged_plan")->Write(*plan);
+    }
   }
   OF_BARRIER();
 }
@@ -818,10 +830,15 @@ void CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan) {
 
 Oneflow::Oneflow(const oneflow::JobSet& job_set) {
   // Runtime
+  ProfilerStart("/tmp/prof/oneflow");
+  auto s = GetCurTime();
   CompileAndMergePlanOnMaster(job_set.job(), &plan_);
   if (Global<MachineCtx>::Get()->IsThisMachineMaster()) {
     runtime_buffers_scope_.reset(new RuntimeBuffersScope(plan_));
   }
+  auto e = GetCurTime();
+  LOG(ERROR) << "OneFlow " << (e - s) / 1e6;
+  ProfilerStop();
   runtime_.reset(new Runtime(plan_, GetMaxVal<size_t>(), false));
 }
 
