@@ -298,6 +298,7 @@ void Operator::GenKernelConf(
     data_type = GetDataTypeFromBnInOpVec(GetBlobDesc4BnInOp, input_bns());
   }
   kernel_conf->set_data_type(data_type);
+
   VirtualGenKernelConf(GetBlobDesc4BnInOp, parallel_ctx, kernel_conf, op_ctx,
                        LogicalBlobDesc4BnInOp);
 }
@@ -490,7 +491,7 @@ Maybe<void> Operator::NaiveInferBatchAxis(
     const OptInt64* const cur_ibn_batch_axis = BatchAxis4BnInOp(ibn);
     if (cur_ibn_batch_axis->has_value() == false) { continue; }
     if (batch_axis) {
-      // CHECK_OR_RETURN(*batch_axis == *cur_ibn_batch_axis);
+      CHECK_OR_RETURN(*batch_axis == *cur_ibn_batch_axis);
     } else {
       batch_axis = cur_ibn_batch_axis;
     }

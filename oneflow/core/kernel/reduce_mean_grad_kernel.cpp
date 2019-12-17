@@ -25,6 +25,12 @@ void ReduceMeanGradKernel<device_type, T>::ForwardDataContent(
       XpuVarNdarray<const T>(reduced_shape, tmp_blob->dptr<T>()));
 }
 
+template<DeviceType device_type, typename T>
+void ReduceMeanGradKernel<device_type, T>::ForwardDim0ValidNum(
+    const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const {
+  BnInOp2Blob("dx")->CopyDim0ValidNumFrom(ctx.device_ctx, BnInOp2Blob("x"));
+}
+
 ADD_DEFAULT_KERNEL_CREATOR(OperatorConf::kReduceMeanGradConf, ReduceMeanGradKernel,
                            FLOATING_DATA_TYPE_SEQ);
 
