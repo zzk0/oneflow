@@ -815,7 +815,9 @@ void CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan) {
     if (Global<ResourceDesc>::Get()->debug_mode()) {
       TeePersistentLogStream::Create("merged_plan")->Write(*plan);
     }
-    PlanUtil::ToDotFile(*plan, "/dot/merged_plan.dot");
+    if (Global<ResourceDesc>::Get()->debug_mode()) {
+      PlanUtil::ToDotFile(*plan, "/dot/merged_plan.dot");
+    }
     PushPlan("merged_plan", *plan);
   } else {
     PullPlan("merged_plan", plan);
