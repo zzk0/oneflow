@@ -338,7 +338,7 @@ const ParallelDesc& OpNode::BlobParallelDesc4Obn(const std::string& obn) const {
 void OpNode::InitLbi2SourceNode() {
   for (OpEdge* edge : in_edges()) {
     for (const LogicalBlobId& lbi : edge->lbis()) {
-      CHECK(lbi2source_node_->emplace(lbi, edge->src_node()).second);
+      CHECK(lbi2source_node_.emplace(lbi, edge->src_node()).second);
     }
   }
   return nullptr;
