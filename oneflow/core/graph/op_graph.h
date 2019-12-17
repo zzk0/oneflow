@@ -83,7 +83,7 @@ class OpNode final : public Node<OpNode, OpEdge> {
   HashMap<LogicalBlobId, OptInt64> lbi2batch_axis_;
   HashMap<std::string, std::vector<std::shared_ptr<BlobDesc>>> bn2parallel_id2blob_desc_;
   HashMap<LogicalBlobId, std::unique_ptr<BlobDesc>> lbi2logical_blob_desc_;
-  HashMap<LogicalBlobId, OpNode>* lbi2source_node_;
+  HashMap<LogicalBlobId, OpNode*> lbi2source_node_;
 };
 
 class OpEdge final : public Edge<OpNode, OpEdge> {
