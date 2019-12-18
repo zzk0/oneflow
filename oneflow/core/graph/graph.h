@@ -313,17 +313,17 @@ void Graph<NodeType, EdgeType>::DfsForEachNode(
     const std::list<NodeType*>& starts,
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachNext,
     const std::function<void(NodeType*)>& Handler) const {
-  HashSet<NodeType*> visited_nodes;
+  std::vector<bool> visited_nodes(next_node_idx_);
   std::stack<NodeType*> stack;
   for (NodeType* start : starts) { stack.push(start); }
   while (!stack.empty()) {
     NodeType* cur_node = stack.top();
     stack.pop();
-    if (visited_nodes.find(cur_node) == visited_nodes.end()) {
+    if (visited_nodes.at(cur_node->IndexInGraph()) == false) {
       Handler(cur_node);
-      visited_nodes.insert(cur_node);
+      visited_nodes[cur_node->IndexInGraph()] = true;
       ForEachNext(cur_node, [&](NodeType* next) {
-        if (visited_nodes.find(next) == visited_nodes.end()) { stack.push(next); }
+        if (visited_nodes.at(next->IndexInGraph()) == false) { stack.push(next); }
       });
     }
   }
@@ -497,7 +497,7 @@ void Graph<NodeType, EdgeType>::DfsTopoForEachNode(
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachInNode,
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachOutNode,
     const std::function<void(NodeType*)>& Handler) const {
-  HashMap<NodeType*, bool> be_visited;
+  std::vector<bool> be_visited(next_node_idx_);
   std::stack<NodeType*> stack;
   for (NodeType* start : starts) {
     stack.push(start);
@@ -507,13 +507,13 @@ void Graph<NodeType, EdgeType>::DfsTopoForEachNode(
     NodeType* cur_node = stack.top();
     stack.pop();
     Handler(cur_node);
-    be_visited[cur_node] = true;
+    be_visited[cur_node->IndexInGraph()] = true;
     ForEachOutNode(cur_node, [&](NodeType* out) {
       bool is_ready = true;
       ForEachInNode(out, [&](NodeType* in) {
-        if (is_ready && !be_visited[in]) { is_ready = false; }
+        if (is_ready && !be_visited[in->IndexInGraph()]) { is_ready = false; }
       });
-      if (is_ready && !be_visited[out]) { stack.push(out); }
+      if (is_ready && !be_visited[out->IndexInGraph()]) { stack.push(out); }
     });
   }
 }
