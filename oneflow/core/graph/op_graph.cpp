@@ -468,10 +468,9 @@ void OpGraph::InferOpNodeLogicalBlobDesc(OpNode* op_node) const {
   auto* bn2parallel_id2blob_desc = op_node->mut_bn2parallel_id2blob_desc();
   op_node->SplitLogicalInputBlobDesc();
   int64_t parallel_num = op_node->parallel_desc().parallel_num();
-  const auto& input_bns = op_node->op().input_bns();
   FOR_RANGE(int64_t, parallel_id, 0, parallel_num) {
     auto BlobDesc4BnInOp = [&](const std::string& bn) -> BlobDesc* {
-      if (std::find(input_bns.begin(), input_bns.end(), bn) != input_bns.end()) {
+      if (op_node->input_bns_set().count(bn) != 0) {
         CHECK(bn2parallel_id2blob_desc->find(bn) != bn2parallel_id2blob_desc->end());
         CHECK_EQ(bn2parallel_id2blob_desc->at(bn).size(), parallel_num);
       } else if (bn2parallel_id2blob_desc->find(bn) == bn2parallel_id2blob_desc->end()) {
@@ -511,8 +510,7 @@ void OpGraph::InferLogicalBlobDesc(const Job& job) const {
       return op_node->MutProducerOpNode4BnInOp(bn)->MutBatchAxis4Lbi(op_node->op().BnInOp2Lbi(bn));
     };
     auto LogicalBlobDesc4Ibn = [&](const std::string& ibn) -> const BlobDesc& {
-      const auto& ibns = op_node->op().input_bns();
-      CHECK(std::find(ibns.begin(), ibns.end(), ibn) != ibns.end());
+      CHECK(op_node->input_bns_set().count(ibn) != 0);
       return op_node->LogicalBlobDesc4Lbi(op_node->op().BnInOp2Lbi(ibn));
     };
     CHECK_JUST(op_node->op().InferBatchAxisIf(LogicalBlobDesc4Ibn, BatchAxis4BnInOp));

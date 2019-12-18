@@ -16,15 +16,17 @@ class JobCompleteCtx {
   }
   ~JobCompleteCtx() = default;
 
-  Job* GetJob() {
+  Job* MutJob() {
     is_dirty_ = true;
     return job_;
   }
 
-  std::shared_ptr<JobBuilder> GetJobBuilder() {
+  std::shared_ptr<JobBuilder> MutJobBuilder() {
     is_dirty_ = true;
     return job_builder_;
   }
+
+  const Job* Job() const { return job_; }
 
   std::shared_ptr<OpGraph> GetOpGraph() { return op_graph_; }
 

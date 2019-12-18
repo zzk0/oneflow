@@ -12,18 +12,18 @@ void SetDefaultVariableConf(JobCompleteCtx* ctx) {
       OperatorConf variable_op_conf(op_node->op().op_conf());
       VariableOpConf* variable_conf = variable_op_conf.mutable_variable_conf();
       if (!variable_conf->has_data_type()) {
-        variable_conf->set_data_type(ctx->GetJobBuilder()->job().job_conf().default_data_type());
+        variable_conf->set_data_type(ctx->MutJobBuilder()->job().job_conf().default_data_type());
       }
       if (!variable_conf->has_initializer() && !variable_conf->has_initialize_with_snapshot()) {
-        if (ctx->GetJobBuilder()->job().job_conf().has_default_initializer_conf()) {
+        if (ctx->MutJobBuilder()->job().job_conf().has_default_initializer_conf()) {
           *variable_conf->mutable_initializer() =
-              ctx->GetJobBuilder()->job().job_conf().default_initializer_conf();
-        } else if (ctx->GetJobBuilder()
+              ctx->MutJobBuilder()->job().job_conf().default_initializer_conf();
+        } else if (ctx->MutJobBuilder()
                        ->job()
                        .job_conf()
                        .has_default_initialize_with_snapshot_path()) {
           variable_conf->mutable_initialize_with_snapshot()->set_path(
-              ctx->GetJobBuilder()->job().job_conf().default_initialize_with_snapshot_path());
+              ctx->MutJobBuilder()->job().job_conf().default_initialize_with_snapshot_path());
           variable_conf->mutable_initialize_with_snapshot()->set_key(
               GenLogicalBlobName(op_node->op().BnInOp2Lbi("out")));
         } else {
@@ -44,7 +44,7 @@ void SetDefaultVariableConf(JobCompleteCtx* ctx) {
       } else {
         variable_conf->set_random_seed(pair.first->second);
       }
-      ctx->GetJobBuilder()->AddOrMutOpsOnlyOnce(op_node->parallel_desc().parallel_conf(),
+      ctx->MutJobBuilder()->AddOrMutOpsOnlyOnce(op_node->parallel_desc().parallel_conf(),
                                                 {variable_op_conf});
     }
   });

@@ -5,8 +5,9 @@ namespace oneflow {
 
 class OpGraph;
 class Job;
+class JobCompleteCtx;
 
-void AutoTrainStep(const OpGraph& op_graph, Job* job);
+void AutoTrainStep(JobCompleteCtx* ctx);
 
 }  // namespace oneflow
 

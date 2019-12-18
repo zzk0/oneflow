@@ -37,6 +37,7 @@ class OpNode final : public Node<OpNode, OpEdge> {
   const OpNode& SrcNode4InputBnInOp(const std::string& bn_in_op) const;
   const OpNode& ProducerOpNode4BnInOp(const std::string& bn_in_op) const;
   const ParallelDesc& BlobParallelDesc4Obn(const std::string& obn) const;
+  const HashSet<std::string>& input_bns_set() const { return ibns_; }
 
   std::string VisualStr() const override;
 
