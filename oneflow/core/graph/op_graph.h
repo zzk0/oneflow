@@ -81,6 +81,7 @@ class OpNode final : public Node<OpNode, OpEdge> {
   std::shared_ptr<Operator> op_;
   HashSet<std::string> ibns_;
   std::unique_ptr<Shape> out_blob_time_shape_;
+  mutable std::unique_ptr<Shape> input_blob_fastest_time_shape_;
   SbpSignature sbp_signature_;
   HashMap<LogicalBlobId, OptInt64> lbi2batch_axis_;
   HashMap<std::string, std::vector<std::shared_ptr<BlobDesc>>> bn2parallel_id2blob_desc_;
