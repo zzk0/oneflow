@@ -7,6 +7,42 @@
 
 namespace oneflow {
 
+class JobCompleteCtx {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(JobCompleteCtx)
+  JobCompleteCtx(Job* job) : job_(job), is_dirty_(false) {
+    op_graph_.reset(new OpGraph(*job_));
+    job_builder_.reset(new JobBuilder(job_));
+  }
+  ~JobCompleteCtx() = default;
+
+  Job* GetJob() {
+    is_dirty_ = true;
+    return job_;
+  }
+
+  std::shared_ptr<JobBuilder> GetJobBuilder() {
+    is_dirty_ = true;
+    return job_builder_;
+  }
+
+  std::shared_ptr<OpGraph> GetOpGraph() { return op_graph_; }
+
+  void RefreshOpGraphIfNeeded() {
+    if (is_dirty_) {
+      op_graph_.reset(new OpGraph(*job_));
+      job_builder_.reset(new JobBuilder(job_));
+    }
+    is_dirty_ = false;
+  }
+
+ private:
+  Job* job_;
+  std::shared_ptr<OpGraph> op_graph_;
+  std::shared_ptr<JobBuilder> job_builder_;
+  bool is_dirty_;
+};
+
 class JobCompleter final {
  public:
   OF_DISALLOW_COPY_AND_MOVE(JobCompleter);

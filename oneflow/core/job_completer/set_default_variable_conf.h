@@ -7,7 +7,9 @@
 
 namespace oneflow {
 
-void SetDefaultVariableConf(const OpGraph& op_graph, JobBuilder* job_builder);
+class JobCompleteCtx;
+
+void SetDefaultVariableConf(JobCompleteCtx* ctx);
 
 }  // namespace oneflow
 

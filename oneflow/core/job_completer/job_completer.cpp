@@ -31,6 +31,12 @@ void CheckOpGraph(const OpGraph& op_graph) {
   });
 }
 
+void WithJobCompleteCtx(JobCompleteCtx* ctx,
+                        const std::function<void(JobCompleteCtx* ctx)>& Handler) {
+  Handler(ctx);
+  ctx->RefreshOpGraphIfNeeded();
+}
+
 void WithOpGraphAndMutJob(Job* job, const std::function<void(const OpGraph&, Job*)>& Handler) {
   OpGraph op_graph(*job);
   Handler(op_graph, job);
@@ -43,17 +49,18 @@ void WithOpGraphAndMutJobBuilder(Job* job,
   Handler(op_graph, &job_builder);
 }
 
-void GenerateFacadeImplOpConfIf(const OpNode& op_node, JobBuilder* job_builder) {
+void GenerateFacadeImplOpConfIf(const OpNode& op_node, JobCompleteCtx* ctx) {
   auto op_type_case = op_node.op().op_conf().op_type_case();
   if (IsClassRegistered<GenerateFacadeImplOpConfWrapperStruct>(op_type_case)) {
     std::unique_ptr<GenerateFacadeImplOpConfWrapperStruct> obj;
     obj.reset(NewObj<GenerateFacadeImplOpConfWrapperStruct>(op_type_case));
-    obj->Call(op_node, job_builder);
+    obj->Call(op_node, ctx->GetJobBuilder().get());
   }
 }
 
-void ReplaceFacade(const OpGraph& op_graph, JobBuilder* job_builder) {
-  op_graph.ForEachNode([&](OpNode* op_node) { GenerateFacadeImplOpConfIf(*op_node, job_builder); });
+void ReplaceFacade(JobCompleteCtx* ctx) {
+  ctx->GetOpGraph()->ForEachNode(
+      [&](OpNode* op_node) { GenerateFacadeImplOpConfIf(*op_node, ctx); });
 }
 
 void UpdateJobHelperConfProducedLbi2ConsumedDiffLbi(
@@ -230,8 +237,9 @@ std::function<bool(OpNode*)> MakePredicatorIsReachableFromAnyVariableOps(const O
   };
 }
 
-void TieUpChainHeadersUnReachableFromAnyVariableOps(const OpGraph& op_graph, Job* job) {
-  auto IsReachableFromAnyVariableOps = MakePredicatorIsReachableFromAnyVariableOps(op_graph);
+void TieUpChainHeadersUnReachableFromAnyVariableOps(JobCompleteCtx* ctx) {
+  auto IsReachableFromAnyVariableOps =
+      MakePredicatorIsReachableFromAnyVariableOps(*ctx->GetOpGraph());
   auto GetSourceNodesAndEdges = [&](const HashSet<OpNode*>& chain_nodes,
                                     std::vector<OpNode*>* source_nodes,
                                     std::vector<OpEdge*>* source_edges) {
@@ -245,9 +253,9 @@ void TieUpChainHeadersUnReachableFromAnyVariableOps(const OpGraph& op_graph, Job
       }
     }
   };
-  auto MutOperatorConf4OpName = MakeMutableOperatorConf4OpName(job);
-  auto ParallelConf4OpName = MakeGetterParallelConf4OpName(job->placement());
-  op_graph.ForEachChainFamily([&](const HashSet<OpNode*>& chain_nodes) {
+  auto MutOperatorConf4OpName = MakeMutableOperatorConf4OpName(ctx->GetJob());
+  auto ParallelConf4OpName = MakeGetterParallelConf4OpName(ctx->GetJob()->placement());
+  ctx->GetOpGraph()->ForEachChainFamily([&](const HashSet<OpNode*>& chain_nodes) {
     std::vector<OpNode*> source_nodes;
     std::vector<OpEdge*> source_edges;
     GetSourceNodesAndEdges(chain_nodes, &source_nodes, &source_edges);
@@ -255,7 +263,8 @@ void TieUpChainHeadersUnReachableFromAnyVariableOps(const OpGraph& op_graph, Job
     if (source_nodes.size() <= 1) { return; }
     // ignore small chain
     if (chain_nodes.size() - source_nodes.size() <= 2) { return; }
-    AddIdentityOpAndReconnect("pseudo_chain_header_", job, source_edges, MutOperatorConf4OpName,
+    AddIdentityOpAndReconnect("pseudo_chain_header_", ctx->GetJob(), source_edges,
+                              MutOperatorConf4OpName,
                               *ParallelConf4OpName(source_nodes.at(0)->op().op_name()));
   });
 }
@@ -326,18 +335,18 @@ void MakeAllReduceSequence(const OpGraph& op_graph, JobBuilder* job_builder) {
   AllReduceSequencePass().Apply(op_graph, job_builder);
 }
 
-void EnableAutoMixedPrecision(const OpGraph& op_graph, JobBuilder* job_builder) {
+void EnableAutoMixedPrecision(JobCompleteCtx* ctx) {
   if (!GlobalJobDesc().enable_auto_mixed_precision()) { return; }
   CHECK_GE(CUDA_VERSION, 10000);
   AutoMixedPrecision(AutoMixedPrecisionLists::WhiteList(), AutoMixedPrecisionLists::BlackList(),
                      AutoMixedPrecisionLists::GrayList(), AutoMixedPrecisionLists::ClearList())
-      .Apply(op_graph, job_builder);
+      .Apply(*(ctx->GetOpGraph()), ctx->GetJobBuilder().get());
 }
 
-void EnableNonDistributedOptimizer(const OpGraph& op_graph, JobBuilder* job_builder) {
+void EnableNonDistributedOptimizer(JobCompleteCtx* ctx) {
   if (!GlobalJobDesc().enable_non_distributed_optimizer()) { return; }
   CHECK(GlobalJobDesc().enable_nccl());
-  NonDistributedOptimizerPass().Apply(op_graph, job_builder);
+  NonDistributedOptimizerPass().Apply(*(ctx->GetOpGraph()), ctx->GetJobBuilder().get());
 }
 
 void MakeNcclTupleBroadcastReduceSequence(const OpGraph& op_graph, JobBuilder* job_builder) {
@@ -347,14 +356,15 @@ void MakeNcclTupleBroadcastReduceSequence(const OpGraph& op_graph, JobBuilder* j
 }  // namespace
 
 void JobCompleter::Complete(Job* job) const {
+  JobCompleteCtx ctx(job);
   // replace facade op
-  WithOpGraphAndMutJobBuilder(job, &ReplaceFacade);
+  WithJobCompleteCtx(&ctx, &ReplaceFacade);
   // complete variable ops
-  WithOpGraphAndMutJobBuilder(job, &SetDefaultVariableConf);
-  WithOpGraphAndMutJobBuilder(job, &EnableAutoMixedPrecision);
+  WithJobCompleteCtx(&ctx, &SetDefaultVariableConf);
+  WithJobCompleteCtx(&ctx, &EnableAutoMixedPrecision);
   if (GlobalJobDesc().IsTrain()) {
-    WithOpGraphAndMutJob(job, &TieUpChainHeadersUnReachableFromAnyVariableOps);
-    WithOpGraphAndMutJobBuilder(job, &EnableNonDistributedOptimizer);
+    WithJobCompleteCtx(&ctx, &TieUpChainHeadersUnReachableFromAnyVariableOps);
+    WithJobCompleteCtx(&ctx, &EnableNonDistributedOptimizer);
     WithOpGraphAndMutJob(job, &AutoTrainStep);
     WithOpGraphAndMutJob(job, &AutoLearningRate);
     // complete ops for trainning
