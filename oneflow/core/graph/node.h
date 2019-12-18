@@ -93,7 +93,7 @@ class Node {
     for (EdgeType* edge : out_edges_) { DisConnect(edge); }
   }
 
-  void SetIndexInGraph(int64_t idx) {
+  void SetIndexInGraph(int64_t idx) const {
     CHECK_EQ(idx_in_graph_, -1);
     idx_in_graph_ = idx;
   }
@@ -109,7 +109,7 @@ class Node {
   int64_t node_id_;
   HashSet<EdgeType*> in_edges_;
   HashSet<EdgeType*> out_edges_;
-  int64_t idx_in_graph_ = -1;
+  mutable int64_t idx_in_graph_ = -1;
 };
 
 }  // namespace oneflow
