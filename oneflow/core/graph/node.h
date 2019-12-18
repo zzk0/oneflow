@@ -93,6 +93,13 @@ class Node {
     for (EdgeType* edge : out_edges_) { DisConnect(edge); }
   }
 
+  void SetIndexInGraph(int64_t idx) {
+    CHECK_EQ(idx_in_graph_, -1);
+    idx_in_graph_ = idx;
+  }
+
+  int64_t IndexInGraph() const { return idx_in_graph_; }
+
   virtual std::string VisualStr() const { return ""; }
 
  private:
@@ -102,6 +109,7 @@ class Node {
   int64_t node_id_;
   HashSet<EdgeType*> in_edges_;
   HashSet<EdgeType*> out_edges_;
+  int64_t idx_in_graph_ = -1;
 };
 
 }  // namespace oneflow

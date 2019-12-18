@@ -132,6 +132,7 @@ class Graph {
 
   std::vector<std::unique_ptr<NodeType>> nodes_;
   std::vector<std::unique_ptr<EdgeType>> edges_;
+  int64_t next_node_idx_ = 0;
 };
 
 template<typename NodeType, typename EdgeType>
@@ -216,6 +217,8 @@ EdgeType* Graph<NodeType, EdgeType>::NewEdge(Args&&... args) {
 
 template<typename NodeType, typename EdgeType>
 void Graph<NodeType, EdgeType>::AddAllocatedNode(NodeType* node) {
+  node->SetIndexInGraph(next_node_idx_);
+  next_node_idx_ += 1;
   nodes_.emplace_back(node);
 }
 
@@ -426,11 +429,11 @@ void Graph<NodeType, EdgeType>::TopoForEachNode(
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachInNode,
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachOutNode,
     const std::function<void(NodeType*)>& Handler) const {
-  HashSet<NodeType*> has_queued;
+  std::vector<bool> has_queued(next_node_idx_);
   std::queue<NodeType*> queue;
   for (NodeType* start : starts) {
     queue.push(start);
-    has_queued.insert(start);
+    has_queued.at(start->IndexInGraph()) = true;
     ForEachInNode(start, [&](NodeType*) { LOG(FATAL) << "not a source"; });
   }
   while (!queue.empty()) {
@@ -440,11 +443,11 @@ void Graph<NodeType, EdgeType>::TopoForEachNode(
     ForEachOutNode(cur_node, [&](NodeType* out) {
       bool is_ready = true;
       ForEachInNode(out, [&](NodeType* in) {
-        if (is_ready && has_queued.count(in) == 0) { is_ready = false; }
+        if (is_ready && has_queued.at(in->IndexInGraph()) == false) { is_ready = false; }
       });
-      if (is_ready && has_queued.count(out) == 0) {
+      if (is_ready && has_queued.at(out->IndexInGraph()) == false) {
         queue.push(out);
-        has_queued.insert(out);
+        has_queued.at(out->IndexInGraph()) = true;
       }
     });
   }
