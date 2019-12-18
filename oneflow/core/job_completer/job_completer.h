@@ -26,7 +26,7 @@ class JobCompleteCtx {
     return job_builder_;
   }
 
-  const Job* Job() const { return job_; }
+  const Job* GetJob() const { return job_; }
 
   std::shared_ptr<OpGraph> GetOpGraph() { return op_graph_; }
 

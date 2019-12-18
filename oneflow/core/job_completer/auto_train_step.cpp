@@ -5,9 +5,10 @@
 namespace oneflow {
 
 void AutoTrainStep(JobCompleteCtx* ctx) {
-  if (ctx->Job()->job_conf().train_conf().has_train_step_lbn()) { return; }
+  if (ctx->GetJob()->job_conf().train_conf().has_train_step_lbn()) { return; }
   OperatorConf variable_op_conf{};
-  const std::string train_step_name = "System-Train-TrainStep-" + ctx->Job()->job_conf().job_name();
+  const std::string train_step_name =
+      "System-Train-TrainStep-" + ctx->GetJob()->job_conf().job_name();
   variable_op_conf.set_name(train_step_name);
   VariableOpConf* variable_conf = variable_op_conf.mutable_variable_conf();
   variable_conf->set_out("out");
