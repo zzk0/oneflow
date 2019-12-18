@@ -74,6 +74,7 @@ class OpNode final : public Node<OpNode, OpEdge> {
                       const ParallelContext* parallel_ctx) const;
   void InferBlobParallelDesc();
   void InitLbi2SourceNode();
+  void UpdateLbi2SbpParallel();
 
   ParallelDesc parallel_desc_;
   HashMap<std::string, ParallelDesc> obn2blob_parallel_desc_;
@@ -85,6 +86,7 @@ class OpNode final : public Node<OpNode, OpEdge> {
   HashMap<std::string, std::vector<std::shared_ptr<BlobDesc>>> bn2parallel_id2blob_desc_;
   HashMap<LogicalBlobId, std::unique_ptr<BlobDesc>> lbi2logical_blob_desc_;
   HashMap<LogicalBlobId, OpNode*> lbi2source_node_;
+  HashMap<LogicalBlobId, SbpParallel> lbi2sbp_parallel_;
 };
 
 class OpEdge final : public Edge<OpNode, OpEdge> {
