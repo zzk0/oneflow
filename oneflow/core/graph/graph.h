@@ -287,7 +287,7 @@ void Graph<NodeType, EdgeType>::BfsForEachNode(
     const std::list<NodeType*>& starts,
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachNext,
     const std::function<void(NodeType*)>& Handler) const {
-  std::vector<bool> queued_nodes[next_node_idx_];
+  std::vector<bool> queued_nodes(next_node_idx_);
   std::queue<NodeType*> queue;
   for (NodeType* start : starts) {
     if (queued_nodes.at(start->IndexInGraph()) == false) {
