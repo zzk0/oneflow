@@ -341,7 +341,7 @@ void OpNode::UpdateLbi2SbpParallel() {
     if (it == lbi2sbp_parallel_.end()) {
       lbi2sbp_parallel_[lbi] = sbp_parallel;
     } else {
-      CHECK_EQ(it->second, sbp_parallel);
+      CHECK(it->second == sbp_parallel);
     }
   };
   for (const std::string& ibn : op().input_bns()) { Update(ibn); }
