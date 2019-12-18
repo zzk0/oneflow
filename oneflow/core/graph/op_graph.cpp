@@ -193,9 +193,7 @@ bool OpNode::IsTimeShapeIdentity() const {
 }
 
 const Shape* OpNode::GetInputBlobFastestTimeShape() const {
-  if (input_blob_fastest_time_shape_) {
-    return input_blob_fastest_time_shape_.get();
-  }
+  if (input_blob_fastest_time_shape_) { return input_blob_fastest_time_shape_.get(); }
   const Shape* ret = nullptr;
   for (OpEdge* edge : in_edges()) {
     const Shape* shape = edge->src_node()->out_blob_time_shape();
@@ -204,8 +202,10 @@ const Shape* OpNode::GetInputBlobFastestTimeShape() const {
   for (OpEdge* edge : in_edges()) {
     CHECK_EQ(ret->elem_cnt() % edge->src_node()->out_blob_time_shape()->elem_cnt(), 0);
   }
-  input_blob_fastest_time_shape_.reset(new Shape());
-  *input_blob_fastest_time_shape_ = *ret;
+  if (ret != nullptr) {
+    input_blob_fastest_time_shape_.reset(new Shape());
+    *input_blob_fastest_time_shape_ = *ret;
+  }
   return ret;
 }
 
