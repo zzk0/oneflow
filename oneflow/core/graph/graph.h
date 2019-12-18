@@ -287,12 +287,12 @@ void Graph<NodeType, EdgeType>::BfsForEachNode(
     const std::list<NodeType*>& starts,
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachNext,
     const std::function<void(NodeType*)>& Handler) const {
-  HashSet<NodeType*> queued_nodes;
+  std::vector<bool> queued_nodes[next_node_idx_];
   std::queue<NodeType*> queue;
   for (NodeType* start : starts) {
-    if (queued_nodes.find(start) == queued_nodes.end()) {
+    if (queued_nodes.at(start->IndexInGraph()) == false) {
       queue.push(start);
-      queued_nodes.insert(start);
+      queued_nodes.at(start->IndexInGraph()) = true;
     }
   }
   while (!queue.empty()) {
@@ -300,9 +300,9 @@ void Graph<NodeType, EdgeType>::BfsForEachNode(
     queue.pop();
     Handler(cur_node);
     ForEachNext(cur_node, [&](NodeType* next) {
-      if (queued_nodes.find(next) == queued_nodes.end()) {
+      if (queued_nodes.at(next->IndexInGraph()) == false) {
         queue.push(next);
-        queued_nodes.insert(next);
+        queued_nodes.at(next->IndexInGraph()) = true;
       }
     });
   }
