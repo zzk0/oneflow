@@ -261,11 +261,13 @@ void OpNode::ConcatBlobDesc(const ParallelDesc& blob_parallel_desc,
       same_blob_descs.at(axis_parallel_id).reset(new BlobDesc(*blob_descs.at(axis_parallel_id)));
       same_blob_descs.at(axis_parallel_id)->mut_shape().Set(axis, logical_blob_axis_dim);
     }
-    for (const auto& blob_desc : same_blob_descs) { CHECK(*blob_desc == *same_blob_descs.at(0)); }
+    FOR_RANGE(int64_t, i, 1, same_blob_descs.size()) {
+      CHECK(*same_blob_descs.at(i) == *same_blob_descs.at(0));
+    }
     concatenated_blob_desc->CopyAllFrom(*same_blob_descs.at(0));
   } else {
     // select first BlobDesc
-    for (const auto& blob_desc : blob_descs) { CHECK(*blob_desc == *blob_descs.at(0)); }
+    FOR_RANGE(int64_t, i, 1, blob_descs.size()) { CHECK(*blob_descs.at(i) == *blob_descs.at(0)); }
     concatenated_blob_desc->CopyAllFrom(*blob_descs.at(0));
   }
 }
@@ -285,12 +287,14 @@ void OpNode::SplitLogicalInputBlobDesc() {
     const BlobDesc& logical_blob_desc = ProducerOpNode4BnInOp(bn).LogicalBlobDesc4Lbi(lbi);
     CHECK_NE(logical_blob_desc.data_type(), DataType::kInvalidDataType);
     const SbpParallel& sbp_parallel = SbpParallel4BnInOp(bn);
-    ForEachSplitOrBroadcastBlobDesc(
-        logical_blob_desc, sbp_parallel, [&](const BlobDesc& blob_desc) {
-          bn2parallel_id2blob_desc_[bn].emplace_back(new BlobDesc(blob_desc));
-          CHECK_NE(bn2parallel_id2blob_desc_[bn].back()->data_type(), DataType::kInvalidDataType);
-        });
-    CHECK_EQ(bn2parallel_id2blob_desc_.at(bn).size(), parallel_desc().parallel_num());
+    auto& parallel_id2blob_desc = bn2parallel_id2blob_desc_[bn];
+    parallel_id2blob_desc.reserve(parallel_desc().parallel_num());
+    ForEachSplitOrBroadcastBlobDesc(logical_blob_desc, sbp_parallel,
+                                    [&](const BlobDesc& blob_desc) {
+                                      CHECK_NE(blob_desc.data_type(), DataType::kInvalidDataType);
+                                      parallel_id2blob_desc.emplace_back(new BlobDesc(blob_desc));
+                                    });
+    CHECK_EQ(parallel_id2blob_desc.size(), parallel_desc().parallel_num());
   }
 }
 
