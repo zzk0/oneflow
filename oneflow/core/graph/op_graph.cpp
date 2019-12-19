@@ -52,7 +52,7 @@ bool OpEdge::CalcIsStrict121Connected() const {
   if (!src->parallel_desc().Equals(dst->parallel_desc())) { return false; }
   if (src->IsTimeShapeIdentity() == false) { return false; }
   if (dst->IsTimeShapeIdentity() == false) { return false; }
-  if (*src->GetInputOutputFastestTimeShape() != *src->GetInputOutputFastestTimeShape()) {
+  if (*src->GetInputOutputFastestTimeShape() != *dst->GetInputOutputFastestTimeShape()) {
     return false;
   }
   for (const LogicalBlobId& lbi : lbis()) {
@@ -227,8 +227,8 @@ void OpNode::ForEachSplitOrBroadcastBlobDesc(
     CHECK_LT(axis, blob_desc.shape().NumAxes());
     CHECK_GE(blob_desc.shape().At(axis), parallel_desc().parallel_num());
     BalancedSplitter bs(blob_desc.shape().At(axis), parallel_desc().parallel_num());
+    BlobDesc sub_blob_desc(blob_desc);
     FOR_RANGE(int64_t, axis_parallel_id, 0, parallel_desc().parallel_num()) {
-      BlobDesc sub_blob_desc(blob_desc);
       sub_blob_desc.mut_shape().Set(axis, bs.At(axis_parallel_id).size());
       Handler(sub_blob_desc);
     }
