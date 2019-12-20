@@ -70,7 +70,7 @@ def conv2d(input, output_dim,
 #     name_ = name if reuse == False else name + "_reuse"
 #     return flow.layers.batch_normalization(
 #         inputs=input,
-#         axis=3,
+#         axis=1,
 #         momentum=0.9,
 #         epsilon=1e-4,
 #         center=True,

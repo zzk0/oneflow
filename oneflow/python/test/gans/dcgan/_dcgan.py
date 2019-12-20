@@ -15,6 +15,7 @@ epoch_num = 2
 def conv_out_size_same(size, stride):
   return int(math.ceil(float(size) / float(stride)))
 
+
 def generator(z, trainable=True):
     s_h, s_w = (input_size, input_size)
     s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)

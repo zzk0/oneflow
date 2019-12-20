@@ -8,7 +8,7 @@ flow.config.gpu_device_num(1)
 flow.config.default_data_type(flow.float32)
 
 
-def test_deconv_2d_forward(dilation=1, padding=2, output_padding=2, stride=3):
+def test_deconv_2d_forward(dilation=1, padding=2, output_padding=0, stride=2):
 
     @flow.function
     def ForwardDeconv2dJob(input=flow.input_blob_def((64, 256, 14, 14))):
@@ -34,9 +34,6 @@ def test_deconv_2d_forward(dilation=1, padding=2, output_padding=2, stride=3):
         print("pass forward test!")
     else:
         print("failed")
-    # print(of_out[0][0][0][0])
-    print(of_out[0].shape)
-    # print(torch_out[0][0][0])
 
 def test_deconv_2d_forward_tf(dilation=1, padding='SAME', output_shape=6, stride=2):
 
@@ -97,5 +94,5 @@ def test_deconv_2d_backward():
     
 
 if __name__ == "__main__":
-    test_deconv_2d_forward_tf()
+    test_deconv_2d_forward()
     # test_deconv_2d_backward()
