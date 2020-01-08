@@ -8,40 +8,42 @@ flow.config.gpu_device_num(1)
 flow.config.default_data_type(flow.float32)
 
 
-def test_deconv_2d_forward(dilation=1, padding=2, output_padding=0, stride=2):
+def test_deconv_2d_forward(dilation=1, padding=1, output_padding=0, stride=2,
+                           kernel_size=2, in_channels=4, out_channels=5, in_size=4):
 
     @flow.function
-    def ForwardDeconv2dJob(input=flow.input_blob_def((64, 256, 14, 14))):
+    def ForwardDeconv2dJob(input=flow.input_blob_def((5, in_channels, in_size, in_size))):
         weight = flow.get_variable(name="filter", shape=(
-            256, 3, 2, 2), dtype=flow.float32, initializer=flow.ones_initializer())
+            in_channels, out_channels, kernel_size, kernel_size), dtype=flow.float32, initializer=flow.ones_initializer())
         output = flow.nn.conv2d_transpose(input, weight, strides=stride, output_padding=output_padding, 
                                           dilations=dilation, padding=padding, data_format="NCHW"),
         return output
 
-    x = np.random.randn(64, 256, 14, 14).astype(np.float32)
+    x = np.random.randn(5, in_channels, in_size, in_size).astype(np.float32)
     # oneflow output
     check_point = flow.train.CheckPoint()
     check_point.init()
     of_out = ForwardDeconv2dJob(x).get()
     # torch output
-    deconv = torch.nn.ConvTranspose2d(in_channels=256, out_channels=3, kernel_size=2, stride=stride,
+    deconv = torch.nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride,
                                       padding=padding, output_padding=output_padding, groups=1, bias=False,
                                       dilation=dilation, padding_mode='zeros')
-    deconv.weight = torch.nn.Parameter(torch.ones([256, 3, 2, 2]), requires_grad=True)
+    deconv.weight = torch.nn.Parameter(torch.ones([in_channels, out_channels, kernel_size, kernel_size]), requires_grad=True)
     torch_out = deconv(torch.tensor(x, dtype=torch.float32)).detach().numpy()
 
-    if np.allclose(of_out, torch_out, atol=1e-3):
-        print("pass forward test!")
-    else:
-        print("failed")
+    print(of_out - torch_out)
+    # if np.allclose(of_out, torch_out, atol=1e-3):
+    #     print("pass forward test!")
+    # else:
+    #     print("failed")
 
-def test_deconv_2d_forward_tf(dilation=1, padding='SAME', output_shape=6, stride=2):
+def test_deconv_2d_forward_tf(dilation=1, padding='VALID', output_shape=6, stride=2, kernel_size=3):
 
     x = np.random.randn(5, 4, 3, 3).astype(np.float32)
     @flow.function
     def ForwardDeconv2dJob(input=flow.input_blob_def((5, 4, 3, 3))):
         weight = flow.get_variable(name="filter", shape=(
-            4, 3, 2, 2), dtype=flow.float32, initializer=flow.ones_initializer())
+            4, 3, kernel_size, kernel_size), dtype=flow.float32, initializer=flow.ones_initializer())
         output = flow.nn.conv2d_transpose(input, weight, strides=stride, output_shape=[output_shape, output_shape], 
                                           dilations=dilation, padding=padding, data_format="NCHW")
         return output
@@ -52,7 +54,7 @@ def test_deconv_2d_forward_tf(dilation=1, padding='SAME', output_shape=6, stride
     of_out = ForwardDeconv2dJob(x).get()
     # tensorflow output
     x = tf.convert_to_tensor(x)
-    kernel = tf.ones([2, 2, 3, 4])
+    kernel = tf.ones([kernel_size, kernel_size, 3, 4])
     tf_out = tf.nn.conv2d_transpose(x, kernel, output_shape=[5, 3, output_shape, output_shape], 
                                     strides=[1,1,stride,stride], padding=padding, data_format="NCHW")
     sess = tf.Session()
@@ -94,5 +96,8 @@ def test_deconv_2d_backward():
     
 
 if __name__ == "__main__":
-    test_deconv_2d_forward()
-    # test_deconv_2d_backward()
+    # zero padding pass
+    # test_deconv_2d_forward(padding=0)
+    # non-zero padding fails
+    # test_deconv_2d_forward(padding=2)
+    test_deconv_2d_forward(padding=0, kernel_size=5)

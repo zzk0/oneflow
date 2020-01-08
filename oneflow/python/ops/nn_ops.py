@@ -429,6 +429,7 @@ def deconv2d(
         input is not None), "only one of `input` and `value` could be not None"
     assert (filter is not None) ^ (
         filters is not None), "only one of `filter` and `filters` could be not None"
+
     filters = filters or filter
     input = input or value
 
