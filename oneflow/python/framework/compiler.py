@@ -9,8 +9,8 @@ import oneflow.python.framework.placement_util as placement_util
 import oneflow.python.framework.remote_blob as remote_blob_util
 import oneflow.python.framework.distribute as distribute_util
 import oneflow.python.framework.input_blob_def as input_blob_util
+import oneflow.python.framework.output_blob_def as output_blob_util
 import oneflow.python.ops as ops
-from oneflow.python.lib.core.box import Box
 
 from contextlib import contextmanager
 
@@ -36,10 +36,10 @@ def Compile(function_desc, config_proto):
 
 def _CompileJob(function_desc):
     func = function_desc.job_func
-    func.__oneflow_input_blob_defs__ = _GetArgDefault(func)
-    inputs = _RecursiveMakeInputBlobs(func.__oneflow_input_blob_defs__)
+    func.__oneflow_arg_blob_defs__ = _GetArgDefault(func)
+    inputs = _RecursiveMakeArgBlobs(func.__oneflow_arg_blob_defs__)
     kwarg = dict(allow_cpu_return_op=function_desc.function_attribute.allow_cpu_return_op)
-    func.__oneflow_output_remote_blobs__ = _RecursiveMakeRetRemoteBlobs(func(*inputs), kwarg)
+    func.__oneflow_return_remote_blobs__ = _RecursiveMakeRetRemoteBlobs(func(*inputs), kwarg)
 
 @contextmanager
 def _JobBuildAndInferCtx(job_name):
@@ -53,19 +53,22 @@ def _GetArgDefault(func):
 
 def _CloneArgBlobDef(args):
     if isinstance(args, input_blob_util.ArgBlobDef): return args.Clone()
+    if isinstance(args, output_blob_util.OutArgBlobDef): return args.Clone()
     if isinstance(args, (tuple, list)): return type(args)(_CloneArgBlobDef(x) for x in args)
     if isinstance(args, dict): return {k: _CloneArgBlobDef(v) for k, v in args}
     raise NotImplementedError("oneflow.function only accepts nested input blob defs")
 
-def _RecursiveMakeInputBlobs(input_blob_def):
-    if isinstance(input_blob_def, input_blob_util.ArgBlobDef):
-        return ops.InputOpByArgBlobDef(input_blob_def)
-    if isinstance(input_blob_def, (tuple, list)):
-        return type(input_blob_def)(_RecursiveMakeInputBlobs(x) for x in input_blob_def)
-    if isinstance(input_blob_def, dict):
-        return {k : _RecursiveMakeInputBlobs(v) for k, v in input_blob_def.items()}
+def _RecursiveMakeArgBlobs(arg_blob_def):
+    if isinstance(arg_blob_def, input_blob_util.ArgBlobDef):
+        return ops.InputOpByArgBlobDef(arg_blob_def)
+    if isinstance(arg_blob_def, output_blob_util.OutArgBlobDef):
+        return arg_blob_def
+    if isinstance(arg_blob_def, (tuple, list)):
+        return type(arg_blob_def)(_RecursiveMakeArgBlobs(x) for x in arg_blob_def)
+    if isinstance(arg_blob_def, dict):
+        return {k : _RecursiveMakeArgBlobs(v) for k, v in arg_blob_def.items()}
     raise NotImplementedError("oneflow.function accepts "
-            + "ArgBlobDefs or list/tuple/dict nested ArgBlobDefs as argument")
+            + "ArgBlobDefs/OutArgBlobDefs or list/tuple/dict nested ArgBlobDefs/OutArgBlobDefs as argument")
 
 def _RecursiveMakeRetRemoteBlobs(remote_blobs, kwarg):
     if remote_blobs is None: return None

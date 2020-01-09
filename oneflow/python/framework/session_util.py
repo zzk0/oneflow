@@ -110,7 +110,7 @@ class Session(object):
         job_name = job_func.__name__
         push_util.AsyncPush(self, job_func, *arg)
         self.LaunchJob(job_instance_util.MakeUserJobInstance(job_name))
-        return job_func.__oneflow_output_remote_blobs__
+        return job_func.__oneflow_return_remote_blobs__
 
     def LaunchJob(self, job_instance):
         assert self.status_ is SessionStatus.RUNNING

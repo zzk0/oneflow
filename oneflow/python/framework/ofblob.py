@@ -6,7 +6,6 @@ import oneflow.oneflow_internal as oneflow_api
 import oneflow.python.framework.local_blob as local_blob_util
 import oneflow.python.framework.remote_blob as remote_blob_util
 from google.protobuf import text_format
-from oneflow.python.lib.core.box import Box
 import numpy as np
 import collections
 from functools import reduce

@@ -10,14 +10,9 @@ class Box(object):
         self.value_ = None
         if self.has_value_: self.value_ = arg[0]
 
-    @property
     def value(self):
         assert self.has_value_
         return self.value_
-
-    @property
-    def value_setter(self):
-        return lambda val: self.set_value(val)
 
     def set_value(self, val):
         self.value_ = val

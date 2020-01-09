@@ -1,11 +1,20 @@
 from __future__ import absolute_import
 import oneflow.python.framework.input_blob_def as input_blob_util
+import oneflow.python.framework.output_blob_def as output_blob_util
+import oneflow.python.lib.core.box as box_util
 
 def AsyncPush(session, job_func, *arg):
     job_name = job_func.__name__
-    assert len(arg) == len(job_func.__oneflow_input_blob_defs__)
+    assert len(arg) == len(job_func.__oneflow_arg_blob_defs__)
     for i in range(len(arg)):
-        _AsyncPushArg(session, job_func.__oneflow_input_blob_defs__[i], arg[i])
+        arg_def = job_func.__oneflow_arg_blob_defs__[i]
+        if isinstance(arg_def, input_blob_util.ArgBlobDef):
+            _AsyncPushArg(session, arg_def, arg[i])
+        elif isinstance(arg_def, output_blob_util.OutArgBlobDef):
+            assert isinstance(arg[i], box_util.Box)
+            arg[i].set_value(arg_def.Clone())
+        else:
+            raise NotImplementedError
 
 def _AsyncPushArg(session, arg_blob_def, arg_ndarray):
     if isinstance(arg_blob_def, (list, tuple)):
