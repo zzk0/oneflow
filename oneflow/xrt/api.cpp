@@ -1,10 +1,12 @@
 #include "oneflow/xrt/api.h"
 
 #include "glog/logging.h"
-
+#include "NvInfer.h"
 #include "oneflow/core/operator/operator.h"  // GenLogicalBlobName, GenLogicalBlobId
+#include "oneflow/xrt/tensorrt/trt_int8.h"
 #include "oneflow/xrt/build_graph.h"
 #include "oneflow/xrt/utility/env.h"
+
 
 DEFINE_int32(clustering_minimum_nodes, EnvToInt(FLAGS_clustering_minimum_nodes, 1),
              "Minium nodes of a cluster after clustering.");
@@ -100,6 +102,41 @@ DeviceType XrtDeviceToDeviceType(const XrtDevice &device) {
   } else {
     LOG(FATAL) << "Can not convert xrt device (" << device << ") to device type.";
     return DeviceType::kCPU;
+  }
+}
+
+nvinfer1::CalibrationAlgoType XrtInt8CalibrationAlgoTypeToCalibrationAlgoType
+        (const tensorrt::XrtInt8CalibrationAlgoType &algo_type) {
+  if (algo_type == tensorrt::XrtInt8CalibrationAlgoType::kLegacyCalibration) {
+    return nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION;
+  } else if (algo_type == tensorrt::XrtInt8CalibrationAlgoType::kEntropyCalibration) {
+    return nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION;
+  } else if (algo_type == tensorrt::XrtInt8CalibrationAlgoType::kEntropyCalibration_2) {
+    return nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION_2;
+  } else if (algo_type == tensorrt::XrtInt8CalibrationAlgoType::kMinMaxCalibration) {
+    return nvinfer1::CalibrationAlgoType::kMINMAX_CALIBRATION;
+  } else {
+    LOG(FATAL) << "Can not convert xrt int8 calibration type (" << algo_type << ") to \
+calibration algo type.";
+    return nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION;
+  }
+}
+
+tensorrt::XrtInt8CalibrationAlgoType CalibrationAlgoTypeToXrtInt8CalibrationAlgoType
+        (const nvinfer1::CalibrationAlgoType &algo_type) {
+  switch (algo_type) {
+    case nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION :
+      return tensorrt::XrtInt8CalibrationAlgoType::kLegacyCalibration;
+    case nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION:
+      return tensorrt::XrtInt8CalibrationAlgoType::kEntropyCalibration;
+    case nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION_2:
+      return tensorrt::XrtInt8CalibrationAlgoType::kEntropyCalibration_2;
+    case nvinfer1::CalibrationAlgoType::kMINMAX_CALIBRATION:
+      return tensorrt::XrtInt8CalibrationAlgoType::kMinMaxCalibration;
+    default:
+      DLOG(WARNING) << "Meet invalid calibration type (" << algo_type
+                    << "). Use the default xrtcalibration algo type instead.";
+      return tensorrt::XrtInt8CalibrationAlgoType::kEntropyCalibration;
   }
 }
 

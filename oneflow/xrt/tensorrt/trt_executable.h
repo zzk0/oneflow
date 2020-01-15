@@ -30,6 +30,17 @@ class TrtExecutable : public Executable {
         network_(std::move(network)),
         host_weights_(host_weights) {}
 
+  explicit TrtExecutable(
+      nv::unique_ptr<nvinfer1::IBuilder> &&builder,
+      nv::unique_ptr<nvinfer1::INetworkDefinition> &&network,
+      std::unique_ptr<nvinfer1::IInt8Calibrator> &&calibrator,
+      const util::Map<std::string, std::shared_ptr<std::vector<uint8_t>>> &host_weights)
+      : Executable(XrtEngine::TENSORRT),
+        builder_(std::move(builder)),
+        network_(std::move(network)),
+        calibrator_(std::move(calibrator)),
+        host_weights_(host_weights) {}
+
   virtual ~TrtExecutable() = default;
 
   bool Run(const std::vector<Parameter> &inputs, const ExecutableRunOptions &run_options,
@@ -39,13 +50,15 @@ class TrtExecutable : public Executable {
   bool CreateExecutableEngine(const ExecutableRunOptions &run_options, const int batch_size = -1);
 
   bool ExecuteEngine(const int batch_size, void **buffers, void *stream, bool block_until_done);
-
+  bool CreateExecutableEngineWithInputs(const ExecutableRunOptions &run_options,
+                                           const std::vector<Parameter> &inputs,
+                                           const int batch_size = -1);
  private:
   nv::unique_ptr<nvinfer1::ICudaEngine> engine_;
   nv::unique_ptr<nvinfer1::IBuilder> builder_;
   nv::unique_ptr<nvinfer1::INetworkDefinition> network_;
   nv::unique_ptr<nvinfer1::IExecutionContext> execution_context_;
-
+  std::unique_ptr<nvinfer1::IInt8Calibrator> calibrator_;
   util::Map<std::string, std::shared_ptr<std::vector<uint8_t>>> host_weights_;
 };
 

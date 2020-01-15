@@ -1,13 +1,16 @@
 #include "cuda_runtime.h"
 
+
 #include "oneflow/xrt/tensorrt/trt_executable.h"
+#include "oneflow/xrt/tensorrt/trt_int8.h"
 
 namespace oneflow {
 namespace xrt {
 
 namespace tensorrt {
 
-bool TrtExecutable::CreateExecutableEngine(const ExecutableRunOptions &run_options,
+bool TrtExecutable::CreateExecutableEngineWithInputs(const ExecutableRunOptions &run_options,
+                                           const std::vector<Parameter> &inputs,
                                            const int batch_size) {
   if (!builder_ || !network_) { return false; }
   auto build_config = nv::unique_ptr<nvinfer1::IBuilderConfig>(builder_->createBuilderConfig());
@@ -27,10 +30,28 @@ bool TrtExecutable::CreateExecutableEngine(const ExecutableRunOptions &run_optio
                    "hardware does not support.";
     }
   }
-  // flags |= (1U << int(nvinfer1::BuilderFlag::kINT8));
+  //std::vector<int> images_dims={3, 3, 224, 224};
+  std::string list_file = "/n02129165";
+  int max_batches = 128;
+  //const std::string suffix = "0";
+  std::vector<std::string> calibration_data_dir = {"/home/sunxuexue/trt/dataset/gen_imagenet_ofrecord/validation"};
+  nvinfer1::Dims images_dims={batch_size, 3, 224, 224};
+  if (run_options.tensorrt_int8) {
+    if (builder_->platformHasFastInt8()) {
+      flags |= (1U << int(nvinfer1::BuilderFlag::kINT8));
+      builder_->setInt8Mode(true);
+      TrtBatchStream calibratorStream(batch_size, max_batches, images_dims, list_file, calibration_data_dir);
+      calibrator_.reset(new Int8EntropyCalibrator<TrtBatchStream>(calibratorStream, 0, inputs[0].name().c_str()));
+
+      build_config->setInt8Calibrator(calibrator_.get());
+    } else {
+      LOG(INFO) << "TensorRT couldn't use int8 precision since the GPU "
+                   "hardware does not support.";
+    }
+  }
+
   // flags |= (1U << int(nvinfer1::BuilderFlag::kREFIT));
   build_config->setFlags(flags);
-  // build_config->setInt8Calibrator();
 
   int32_t max_batch_size = std::max(run_options.max_batch_size, batch_size);
   builder_->setMaxBatchSize(max_batch_size);
@@ -54,7 +75,7 @@ bool TrtExecutable::Run(const std::vector<Parameter> &inputs,
                         const ExecutableRunOptions &run_options, bool block_until_done) {
   // TODO(hjchen2)
   if (!execution_context_ && !engine_) {
-    CHECK(CreateExecutableEngine(run_options)) << "Cannot create TensorRT executanble engine.";
+    CHECK(CreateExecutableEngineWithInputs(run_options, inputs)) << "Cannot create TensorRT executanble engine.";
   }
   // All return params are results of the executable.
   this->results_ = run_options.return_params;
@@ -77,7 +98,7 @@ bool TrtExecutable::Run(const std::vector<Parameter> &inputs,
   if (batch_size > engine_->getMaxBatchSize()) {
     LOG(WARNING) << "Rebuild engine since the maximum batch size " << engine_->getMaxBatchSize()
                  << " is less than the input batch size " << batch_size;
-    CHECK(CreateExecutableEngine(run_options, batch_size))
+    CHECK(CreateExecutableEngineWithInputs(run_options, inputs, batch_size))
         << "Failed to create engine with batch size " << batch_size;
     execution_context_.reset(engine_->createExecutionContext());
   }
