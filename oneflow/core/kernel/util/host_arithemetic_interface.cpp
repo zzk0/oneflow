@@ -99,4 +99,31 @@ void ArithemeticIf<DeviceType::kCPU>::InitializeWithConstConf(
   }
 }
 
+#define MUL_BY_SCALAR(T)                                                                         \
+  void ArithemeticIf<DeviceType::kCPU>::MulByScalar(DeviceCtx* ctx, const int64_t n, const T* x, \
+                                                    const T y, T* z) {                           \
+    for (int64_t i = 0; i < n; ++i) { z[i] = x[i] * y; }                                         \
+  }
+
+MUL_BY_SCALAR(float);
+MUL_BY_SCALAR(double);
+MUL_BY_SCALAR(int32_t);
+MUL_BY_SCALAR(int64_t);
+
+#undef MUL_BY_SCALAR
+
+#define FILL(T)                                                                              \
+  void ArithemeticIf<DeviceType::kCPU>::Fill(DeviceCtx* ctx, const int64_t n, const T value, \
+                                             T* y) {                                         \
+    std::fill_n(y, n, value);                                                                \
+  }
+
+FILL(float);
+FILL(double);
+FILL(int8_t);
+FILL(int32_t);
+FILL(int64_t);
+
+#undef FILL
+
 }  // namespace oneflow

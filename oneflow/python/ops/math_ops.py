@@ -20,6 +20,23 @@ def add(x, y, name=None):
     else:
         return broadcast_add(x, y, name)
 
+@oneflow_export("math.add_n")
+def add_n(inputs, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("AddN_"),
+    )
+    assert len(inputs) > 1
+    for blob in inputs:
+        getattr(op_conf.add_conf, "in").append(blob.logical_blob_name)
+    op_conf.add_conf.out = "out"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
 
 @oneflow_export("math.subtract")
 def subtract(x, y, name=None):
@@ -57,6 +74,19 @@ def divide(x, y, name=None):
         return broadcast_div(x, y, name)
     else:
         return broadcast_div(x, y, name)
+
+
+@oneflow_export("math.mod")
+def floor_mod(x, y, name=None):
+    if isinstance(x, (int, float)):
+        raise NotImplementedError
+    elif isinstance(y, (int, float)):
+        raise NotImplementedError
+    elif x.static_shape == y.static_shape:
+        # TODO: add element-wise op
+        return broadcast_floor_mod(x, y, name)
+    else:
+        return broadcast_floor_mod(x, y, name)
 
 
 def scalar_add(x, operand, name=None):
@@ -197,6 +227,23 @@ def broadcast_div(x, y, name=None):
     return remote_blob_util.RemoteBlob(lbi)
 
 
+def broadcast_floor_mod(x, y, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("BroadcastMod_"),
+    )
+    op_conf.broadcast_floor_mod_conf.a = x.logical_blob_name
+    op_conf.broadcast_floor_mod_conf.b = y.logical_blob_name
+    op_conf.broadcast_floor_mod_conf.out = "out"
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
+
+
 @oneflow_export("math.tanh")
 def tanh(x, name=None):
     op_conf = op_conf_util.OperatorConf()
@@ -289,9 +336,8 @@ def unsorted_batch_segment_sum(data, segment_ids, num_segments, name=None):
     return remote_blob_util.RemoteBlob(lbi)
 
 
+@oneflow_export("math.sqrt")
 def sqrt(x, name=None):
-    # TODO: not ready yet
-    raise NotImplementedError
     op_conf = op_conf_util.OperatorConf()
     setattr(op_conf, "name", name if name is not None else id_util.UniqueStr("Sqrt_"))
     setattr(op_conf.sqrt_conf, "in", x.logical_blob_name)
@@ -303,9 +349,8 @@ def sqrt(x, name=None):
     return remote_blob_util.RemoteBlob(lbi)
 
 
+@oneflow_export("math.rsqrt")
 def rsqrt(x, name=None):
-    # TODO: not ready yet
-    raise NotImplementedError
     op_conf = op_conf_util.OperatorConf()
     setattr(op_conf, "name", name if name is not None else id_util.UniqueStr("Rsqrt_"))
     setattr(op_conf.rsqrt_conf, "in", x.logical_blob_name)
@@ -572,3 +617,38 @@ def argmax(input, axis=None, output_type=None, name=None):
     setattr(out_lbi, "op_name", op_conf.name)
     setattr(out_lbi, "blob_name", "out")
     return remote_blob_util.RemoteBlob(out_lbi)
+
+@oneflow_export("math.reduced_shape_elem_cnt")
+def elem_cnt(input_blob, axis=None, dtype=None, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(op_conf, "name", name if name is not None else id_util.UniqueStr("ShapeElemCnt_"))
+    op_conf.shape_elem_cnt_conf.x = input_blob.logical_blob_name
+    if axis is None:
+        op_conf.shape_elem_cnt_conf.exclude_axis_conf.SetInParent()
+    else:
+        assert isinstance(axis, (tuple, list))
+        op_conf.shape_elem_cnt_conf.include_axis_conf.axis.extend(axis)
+    if dtype is not None:
+        op_conf.shape_elem_cnt_conf.data_type = dtype
+    op_conf.shape_elem_cnt_conf.y = "y"
+    compile_context.CurJobAddOp(op_conf)
+    out_lbi = logical_blob_id_util.LogicalBlobId()
+    out_lbi.op_name = op_conf.name
+    out_lbi.blob_name = "y"
+    return remote_blob_util.RemoteBlob(out_lbi)
+
+@oneflow_export('math.square')
+def square(x, name=None):
+    op_conf = op_conf_util.OperatorConf()
+    setattr(
+        op_conf,
+        "name",
+        name if name is not None else id_util.UniqueStr("Square_"),
+    )
+    setattr(op_conf.square_conf, "in", x.logical_blob_name)
+    setattr(op_conf.square_conf, "out", "out")
+    compile_context.CurJobAddOp(op_conf)
+    lbi = logical_blob_id_util.LogicalBlobId()
+    lbi.op_name = op_conf.name
+    lbi.blob_name = "out"
+    return remote_blob_util.RemoteBlob(lbi)
