@@ -574,6 +574,11 @@ message LinearCosineDecayConf {
   optional double beta = 4 [default = 0.001];
 }
 
+message PiecewiseScalingConf {
+  repeated int64 boundaries = 1;
+  repeated double scales = 2; 
+}
+
 message LearningRateDecayConf {
   oneof type {
     ExponentialDecayConf exponential_conf = 2000;
@@ -583,6 +588,7 @@ message LearningRateDecayConf {
     PolynomialDecayConf polynomial_conf = 2004;
     CosineDecayConf cosine_conf = 2005;
     LinearCosineDecayConf linear_cosine_conf = 2006;
+    PiecewiseScalingConf piecewise_scaling_conf = 2007;
   }
 }
 
@@ -957,7 +963,7 @@ message DataLoadOpConf {
   required DatasetProto dataset = 3;
   repeated BlobConf blobs = 4;
   repeated DataTransformProto transforms = 5;
-  optional int32 batch_cache_size = 6 [default = 3];
+  required int32 num_parallels = 6;
 }
 
 message DecodeOFRecordOpConf {
@@ -1766,6 +1772,7 @@ message BoxDecodeOpConf {
   required string boxes = 3;
   // conf
   required BBoxRegressionWeights regression_weights = 4;
+  required float bbox_xform_clip = 5;
 }
 
 message LevelMapOpConf {
@@ -1980,6 +1987,16 @@ message RandomLikeOpConf {
   required string like = 1;
   required string out = 2;
   optional int64 random_seed = 3;
+}
+
+message NvtxRangeStartOpConf {
+  repeated string in = 1;
+  required string msg = 2;
+}
+
+message NvtxRangeEndOpConf {
+  repeated string in = 1;
+  required string msg = 2;
 }
 
 message OperatorConf {
@@ -2212,6 +2229,10 @@ message OperatorConf {
 
     // mutable input op
     AxpyOpConf axpy_conf = 752;
+
+    // debug op
+    NvtxRangeStartOpConf nvtx_range_start_conf = 801;
+    NvtxRangeEndOpConf nvtx_range_end_conf = 802;
   }
 }
 

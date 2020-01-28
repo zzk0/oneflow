@@ -18,7 +18,7 @@ def make_data_loader(cfg, is_train):
             group_by_aspect_ratio=cfg.DATALOADER.ASPECT_RATIO_GROUPING,
         )
         data_loader = flow.data.DataLoader(
-            coco, cfg.SOLVER.BATCH_SIZE, cfg.DATALOADER.CACHE_SIZE
+            coco, cfg.SOLVER.IMS_PER_BATCH, cfg.DATALOADER.NUM_WORKERS
         )
 
         aligned_min_size = roundup(cfg.INPUT.MIN_SIZE_TRAIN, cfg.DATALOADER.SIZE_DIVISIBILITY)
@@ -69,6 +69,12 @@ def make_data_loader(cfg, is_train):
             variable_length_axes=(0,),
             is_dynamic=True,
         )
+        data_loader.add_blob(
+            "image_id",
+            data_util.kImageId,
+            shape=(1, ),
+            dtype=flow.int64,
+        )
         data_loader.add_transform(
             flow.data.TargetResizeTransform(cfg.INPUT.MIN_SIZE_TRAIN, cfg.INPUT.MAX_SIZE_TRAIN)
         )
@@ -89,7 +95,7 @@ def make_data_loader(cfg, is_train):
             group_by_aspect_ratio=True,
         )
         data_loader = flow.data.DataLoader(
-            coco, cfg.SOLVER.BATCH_SIZE, cfg.DATALOADER.CACHE_SIZE
+            coco, cfg.SOLVER.IMS_PER_BATCH, cfg.DATALOADER.NUM_WORKERS
         )
 
         aligned_min_size = roundup(cfg.INPUT.MIN_SIZE_TEST, cfg.DATALOADER.SIZE_DIVISIBILITY)

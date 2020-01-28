@@ -54,9 +54,16 @@ def test_trainable(input=flow.input_blob_def((batch_size, 100))):
     flow.config.train.primary_lr(0.0001)
     flow.config.train.model_update_conf(dict(naive_conf={}))
 
+<<<<<<< HEAD
     loss = linear(input, 1, trainable=False, name="linear")
     flow.losses.add_loss(loss)
     return loss
+=======
+    ret = linear(input, 1, trainable=False, name="linear0")
+    loss = linear(input, 1, trainable=True, name="linear1") + ret
+    flow.losses.add_loss(loss)
+    return (ret, loss)
+>>>>>>> dev_quick_dirty_object_detection
 
 flow.config.gpu_device_num(1)
 flow.config.default_data_type(flow.float32)
@@ -66,8 +73,17 @@ check_point.init()
 # when the input is fixed, the loss should not drop but it does
 z = np.random.normal(0, 1, size=(batch_size, 100)).astype(np.float32)
 for itr in range(iterations):
+<<<<<<< HEAD
     loss = test_trainable(z).get()
 
     if  (itr + 1) % 10 == 0:
         print(itr + 1, "th batch:")
         print("loss:", loss.mean())
+=======
+    (ret, loss) = test_trainable(z).get()
+
+    if  (itr + 1) % 10 == 0:
+        print(itr + 1, "th batch:")
+        print("ret:", ret.mean())
+        print("loss:", loss.mean())
+>>>>>>> dev_quick_dirty_object_detection

@@ -13,6 +13,7 @@ _C = CN()
 # ---------------------------------------------------------------------------- #
 _C.ENV = CN()
 _C.ENV.NUM_GPUS = 4
+_C.ENV.IMS_PER_GPU = 2
 _C.ENV.ENABLE_INPLACE = False
 _C.ENV.CUDNN_BUFFER_SIZE_LIMIT = 1280
 _C.ENV.CUDNN_CONV_HEURISTIC_SEARCH_ALGO = True
@@ -74,7 +75,7 @@ _C.DATALOADER.SIZE_DIVISIBILITY = 32
 # is compatible. This groups portrait images together, and landscape images
 # are not batched with portrait images.
 _C.DATALOADER.ASPECT_RATIO_GROUPING = True
-_C.DATALOADER.CACHE_SIZE = 3
+_C.DATALOADER.NUM_WORKERS = 8
 
 # ---------------------------------------------------------------------------- #
 # Backbone options
@@ -132,6 +133,7 @@ _C.MODEL.RPN.FPN_POST_NMS_TOP_N_TRAIN = 1000
 _C.MODEL.RPN.FPN_POST_NMS_TOP_N_TEST = 1000
 
 _C.MODEL.RPN.RANDOM_SAMPLE = True
+_C.MODEL.RPN.ZERO_CTRL = False
 
 # ---------------------------------------------------------------------------- #
 # ROI HEADS options
@@ -172,6 +174,7 @@ _C.MODEL.ROI_MASK_HEAD.POOLER_SAMPLING_RATIO = 2
 _C.MODEL.ROI_MASK_HEAD.POOLER_SCALES = (0.25, 0.125, 0.0625, 0.03125)
 _C.MODEL.ROI_MASK_HEAD.CONV_LAYERS = (256, 256, 256, 256)
 # _C.MODEL.ROI_MASK_HEAD.RESOLUTION = 28
+_C.MODEL.ROI_MASK_HEAD.ZERO_CTRL = False
 
 # Dilation
 _C.MODEL.ROI_MASK_HEAD.DILATION = 1
@@ -190,12 +193,14 @@ _C.MODEL.RESNETS.BACKBONE_OUT_CHANNELS = 256
 _C.MODEL.RESNETS.RES2_OUT_CHANNELS = 256
 _C.MODEL.RESNETS.STEM_OUT_CHANNELS = 64
 
+_C.MODEL.COLLECT_ACCURACY_METRICS = False
 # ---------------------------------------------------------------------------- #
 # Solver
 # ---------------------------------------------------------------------------- #
 _C.SOLVER = CN()
 _C.SOLVER.MAX_ITER = 180000
 
+_C.SOLVER.MAKE_LR = False
 _C.SOLVER.BASE_LR = 0.01
 _C.SOLVER.BIAS_LR_FACTOR = 2
 
@@ -205,9 +210,9 @@ _C.SOLVER.MOMENTUM = 0.9
 _C.SOLVER.WEIGHT_DECAY = 0.0001
 _C.SOLVER.WEIGHT_DECAY_BIAS = 0
 
-# _C.SOLVER.GAMMA = 0.1
 _C.SOLVER.STEPS = (120000, 160000)
-_C.SOLVER.LR_DECAY_VALUES = [0.01, 0.001, 0.0001]
+# _C.SOLVER.GAMMA = 0.1  # GAMMA with 3 step stections -> LR_DECAY_VALUES
+_C.SOLVER.LR_DECAY_VALUES = (1, 0.1, 0.01)
 _C.SOLVER.ENABLE_LR_DECAY = True
 
 _C.SOLVER.WARMUP_FACTOR = 1.0 / 3
@@ -221,14 +226,19 @@ _C.SOLVER.METRICS_PERIOD = 0
 # Number of images per batch
 # This is global, so if we have 8 GPUs and IMS_PER_BATCH = 16, each GPU will
 # see 2 images per batch
-_C.SOLVER.IMS_PER_BATCH = 2
-_C.SOLVER.BATCH_SIZE = 8
+_C.SOLVER.IMS_PER_BATCH = 8
+_C.SOLVER.REDUCE_ALL_LOSSES = False
 
 # ---------------------------------------------------------------------------- #
 # Precision options
 # ---------------------------------------------------------------------------- #
 # Precision of input, allowable: (float32, float16)
 _C.DTYPE = "float32"
+
+# ---------------------------------------------------------------------------- #
+#  Async get oneflow function outputs
+# ---------------------------------------------------------------------------- #
+_C.ASYNC_GET = True
 
 # ---------------------------------------------------------------------------- #
 #  deprecated config
@@ -391,10 +401,21 @@ def check_compatibility(d1, d2):
 
 if __name__ == "__main__":
     import torch_config
+    import argparse
+
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
+    parser.add_argument("-of", "--oneflow_config_yaml", type=str, required=True)
+    parser.add_argument("-py", "--pytorch_config_yaml", type=str, required=True)
+    args = parser.parse_args()
 
     torch_cfg = torch_config._C.clone()
-    # torch_cfg.merge_from_file("/home/zhangwenxiao/repos/maskrcnn-benchmark/golden_standard/1-card.yaml")
-    (d1_diff, d2_diff, d1_only, d2_only) = check_compatibility(_C, torch_cfg)
+    flow_cfg = _C.clone()
+    if hasattr(args, "oneflow_config_yaml"):
+        flow_cfg.merge_from_file(args.oneflow_config_yaml)
+    if hasattr(args, "pytorch_config_yaml"):
+        torch_cfg.merge_from_file(args.pytorch_config_yaml)
+
+    (d1_diff, d2_diff, d1_only, d2_only) = check_compatibility(flow_cfg, torch_cfg)
     print("oneflow diff:\n{}\n".format(d1_diff))
     print("pytorch diff:\n{}\n".format(d2_diff))
     print("oneflow only:\n{}\n".format("\n".join(d1_only)))

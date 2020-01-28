@@ -1,7 +1,7 @@
 import oneflow.core.operator.op_conf_pb2 as op_conf_util
 import oneflow as flow
 from matcher import Matcher
-
+import accuracy
 
 def _Conv2d(
     inputs,
@@ -195,6 +195,7 @@ class RPNLoss(object):
                     neg_inds,
                     total_subsample_num=self.cfg.MODEL.RPN.BATCH_SIZE_PER_IMAGE,
                     pos_fraction=self.cfg.MODEL.RPN.POSITIVE_FRACTION,
+                    name="img{}_pos_neg_sample".format(img_idx)
                 )
 
                 sampled_bbox_target_list.append(
@@ -212,6 +213,7 @@ class RPNLoss(object):
                             "weight_h": 1.0,
                             "weight_w": 1.0,
                         },
+                        name="img{}_pos_box_encode".format(img_idx)
                     )
                 )
                 sampled_bbox_pred_list.append(
@@ -250,18 +252,31 @@ class RPNLoss(object):
                         sampled_bbox_target_list, axis=0, name="bbox_target"
                     ),  # CHECK_POINT: bbox_target
                     beta=1.0 / 9.0,
+                    name="box_reg_loss"
                 ),
-                name="box_reg_loss",
+                name="box_reg_loss_sum",
             )
             bbox_loss_mean = flow.math.divide(
                 bbox_loss, total_sample_cnt, name="box_reg_loss_mean"
             )
 
+            gt_objectness_logits = flow.concat(
+                        sampled_cls_label_list, axis=0, name="cls_label"
+                    )
+            if self.cfg.MODEL.COLLECT_ACCURACY_METRICS:
+                num_pos_anchors_mask = gt_objectness_logits == flow.constant_scalar(value=1, dtype=flow.int8)
+                num_neg_anchors_mask = gt_objectness_logits == flow.constant_scalar(value=0, dtype=flow.int8)
+                num_pos_anchors = flow.math.reduce_sum(flow.cast(num_pos_anchors_mask, dtype=flow.float))
+                num_neg_anchors = flow.math.reduce_sum(flow.cast(num_neg_anchors_mask, dtype=flow.float))
+                accuracy.put_metrics(
+                    {
+                        "rpn/num_pos_anchors" : num_pos_anchors * (1.0 / len(image_size_list)),
+                        "rpn/num_neg_anchors" : num_neg_anchors * (1.0 / len(image_size_list))
+                    }
+                )
             cls_loss = flow.math.reduce_sum(
                 flow.nn.sigmoid_cross_entropy_with_logits(
-                    flow.concat(
-                        sampled_cls_label_list, axis=0, name="cls_label"
-                    ),  # CHECK_POINT: cls label
+                    gt_objectness_logits,  # CHECK_POINT: cls label
                     flow.concat(
                         sampled_cls_logit_list, axis=0, name="cls_logit"
                     ),  # CHECK_POINT: cls logit
@@ -305,6 +320,7 @@ class RPNProposal(object):
         bbox_pred_list,
         image_size_list,
         resized_gt_boxes_list,
+        zero_ctrl=None
     ):
         with flow.deprecated.variable_scope("rpn-postprocess"):
             proposals = []
@@ -312,11 +328,14 @@ class RPNProposal(object):
                 proposal_list = []
                 score_list = []
                 for layer_i in range(len(cls_logit_list)):
-                    # cls_probs = flow.keras.activations.sigmoid(
-                    #     cls_logit_list[layer_i][img_idx],
-                    #     name="img{}_layer{}_cls_probs".format(img_idx, layer_i),
-                    # )
-                    cls_probs = cls_logit_list[layer_i][img_idx]
+                    cls_logits = cls_logit_list[layer_i][img_idx]
+                    if zero_ctrl is not None:
+                        cls_logits += zero_ctrl
+                    cls_probs = flow.keras.activations.sigmoid(
+                        cls_logits,
+                        name="img{}_layer{}_cls_probs".format(img_idx, layer_i),
+                    )
+                    # cls_probs = cls_logit_list[layer_i][img_idx]
                     pre_nms_top_k_inds = flow.math.top_k(
                         cls_probs,
                         k=self.top_n_per_fm,

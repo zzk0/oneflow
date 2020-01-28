@@ -1,39 +1,53 @@
-#  pip3 install -U altair vega_datasets jupyterlab --user
+# pip3 install -U altair vega_datasets jupyterlab pyyaml --user
 import altair as alt
 import pandas as pd
 import numpy as np
 import os
 import glob
+import yaml
+import operator
+from functools import reduce
 
 
-def plot_value(df):
+def plot_value(df, fit=True):
+    if df.empty:
+        return
     legends = df["legend"].unique()
-    poly_data = pd.DataFrame(
-        {"iter": np.linspace(df["iter"].min(), df["iter"].max(), 1000)}
-    )
-    for legend in legends:
-        poly_data[legend + "-fit"] = np.poly1d(
-            np.polyfit(
-                df[df["legend"] == legend]["iter"],
-                df[df["legend"] == legend]["value"],
-                3,
-            )
-        )(poly_data["iter"])
 
     base = alt.Chart(df).interactive()
 
-    chart = base.mark_circle().encode(x="iter", y="value", color="legend:N")
+    if fit:
+        chart = base.mark_circle()
+    else:
+        chart = base.mark_line()
 
-    polynomial_fit = (
-        alt.Chart(poly_data)
-        .transform_fold(
-            [legend + "-fit" for legend in legends], as_=["legend", "value"]
+    if fit:
+        poly_data = pd.DataFrame(
+            {"iter": np.linspace(df["iter"].min(), df["iter"].max(), 1000)}
         )
-        .mark_line()
-        .encode(x="iter:Q", y="value:Q", color="legend:N")
+        for legend in legends:
+            poly_data[legend + "-fit"] = np.poly1d(
+                np.polyfit(
+                    df[df["legend"] == legend]["iter"],
+                    df[df["legend"] == legend]["value"],
+                    3,
+                )
+            )(poly_data["iter"])
+        polynomial_fit = (
+            alt.Chart(poly_data)
+            .transform_fold(
+                [legend + "-fit" for legend in legends], as_=["legend", "value"]
+            )
+            .mark_line()
+        )
+        chart += polynomial_fit
+
+    chart = chart.encode(alt.X("iter:Q", scale=alt.Scale(zero=False))).encode(
+        alt.Y("value:Q")
     )
-    chart += polynomial_fit
+    chart = chart.encode(color="legend:N")
     chart.display()
+    # chart.save("{}.svg".format("".join(legends)))
 
 
 def plot_by_legend(df):
@@ -46,22 +60,30 @@ def plot_by_legend(df):
 def plot_many_by_legend(df_dict):
     legend_set_unsored = []
     legend_set_sorted = [
+        "elapsed_time",
         "loss_rpn_box_reg",
         "loss_objectness",
-        "lr",
         "loss_box_reg",
-        "total_pos_inds_elem_cnt",
         "loss_classifier",
         "loss_mask",
-        "elapsed_time",
+        "lr",
     ]
+    unique_legends = []
     for _, df in df_dict.items():
-        for legend in list(df["legend"].unique()):
-            if (
-                legend not in legend_set_sorted
-                and df[df["legend"] == legend]["note"].size is 0
-            ):
-                legend_set_unsored.append(legend)
+        unique_legends += list(df["legend"].unique())
+    unique_legends = set(unique_legends)
+    for legend in unique_legends:
+        if (legend not in legend_set_sorted) and (
+            "note" in df and df[df["legend"] == legend]["note"].isnull().all()
+        ):
+            legend_set_unsored.append(legend)
+        else:
+            if legend not in legend_set_sorted:
+                print("skipping legend: {}".format(legend))
+
+    limit, rate = get_limit_and_rate(list(df_dict.values()))
+    print(limit, rate)
+    # limit, rate = 520, 1
     for legend in legend_set_sorted + legend_set_unsored:
         df_by_legend = pd.concat(
             [
@@ -69,7 +91,9 @@ def plot_many_by_legend(df_dict):
                 for k, df in df_dict.items()
             ],
             axis=0,
+            sort=False,
         )
+        df_by_legend = subset_and_mod(df_by_legend, limit, rate)
         plot_value(df_by_legend)
 
 
@@ -81,78 +105,31 @@ def update_legend(df, prefix):
     return df
 
 
-DL = "/Users/jackal/Downloads/"
-
-
-COLUMNS = [
-    "loss_rpn_box_reg",
-    "loss_objectness",
-    "loss_box_reg",
-    "loss_classifier",
-    "loss_mask",
-]
-
-
-def make_loss_frame(hisogram, column_index, legend="undefined"):
-    assert column_index < len(COLUMNS)
-    ndarray = np.array(hisogram)[:, [column_index, len(COLUMNS)]]
-    return pd.DataFrame(
-        {"iter": ndarray[:, 1], "legend": legend, "value": ndarray[:, 0]}
-    )
-
-
-def make_loss_frame5(losses_hisogram, source):
-    return pd.concat(
-        [
-            make_loss_frame(losses_hisogram, column_index, legend=column_name)
-            for column_index, column_name in enumerate(COLUMNS)
-        ],
-        axis=0,
-        ignore_index=True,
-    )
-
-
-touch_loss_np = np.load(os.path.join(DL, "pytorch_maskrcnn_losses.npy"))
-
-torch_old_70k = make_loss_frame5(touch_loss_np, "pytorch_maskrcnn_losses")
-
-flow = pd.read_csv(
-    os.path.join(
-        DL,
-        "loss-19999-batch_size-8-gpu-4-image_dir-train2017-2019-12-12--02-51-33.csv",
-    )
-)
-torch_before_fix_1x1 = pd.read_csv(
-    os.path.join(
-        DL,
-        "torch-13299-batch_size-8-image_dir-coco_2017_train-2019-12-12--02-01-47.csv",
-    )
-)
-
-
-def latest_wildcard(path):
+def wildcard_at(path, index):
     result = glob.glob(path)
+    assert len(result) > 0, "there is no files in {}".format(path)
     result.sort(key=os.path.getmtime)
-    return result[-1]
+    return result[index]
 
 
-flow_latest_csv = latest_wildcard(os.path.join(DL, "loss*.csv"))
-torch_latest_csv = latest_wildcard(os.path.join(DL, "torch*.csv"))
-
-flow_latest = pd.read_csv(flow_latest_csv)
-torch_latest = pd.read_csv(torch_latest_csv)
-
-flow = flow_latest
-torch = torch_latest
-LIMIT = min(torch["iter"].max(), flow["iter"].max())
-TAKE_EVERY_N = 1
-if LIMIT > 2500:
-    TAKE_EVERY_N = LIMIT // 2500 + 1
+def get_df(path, wildcard=None, index=-1, post_process=None):
+    if os.path.isdir(path) and wildcard is not None:
+        path = wildcard_at(os.path.join(path, wildcard), index)
+    df = pd.read_csv(path)
+    print(path)
+    if callable(post_process):
+        df = post_process(df)
+    return df
 
 
-def isinstance2(x, t):
-    print(type(x))
-    return isinstance(x, t)
+def get_limit_and_rate(dfs):
+    maxs = [df["iter"].max() for df in dfs] + [df.size for df in dfs]
+
+    limit = min(maxs)
+    rate = 1
+    if limit * len(dfs) > 5000:
+        rate = int(limit / (5000 // len(dfs)) + 1)
+    return limit, rate
 
 
 def subset_and_mod(df, limit, take_every_n):
@@ -160,9 +137,131 @@ def subset_and_mod(df, limit, take_every_n):
     return df_limited[df_limited["iter"] % take_every_n == 0]
 
 
-plot_many_by_legend(
-    {
-        "flow": subset_and_mod(flow, LIMIT, TAKE_EVERY_N),
-        "torch": subset_and_mod(torch, LIMIT, TAKE_EVERY_N),
-    }
-)
+def parse_cfg(df):
+    yaml_string = df[df["legend"] == "cfg"]["note"][0]
+    return yaml.safe_load(yaml_string)
+
+
+def getitem(d, k):
+    if k in d and d is not None:
+        return d[k]
+    else:
+        return None
+
+
+def get_with_path(dict, path):
+    return reduce(getitem, path.split("."), dict)
+
+
+def get_with_path_print(dict, path):
+    got = get_with_path(dict, path)
+    if got is None:
+        print(f"{path} not found")
+    else:
+        print("{}: {}".format(path, got))
+
+
+def print_perf_summary(df, skip_iter_before=1):
+    df = df[df["iter"] > skip_iter_before]
+    print("elapsed_time median", df[df["legend"] == "elapsed_time"]["value"].median())
+    print("elapsed_time mean", df[df["legend"] == "elapsed_time"]["value"].mean())
+    print("elapsed_time min", df[df["legend"] == "elapsed_time"]["value"].min())
+    print("elapsed_time max", df[df["legend"] == "elapsed_time"]["value"].max())
+
+
+def post_process_flow(df):
+    cfg = parse_cfg(df)
+    get_with_path_print(cfg, "MODEL.WEIGHT")
+    get_with_path_print(cfg, "INPUT.MIRROR_PROB")
+    get_with_path_print(cfg, "MODEL.RPN.RANDOM_SAMPLE")
+    get_with_path_print(cfg, "MODEL.ROI_HEADS.RANDOM_SAMPLE")
+    get_with_path_print(cfg, "MODEL.RPN.ZERO_CTRL")
+    get_with_path_print(cfg, "MODEL.ROI_MASK_HEAD.ZERO_CTRL")
+    print_perf_summary(df, skip_iter_before=1)
+    df.drop(["rank", "note"], axis=1)
+    print("min iter: {}, max iter: {}".format(df["iter"].min(), df["iter"].max()))
+    if "primary_lr" in df["legend"].unique():
+        df["legend"].replace("primary_lr", "lr", inplace=True)
+    df = df.groupby(["iter", "legend"], as_index=False).mean()
+    return df
+
+
+def post_process_torch(df):
+    print_perf_summary(df, skip_iter_before=2)
+    if df[df["value"].notnull()]["iter"].min() == 0:
+        df.loc[:]["iter"] += 1
+    return df
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
+    parser.add_argument("-d", "--metrics_dir", type=str)
+    parser.add_argument("-o", "--oneflow_metrics_path", type=str)
+    parser.add_argument("-p", "--pytorch_metrics_path", type=str)
+    args = parser.parse_args()
+
+    if hasattr(args, "metrics_dir"):
+        flow_metrics_path = args.metrics_dir
+        torch_metrics_path = args.metrics_dir
+
+    if hasattr(args, "oneflow_metrics_path"):
+        flow_metrics_path = args.oneflow_metrics_path
+
+    if hasattr(args, "pytorch_metrics_path"):
+        torch_metrics_path = args.pytorch_metrics_path
+
+    assert os.path.exists(flow_metrics_path), "{} not found".format(flow_metrics_path)
+    assert os.path.exists(torch_metrics_path), "{} not found".format(torch_metrics_path)
+
+    plot_many_by_legend(
+        {
+            "flow": get_df(flow_metrics_path, "loss*.csv", -1, post_process_flow),
+            # "flow2": get_df(flow_metrics_path, "loss*.csv", -2, post_process_flow),
+            # "flow1": get_df(
+            #     os.path.join(
+            #         args.metrics_dir,
+            #         "loss-520-batch_size-8-gpu-4-image_dir-('val2017',)-2019-12-29--21-27-34.csv",
+            #     ),
+            #     post_process=post_process_flow,
+            # ),
+            # "flow2": get_df(
+            #     os.path.join(
+            #         args.metrics_dir,
+            #         "loss-520-batch_size-8-gpu-4-image_dir-('val2017',)-2019-12-31--10-37-45-500-520.csv",
+            #     ),
+            #     post_process=post_process_flow,
+            # ),
+            "torch": get_df(torch_metrics_path, "torch*.csv", -1, post_process_torch),
+            # "torch1": get_df(
+            #     os.path.join(
+            #         args.metrics_dir,
+            #         "torch-520-batch_size-8-image_dir-coco_instances_val2017_subsample_8_repeated-2019-12-29--06-25-23.csv",
+            #     ),
+            #     post_process=post_process_torch,
+            # ),
+        }
+    )
+    # plot_many_by_legend(
+    #     {
+    #         "flow1": get_df(
+    #             flow_metrics_path, "loss*.csv", -1, post_process_flow
+    #         ),
+    #         # "flow2": get_df(
+    #         #     flow_metrics_path, "loss*.csv", -2, post_process_flow
+    #         # ),
+    #     }
+    # )
+    # plot_many_by_legend(
+    #     {
+    #         "torch1": get_df(
+    #             flow_metrics_path, "torch*.csv", -2, post_process_torch
+    #         ),
+    #         "torch2": get_df(
+    #             flow_metrics_path, "torch*.csv", -3, post_process_torch
+    #         ),
+    #     }
+    # )
+
+    # plot_by_legend(flow_df)
