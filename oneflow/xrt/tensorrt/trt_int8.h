@@ -84,6 +84,7 @@ inline std::string locateFile(const std::string& filepathSuffix, const std::vect
         }
         else
             filepath = dir + filepathSuffix;
+            LOG(INFO) << "data dir: " << filepath << std::endl;
 
         for (int i = 0; i < MAX_DEPTH && !found; i++)
         {
@@ -375,7 +376,7 @@ private:
                 return false;
             }
 
-            int d[4];
+            int d[4]={mBatchSize, 3, 224, 224};
             size_t readSize = fread(d, sizeof(int), 4, file);
             assert(readSize == 4);
             assert(mDims.d[0] == d[0] && mDims.d[1] == d[1] && mDims.d[2] == d[2] && mDims.d[3] == d[3]);

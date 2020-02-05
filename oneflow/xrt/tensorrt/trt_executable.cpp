@@ -9,6 +9,7 @@ namespace xrt {
 
 namespace tensorrt {
 
+
 bool TrtExecutable::CreateExecutableEngineWithInputs(const ExecutableRunOptions &run_options,
                                            const std::vector<Parameter> &inputs,
                                            const int batch_size) {
@@ -31,19 +32,25 @@ bool TrtExecutable::CreateExecutableEngineWithInputs(const ExecutableRunOptions 
     }
   }
   //std::vector<int> images_dims={3, 3, 224, 224};
-  std::string list_file = "/n02129165";
+  std::string list_file = "/n02129165/";
   int max_batches = 128;
   //const std::string suffix = "0";
-  std::vector<std::string> calibration_data_dir = {"/home/sunxuexue/trt/dataset/gen_imagenet_ofrecord/validation"};
-  nvinfer1::Dims images_dims={batch_size, 3, 224, 224};
+//  std::vector<std::string> calibration_data_dir = {"/home/sunxuexue/trt/dataset/gen_imagenet_ofrecord/validation"};
+  std::vector<std::string> calibrator_data_dir;
+  calibrator_data_dir.emplace_back("/home/sunxuexue/trt/dataset/gen_imagenet_ofrecord/validation");
+  nvinfer1::Dims images_dims={50, 3, 224, 224};
   if (run_options.tensorrt_int8) {
     if (builder_->platformHasFastInt8()) {
       flags |= (1U << int(nvinfer1::BuilderFlag::kINT8));
       builder_->setInt8Mode(true);
-      TrtBatchStream calibratorStream(batch_size, max_batches, images_dims, list_file, calibration_data_dir);
-      calibrator_.reset(new Int8EntropyCalibrator<TrtBatchStream>(calibratorStream, 0, inputs[0].name().c_str()));
-
-      build_config->setInt8Calibrator(calibrator_.get());
+      LOG(INFO) << "--------------------------set int 8 mode, to set trt batch stream-----------------------";
+      TrtBatchStream calibratorStream(50, max_batches, images_dims, list_file, calibrator_data_dir);
+      LOG(INFO) << "-----------------------pass trt batchstream -------------------";
+      std::unique_ptr<nvinfer1::IInt8Calibrator> int8_calibrator;
+      int8_calibrator.reset(new Int8EntropyCalibrator<TrtBatchStream>(calibratorStream, 0, inputs[0].name().c_str()));
+      LOG(INFO) << "Reset Int8 Calibrator.";
+      build_config->setInt8Calibrator(int8_calibrator.get());
+      LOG(INFO) << "-----------------------Int8 Calibrator setted-----------------------";
     } else {
       LOG(INFO) << "TensorRT couldn't use int8 precision since the GPU "
                    "hardware does not support.";
@@ -51,7 +58,7 @@ bool TrtExecutable::CreateExecutableEngineWithInputs(const ExecutableRunOptions 
   }
 
   // flags |= (1U << int(nvinfer1::BuilderFlag::kREFIT));
-  build_config->setFlags(flags);
+  build_config->setFlags(flags); //int8=1
 
   int32_t max_batch_size = std::max(run_options.max_batch_size, batch_size);
   builder_->setMaxBatchSize(max_batch_size);
@@ -75,7 +82,7 @@ bool TrtExecutable::Run(const std::vector<Parameter> &inputs,
                         const ExecutableRunOptions &run_options, bool block_until_done) {
   // TODO(hjchen2)
   if (!execution_context_ && !engine_) {
-    CHECK(CreateExecutableEngineWithInputs(run_options, inputs)) << "Cannot create TensorRT executanble engine.";
+    CHECK(CreateExecutableEngineWithInputs(run_options , inputs)) << "Cannot create TensorRT executanble engine.";
   }
   // All return params are results of the executable.
   this->results_ = run_options.return_params;

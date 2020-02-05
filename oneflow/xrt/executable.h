@@ -33,7 +33,7 @@ struct ExecutableRunOptions {
   // Enable TensorRT fp16
   bool tensorrt_fp16 = false;
   // Enable TensorRT int8
-  bool tensorrt_int8 = false;
+  bool tensorrt_int8 = true;
 
   // Feed the return parameters to reuse it's storage while running
   // the executable.

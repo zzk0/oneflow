@@ -23,7 +23,7 @@ DEFINE_bool(use_tensorrt, EnvToBool(FLAGS_use_tensorrt, false), "It's optional t
 
 DEFINE_bool(tensorrt_fp16, EnvToBool(FLAGS_tensorrt_fp16, false),
             "Enable fp16 precision for TENSORRT engine.");
-DEFINE_bool(tensorrt_int8, EnvToBool(FLAGS_tensorrt_int8, false),
+DEFINE_bool(tensorrt_int8, EnvToBool(FLAGS_tensorrt_int8, true),
             "Enable int8 precision for TENSORRT engine.");
 
 namespace oneflow {

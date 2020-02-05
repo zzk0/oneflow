@@ -69,6 +69,7 @@ class TrtBuilder {
 
   nv::unique_ptr<nvinfer1::IBuilder> builder_;
   nv::unique_ptr<nvinfer1::INetworkDefinition> network_;
+ // std::unique_ptr<nvinfer1::IInt8Calibrator> calibrator_ = builder_.int8_calibrator;
 
   util::Map<int64_t, TrtValueKind> value_kinds_;
   util::Map<int64_t, Parameter> params_;
@@ -100,6 +101,7 @@ class TrtBuilder {
   nvinfer1::IBuilder *builder() const { return builder_.get(); }
 
   nvinfer1::INetworkDefinition *network() const { return network_.get(); }
+//  nvinfer1::IInt8Calibrator *calibrator() const { return builder_.int8_calibrator.get(); }
 
   // Returns handle for the added parameter.
   int64_t AddParameter(const Parameter &param);
