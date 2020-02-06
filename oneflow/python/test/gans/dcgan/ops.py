@@ -14,7 +14,7 @@ def get_const_initializer():
     return flow.constant_initializer(0.002)
 
 def deconv2d(input, output_shape,
-             k_h=1, k_w=1, d_h=2, d_w=2, stddev=0.02,
+             k_h=2, k_w=2, d_h=2, d_w=2, stddev=0.02,
              name=None, trainable=True, reuse=False, const_init=False):
     assert name is not None
     name_ = name if reuse == False else name + "_reuse"
@@ -43,7 +43,7 @@ def deconv2d(input, output_shape,
 
 
 def conv2d(input, output_dim, 
-       k_h=1, k_w=1, d_h=2, d_w=2, stddev=0.02,
+       k_h=2, k_w=2, d_h=2, d_w=2, stddev=0.02,
        name=None, trainable=True, reuse=False, const_init=False):
     assert name is not None
     name_ = name if reuse == False else name + "_reuse"

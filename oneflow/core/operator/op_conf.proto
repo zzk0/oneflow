@@ -151,6 +151,7 @@ message ConvConf {
   repeated int32 kernel_size = 4;
   repeated int32 strides = 5;
   repeated int32 dilation_rate = 6;
+  repeated int32 padding_needed = 7;
 }
 
 message ConvDataGradOpConf {

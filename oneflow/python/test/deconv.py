@@ -9,7 +9,7 @@ flow.config.default_data_type(flow.float32)
 
 
 def test_deconv_2d_forward(dilation=1, padding=1, output_padding=0, stride=2,
-                           kernel_size=2, in_channels=4, out_channels=5, in_size=4):
+                           kernel_size=5, in_channels=4, out_channels=5, in_size=4):
 
     @flow.function
     def ForwardDeconv2dJob(input=flow.input_blob_def((5, in_channels, in_size, in_size))):
@@ -99,5 +99,5 @@ if __name__ == "__main__":
     # zero padding pass
     # test_deconv_2d_forward(padding=0)
     # non-zero padding fails
-    # test_deconv_2d_forward(padding=2)
-    test_deconv_2d_forward(padding=0, kernel_size=5)
+    test_deconv_2d_forward(padding=3, kernel_size=5)
+    # test_deconv_2d_forward(padding=1, kernel_size=5)

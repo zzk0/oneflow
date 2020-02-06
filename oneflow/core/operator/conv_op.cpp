@@ -20,12 +20,19 @@ void GetOutAndPad(const DenseShapeView& in_blob_shape, const PbMessage& conv_con
   const PbRf<int32_t>& dilation_rate = GetPbRfFromPbMessage<int32_t>(conv_conf, "dilation_rate");
   const auto& strides = GetPbRfFromPbMessage<int32_t>(conv_conf, "strides");
   const PbRf<int32_t>& kernel_size = GetPbRfFromPbMessage<int32_t>(conv_conf, "kernel_size");
-  FOR_RANGE(int32_t, i, 0, opkernel_dim) {
-    GetWindowedOutputSize(in_blob_shape.At(DhwOffset(data_format) + i), kernel_size.Get(i),
-                          dilation_rate.Get(i), strides.Get(i), padding,
-                          out ? &(out->at(i)) : nullptr,
-                          pad_small_side ? &(pad_small_side->at(i)) : nullptr,
-                          pad_large_side ? &(pad_large_side->at(i)) : nullptr);
+  const PbRf<int32_t>& padding_needed = GetPbRfFromPbMessage<int32_t>(conv_conf, "padding_needed");
+  if (padding == "deconv"){
+    FOR_RANGE(int32_t, i, 0, opkernel_dim){
+      pad_large_side->at(i) = padding_needed.Get(i)/2;
+    }     
+  }else{
+    FOR_RANGE(int32_t, i, 0, opkernel_dim) {
+      GetWindowedOutputSize(in_blob_shape.At(DhwOffset(data_format) + i), kernel_size.Get(i),
+                            dilation_rate.Get(i), strides.Get(i), padding,
+                            out ? &(out->at(i)) : nullptr,
+                            pad_small_side ? &(pad_small_side->at(i)) : nullptr,
+                            pad_large_side ? &(pad_large_side->at(i)) : nullptr);
+    }
   }
 }
 

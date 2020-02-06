@@ -536,7 +536,7 @@ def deconv2d(
     op_conf.deconv_conf.x = input.logical_blob_name
     op_conf.deconv_conf.y = "out"
     op_conf.deconv_conf.filter = filters.logical_blob_name
-    op_conf.deconv_conf.conv_conf.padding = padding.lower() if output_shape is not None else "same"
+    op_conf.deconv_conf.conv_conf.padding = padding.lower() if output_shape is not None else "deconv"
     op_conf.deconv_conf.conv_conf.data_format = channel_pos
     if channel_pos == "channels_first":
         op_conf.deconv_conf.filters = filters.static_shape[1]
@@ -553,6 +553,7 @@ def deconv2d(
     op_conf.deconv_conf.conv_conf.strides.extend(strides)
     op_conf.deconv_conf.conv_conf.dilation_rate.extend(dilations)
     op_conf.deconv_conf.conv_conf.num_spatial_dims = 2
+    op_conf.deconv_conf.conv_conf.padding_needed.extend(padding_needed)
     op_conf.deconv_conf.padding_needed.extend(padding_needed)
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
