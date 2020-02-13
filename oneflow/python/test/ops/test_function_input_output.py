@@ -3,11 +3,7 @@ import numpy as np
 
 def test_FixedTensorDef(test_case):
     @flow.function()
-    def Foo(x=flow.FixedTensorDef((2, 5))):
-        a = flow.reshape(x, (x.shape[0], -1))
-        print(a)
-        print(x)
-        return x
+    def Foo(x=flow.FixedTensorDef((2, 5))): return x
     data = np.ones((2, 5), dtype=np.float32)
     of_ret =Foo(data).get()
     test_case.assertEqual(of_ret.ndarray().max(), 1)
@@ -26,11 +22,7 @@ def test_FixedTensorDef_2_device(test_case):
 
 def test_MirroredTensorDef(test_case):
     @flow.function()
-    def Foo(x=flow.MirroredTensorDef((2, 5))):
-        a = flow.reshape(x, (x.shape[0], -1))
-        print(a)
-        print(x)
-        return x
+    def Foo(x=flow.MirroredTensorDef((2, 5))): return x
     data = np.ones((1, 5), dtype=np.float32)
     ndarray_list = Foo([data]).get().ndarray_list()
     test_case.assertEqual(len(ndarray_list), 1)
@@ -54,9 +46,10 @@ def test_MirroredTensorDef_4_device(test_case):
 
     @flow.function()
     def Foo(image_label=[flow.MirroredTensorDef(image_shape), flow.MirroredTensorDef(label_shape)]):
-        #image, label = image_label
-        #a = flow.dynamic_reshape(image, (image.shape[0], -1))
-        #print(a)
+        image, label = image_label
+        a = flow.dynamic_reshape(image, (image.shape[0], -1))
+        print(a)
+        print(a.shape)
         return image_label
 
     ndarray_lst = lambda shape: [np.random.rand(*shape).astype(np.float32) for i in range(num_gpus)]

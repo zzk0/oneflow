@@ -2,7 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import oneflow as flow
-from collections import OrderedDict 
+from collections import OrderedDict
 
 from test_util import GenArgList
 from test_util import GetSavePath
@@ -54,10 +54,39 @@ def compare_with_tensorflow(device_type, input_shape, output_shape):
     )
 
 
-def test_reshape(test_case):
-    arg_dict = OrderedDict()
-    arg_dict["device_type"] = ["gpu"]
-    arg_dict["input_shape"] = [(10, 10, 10)]
-    arg_dict["output_shape"] = [(100, 10), (10, 100), (5, 20, 10)]
-    for arg in GenArgList(arg_dict):
-        compare_with_tensorflow(*arg)
+#def test_reshape(test_case):
+#    arg_dict = OrderedDict()
+#    arg_dict["device_type"] = ["gpu"]
+#    arg_dict["input_shape"] = [(10, 10, 10)]
+#    arg_dict["output_shape"] = [(100, 10), (10, 100), (5, 20, 10)]
+#    for arg in GenArgList(arg_dict):
+#        compare_with_tensorflow(*arg)
+
+
+def test_Reshape_MirroredTensorDef_4_device(test_case):
+    num_gpus = 2
+    shape = (64, 3, 224, 224)
+    flow.config.gpu_device_num(num_gpus)
+    func_config = flow.FunctionConfig()
+    func_config.default_data_type(flow.float)
+    func_config.default_distribute_strategy(flow.distribute.mirrored_strategy())
+    func_config.train.primary_lr(1e-4)
+    func_config.train.model_update_conf(dict(naive_conf={}))
+    @flow.function(func_config)
+    def Foo(a=flow.MirroredTensorDef(shape)):
+        b = flow.get_variable(
+            "b",
+            shape=a.shape,
+            dtype=flow.float,
+            initializer=flow.random_uniform_initializer(minval=-10, maxval=10),
+            trainable=True,
+        )
+        loss = a + b
+        loss = flow.reshape(loss, (loss.shape[0], -1))
+        flow.losses.add_loss(loss)
+        return loss
+
+    a = [np.random.rand(*shape).astype(np.float32) for i in range(num_gpus)]
+    loss = Foo(a).get()#.ndarray_list()
+    print(loss)
+
