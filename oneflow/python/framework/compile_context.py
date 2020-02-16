@@ -5,6 +5,7 @@ import oneflow.python.framework.placement_context as placement_context
 import oneflow.python.framework.c_api_util as c_api_util
 import oneflow.python.framework.distribute_context as distribute_ctx
 import oneflow.python.framework.session_context as session_ctx
+from oneflow.python.framework.mmdnn_util import CreateIRNode, ClearIRNodes
 
 def GetCurJobConfigProto():
     job_name = c_api_util.JobBuildAndInferCtx_GetCurrentJobName()
@@ -16,10 +17,12 @@ def CurJobAddOp(op_conf, parallel_conf=None):
 
 def CurJobAddConsistentOp(op_conf, parallel_conf=None):
     op_conf, parallel_conf = GetOpConfAndParallelConf(op_conf, parallel_conf)
+    CreateIRNode(op_conf)
     return c_api_util.CurJobBuildAndInferCtx_AddAndInferConsistentOp(op_conf, parallel_conf)
 
 def CurJobAddMirroredOp(op_conf, parallel_conf=None):
     op_conf, parallel_conf = GetOpConfAndParallelConf(op_conf, parallel_conf)
+    CreateIRNode(op_conf)
     return c_api_util.CurJobBuildAndInferCtx_AddAndInferMirroredOp(op_conf, parallel_conf)
 
 def ResetCurJobContext():
@@ -29,6 +32,8 @@ def ResetCurJobContext():
     global cur_job_variable_scope_stack
     assert len(cur_job_variable_scope_stack) == 0
     cur_job_variable_scope_stack = []
+
+    ClearIRNodes()
 
 def GetOpConfAndParallelConf(op_conf, parallel_conf=None):
     _PrependOpNamePrefixIfNeed(op_conf)
