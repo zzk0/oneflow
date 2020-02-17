@@ -24,6 +24,8 @@ def assign_attr_value(attr, val):
     else:
         raise NotImplementedError('AttrValue cannot be of %s' % type(val))
 
+def _input_name_of2mm(name):
+    return name[:name.rfind('/')]
 
 def CreateIRNode(op_conf):
     node_pb2 = NodeDef()
@@ -36,10 +38,11 @@ def CreateIRNode(op_conf):
     if 'in' in dir(op_type_pb2):
         in_value = getattr(op_type_pb2, 'in')
         if isinstance(in_value, str):
-            node_pb2.input.append(in_value)
+            if in_value <> "":
+                node_pb2.input.append(_input_name_of2mm(in_value))
         else: #<class 'google.protobuf.internal.containers.RepeatedScalarFieldContainer'>
             for v in in_value:
-                node_pb2.input.append(v)
+                node_pb2.input.append(_input_name_of2mm(v))
     global cur_job_user_op_name2ir_node
     cur_job_user_op_name2ir_node[op_conf.name] = node_pb2
 
