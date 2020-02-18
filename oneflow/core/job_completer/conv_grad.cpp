@@ -26,6 +26,7 @@ ConvConf ConvConfFromConvOpConf(const OperatorConf& op_conf) {
   *conv_conf.mutable_kernel_size() = GetPbRfFromPbMessage<int32_t>(*msg, "kernel_size");
   *conv_conf.mutable_strides() = GetPbRfFromPbMessage<int32_t>(*msg, "strides");
   *conv_conf.mutable_dilation_rate() = GetPbRfFromPbMessage<int32_t>(*msg, "dilation_rate");
+  conv_conf.add_padding_needed(0);
   return conv_conf;
 }
 
