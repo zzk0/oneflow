@@ -5,7 +5,7 @@ import oneflow.python.framework.placement_context as placement_context
 import oneflow.python.framework.c_api_util as c_api_util
 import oneflow.python.framework.distribute_context as distribute_ctx
 import oneflow.python.framework.session_context as session_ctx
-from oneflow.python.framework.mmdnn_util import CreateIRNode, ClearIRNodes
+from oneflow.python.framework.onnx_util import CreateIRNode, ClearIRNodes
 
 def GetCurJobConfigProto():
     job_name = c_api_util.JobBuildAndInferCtx_GetCurrentJobName()

@@ -11,7 +11,6 @@ import oneflow.python.framework.distribute as distribute_util
 import oneflow.python.framework.input_blob_def as input_blob_util
 import oneflow.python.ops as ops
 from oneflow.python.lib.core.box import Box
-from oneflow.python.framework.mmdnn_util import SaveIRGraphDef
 
 from contextlib import contextmanager
 
@@ -33,7 +32,6 @@ def Compile(function_desc, config_proto):
     with _JobBuildAndInferCtx(job_conf.job_name), placement_scope, distribute_strategy:
         c_api_util.CurJobBuildAndInferCtx_SetJobConf(job_conf)
         _CompileJob(function_desc)
-        SaveIRGraphDef()#TODO set save path
         c_api_util.CurJobBuildAndInferCtx_Complete()
 
 def _CompileJob(function_desc):
