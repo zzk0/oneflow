@@ -4,12 +4,6 @@ from onnx import helper, onnx_pb
 from oneflow.python.oneflow_export import oneflow_export
 
 
-def _io_name_of2onnx(io_name):
-    if in_or_out == 'out':
-        return '{}/{}'.format(op_name, io_name)
-    return io_name
-    #return name[:name.rfind('/')]
-
 def _of_op_type_case2onnx_op_type(op_type_case):
     return op_type_case
 
