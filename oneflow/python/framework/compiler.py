@@ -16,6 +16,7 @@ from contextlib import contextmanager
 
 from oneflow.python.oneflow_export import oneflow_export
 import oneflow.python.framework.c_api_util as c_api_util
+from oneflow.python.framework.onnx_util import SetOutputRemoteBlob4IR
 
 def Compile(function_desc, config_proto):
     job_conf = function_desc.job_config_proto
@@ -40,6 +41,7 @@ def _CompileJob(function_desc):
     inputs = _RecursiveMakeInputBlobs(func.__oneflow_input_blob_defs__)
     kwarg = dict(allow_cpu_return_op=function_desc.function_attribute.allow_cpu_return_op)
     func.__oneflow_output_remote_blobs__ = _RecursiveMakeRetRemoteBlobs(func(*inputs), kwarg)
+    SetOutputRemoteBlob4IR(func.__oneflow_output_remote_blobs__)
 
 @contextmanager
 def _JobBuildAndInferCtx(job_name):

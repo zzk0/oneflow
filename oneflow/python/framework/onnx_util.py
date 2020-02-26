@@ -1,7 +1,31 @@
 from google.protobuf import descriptor
 from onnx import ModelProto, GraphProto, NodeProto, OperatorSetIdProto
-from onnx import helper, onnx_pb
+from onnx import helper, onnx_pb, TensorProto
 from oneflow.python.oneflow_export import oneflow_export
+import oneflow.core.common.data_type_pb2 as data_type_pb2
+
+
+def SetOutputRemoteBlob4IR(outputs):
+    global cur_job_lbn_2_output_remote_blob
+    cur_job_lbn_2_output_remote_blob = {}
+    for key, output in outputs.items():
+        lbn = output.lbi.op_name + '/' + output.lbi.blob_name
+        cur_job_lbn_2_output_remote_blob[lbn] = output
+    
+
+def ClearOutputRemoteBlob4IR():
+    global cur_job_lbn_2_output_remote_blob
+    cur_job_lbn_2_output_remote_blob = {}
+
+
+def AddCurrentJobOpConf4IR(op_conf):
+    global cur_job_op_confs
+    cur_job_op_confs.append(op_conf)
+
+
+def ClearIRNodes():
+    global cur_job_op_confs
+    cur_job_op_confs = []
 
 
 def _of_op_type_case2onnx_op_type(op_type_case):
@@ -55,6 +79,7 @@ def _is_out(op_type_case, field_name):
 
 def PrepareOnnxArgs(op_conf):
     op_type_case = op_conf.WhichOneof('op_type')
+    print(op_type_case)
     op_type_pb2 = getattr(op_conf, op_type_case)
     op_type = _of_op_type_case2onnx_op_type(op_type_case)
 
@@ -77,36 +102,64 @@ def PrepareOnnxArgs(op_conf):
         raise SerializeToJsonError('Failed to serialize {0} field: {1}.'.format(field.name, e))
     return op_type, inputs, outputs, attr
 
-def CreateIRNode(op_conf):
-    op_type, inputs, outputs, attr = PrepareOnnxArgs(op_conf)
-    print(op_type, inputs, outputs, attr)
-    node_pb2 = helper.make_node(op_type, inputs, outputs, name=op_conf.name, **attr)
 
-    global cur_job_user_op_name2onnx_node
-    cur_job_user_op_name2onnx_node[op_conf.name] = node_pb2
+OF_TO_ONNX_DTYPE = {
+    data_type_pb2.kFloat:TensorProto.FLOAT,
+    data_type_pb2.kInt32:TensorProto.INT32,
+    #TODO support more dtypes 
+}
 
-def ClearIRNodes():
-    global cur_job_user_op_name2onnx_node
-    cur_job_user_op_name2onnx_node = {}
-
+def Prepare4OnnxGraph():
+    inputs = []
+    outputs = []
+    nodes = []
+    initializers = []
+    global cur_job_op_confs
+    global cur_job_lbn_2_output_remote_blob
+    for op_conf in cur_job_op_confs:
+        op_type_case = op_conf.WhichOneof('op_type')
+        op_type_pb2 = getattr(op_conf, op_type_case)
+        if op_type_case == 'input_conf':
+            lbn = op_conf.name + '/' + op_type_pb2.out
+            dtype = OF_TO_ONNX_DTYPE[op_type_pb2.blob_conf.data_type]
+            shape = op_type_pb2.blob_conf.shape.dim
+            inputs.append(helper.make_tensor_value_info(lbn, dtype, shape))
+        elif op_type_case == 'return_conf':
+            lbn = op_conf.name + '/' + op_type_pb2.out
+            assert lbn in cur_job_lbn_2_output_remote_blob
+            dtype = OF_TO_ONNX_DTYPE[cur_job_lbn_2_output_remote_blob[lbn].dtype]
+            shape = cur_job_lbn_2_output_remote_blob[lbn].shape 
+            outputs.append(helper.make_tensor_value_info(lbn, dtype, shape))
+            print('outputs', outputs[-1])
+        elif op_type_case == 'variable_conf':
+            #TODO
+            print('initializers', op_conf)
+        else:
+            #TODO
+            print('nodes', op_conf)
+    return nodes, inputs, outputs, initializers
 
 @oneflow_export('export_onnx')
 def SaveOnnxModelProto(path='model.onnx'):
     opset_id = OperatorSetIdProto()
     opset_id.domain = ''
     opset_id.version = 9
+    global cur_job_lbn_2_output_remote_blob
+    job_name = ''
+    for key, v in cur_job_lbn_2_output_remote_blob.items():
+        print(dir(v))
+        job_name = v.job_name_
+        break
 
-    nodes = [node for node in cur_job_user_op_name2onnx_node.values()]
-    graph_pb2 = helper.make_graph(nodes,
-                                  'oneflow-export', #TODO get func name,
-                                  [],#TODO input
-                                  [],#TODO output
-                                  initializer=[], #TODO feed weight here
-                                 )
+    nodes, inputs, outputs, initializers = Prepare4OnnxGraph()
+    graph_pb2 = helper.make_graph(nodes, job_name, inputs, outputs, initializer=initializers)
     model = helper.make_model(graph_pb2, ir_version=4, opset_imports=[opset_id],
                               producer_name='oneflow')
     return model
 
 
-global cur_job_user_op_name2onnx_node
-cur_job_user_op_name2onnx_node = {}
+global cur_job_op_confs
+cur_job_op_confs = []
+
+global cur_job_lbn_2_output_remote_blob
+cur_job_lbn_2_output_remote_blob = {} 
