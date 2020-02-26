@@ -210,13 +210,7 @@ void FoldSubgraphBuilder::BuildXrtLaunchOps() {
 
     // Set launch engine.
     XrtEngine engine = GraphEngine(node->sub_graph());
-    launch_conf->set_engine([&]() -> std::string {
-      switch (engine) {
-        case XrtEngine::XLA: return "XLA";
-        case XrtEngine::TENSORRT: return "TENSORRT";
-        default: LOG(FATAL) << "Not supported engine " << engine; return "";
-      }
-    }());
+    launch_conf->set_engine(XrtEngineToString(engine));
 
     util::Set<std::string> input_mutability;
     bool is_model_update = false;
