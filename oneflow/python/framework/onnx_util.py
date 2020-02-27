@@ -1,3 +1,5 @@
+import os
+import numpy as np
 from google.protobuf import descriptor
 from onnx import ModelProto, GraphProto, NodeProto, OperatorSetIdProto
 from onnx import helper, onnx_pb, TensorProto
@@ -109,7 +111,13 @@ OF_TO_ONNX_DTYPE = {
     #TODO support more dtypes 
 }
 
-def Prepare4OnnxGraph():
+OF_TO_NUMPY_DTYPE = {
+    data_type_pb2.kFloat:np.float32,
+    data_type_pb2.kInt32:np.int32,
+    #TODO support more dtypes 
+}
+
+def Prepare4OnnxGraph(model_load_dir):
     inputs = []
     outputs = []
     nodes = []
@@ -132,26 +140,32 @@ def Prepare4OnnxGraph():
             outputs.append(helper.make_tensor_value_info(lbn, dtype, shape))
             print('outputs', outputs[-1])
         elif op_type_case == 'variable_conf':
-            #TODO
-            print('initializers', op_conf)
+            lbn = op_conf.name + '/' + op_type_pb2.out
+            dtype = OF_TO_ONNX_DTYPE[op_type_pb2.data_type]
+            shape = op_type_pb2.shape.dim
+            path = os.path.join(model_load_dir, op_conf.name, op_type_pb2.out)
+            assert os.path.isfile(path)
+            weight = np.fromfile(path, dtype=OF_TO_NUMPY_DTYPE[op_type_pb2.data_type])
+            print(weight.shape, shape)
+            initializers.append(helper.make_tensor(lbn, dtype, shape, weight))
         else:
             #TODO
             print('nodes', op_conf)
     return nodes, inputs, outputs, initializers
 
 @oneflow_export('export_onnx')
-def SaveOnnxModelProto(path='model.onnx'):
+def SaveOnnxModelProto(model_load_dir, save_path='model.onnx'):
+    #TODO another option, load model from memory
     opset_id = OperatorSetIdProto()
     opset_id.domain = ''
     opset_id.version = 9
     global cur_job_lbn_2_output_remote_blob
     job_name = ''
     for key, v in cur_job_lbn_2_output_remote_blob.items():
-        print(dir(v))
         job_name = v.job_name_
         break
 
-    nodes, inputs, outputs, initializers = Prepare4OnnxGraph()
+    nodes, inputs, outputs, initializers = Prepare4OnnxGraph(model_load_dir)
     graph_pb2 = helper.make_graph(nodes, job_name, inputs, outputs, initializer=initializers)
     model = helper.make_model(graph_pb2, ir_version=4, opset_imports=[opset_id],
                               producer_name='oneflow')
