@@ -20,7 +20,6 @@ def conv2d(
     data_format="NHWC",
     dilations=None,
     name=None,
-    use_bias=True,
 ):
     assert len(input.static_shape) == 4
     assert len(filters.static_shape) == 4
@@ -72,7 +71,7 @@ def conv2d(
         raise ValueError("invalid data_format")
     op_conf.conv_2d_conf.strides.extend(strides)
     op_conf.conv_2d_conf.dilation_rate.extend(dilations)
-    op_conf.conv_2d_conf.use_bias = use_bias
+    op_conf.conv_2d_conf.use_bias = False
 
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
