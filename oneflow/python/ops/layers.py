@@ -22,7 +22,7 @@ def dense(
     bias_regularizer=None,
     trainable=True,
     name=None,
-    model_distribute=distribute_util.broadcast(),
+    model_distribute=distribute_util.auto(),#broadcast(),
 ):
     in_shape = inputs.static_shape
     in_num_axes = len(in_shape)

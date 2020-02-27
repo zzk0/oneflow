@@ -1,8 +1,8 @@
 import os
 import numpy as np
-from google.protobuf import descriptor
+from google.protobuf import descriptor, text_format
 from onnx import ModelProto, GraphProto, NodeProto, OperatorSetIdProto
-from onnx import helper, onnx_pb, TensorProto
+from onnx import checker, helper, onnx_pb, TensorProto
 from oneflow.python.oneflow_export import oneflow_export
 import oneflow.core.common.data_type_pb2 as data_type_pb2
 
@@ -28,6 +28,18 @@ def AddCurrentJobOpConf4IR(op_conf):
 def ClearIRNodes():
     global cur_job_op_confs
     cur_job_op_confs = []
+
+
+def save_protobuf(path, message, as_text=False):
+    dir_name = os.path.dirname(path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    if as_text:
+        with open(path, "w") as f:
+            f.write(text_format.MessageToString(message))
+    else:
+        with open(path, "wb") as f:
+            f.write(message.SerializeToString())
 
 
 OF_TO_ONNX_DTYPE = {
@@ -90,7 +102,9 @@ def _is_out(op_type_case, field_name):
 
 
 OF_OP_TYPE2ONNX_OP_TYPE = {
-    'conv_2d_conf': 'Conv',
+    'reshape_conf': 'Flatten', #onnx reshape has two inputs: data and shape, shape is not attr. 
+    'matmul_conf': 'Gemm', #onnx matmul does not supoort transpose a/b
+    'conv_2d_conf': 'Conv', #onnx does not support bias_add
     'max_pooling_2d_conf': 'MaxPool',
     'average_pooling_2d_conf': 'AveragePool',
 }
@@ -105,7 +119,6 @@ def _get_onnx_op_type(op_type_case):
 def _of_field2onnx_attr(op_type, field, value):
     #if field.label == descriptor.FieldDescriptor.LABEL_REPEATED:
     #    print("{} is repeated".format(field.name), value)
-    print(op_type, field.name, value, type(value))
     takeit = True
     if op_type == 'Conv' or 'Pool' in op_type:
         if field.name == 'padding':
@@ -119,9 +132,13 @@ def _of_field2onnx_attr(op_type, field, value):
             return True, 'strides', value
         else:
             takeit = False # ignore other fields
-    elif op_type == 'Reshape':
-        assert field.name == 'shape'
-        return True, field.name, value.dim
+    elif op_type == 'Flatten': #use flatten replace reshape
+        return True, 'axis', 1
+    elif op_type == 'Gemm': #oneflow matmul
+        if field.name == 'transpose_a':
+            return True, 'transA', 1 if value else 0 
+        elif field.name == 'transpose_b':
+            return True, 'transB', 1 if value else 0 
     return takeit, field.name, value 
 
 
@@ -136,7 +153,7 @@ def _op_conf2onnx_node(op_conf):
     fields = op_type_pb2.ListFields()
     input_names = []
     output_names = []
-    attr = {'group': 1}  
+    attr = {}  
     try:
         for field, value in fields:
             if _is_in(op_type_case, field.name):
@@ -146,7 +163,7 @@ def _op_conf2onnx_node(op_conf):
             else:
                 takeit, attr_name, attr_value = _of_field2onnx_attr(onnx_op_type, field, value)
                 if takeit:
-                    attr[field.name] = attr_value
+                    attr[attr_name] = attr_value
     except ValueError as e:
         raise SerializeToJsonError('Failed to serialize {0} field: {1}.'.format(field.name, e))
 
@@ -169,9 +186,11 @@ def Prepare4OnnxGraph(model_load_dir):
             inputs.append(helper.make_tensor_value_info(lbn, dtype, shape))
         elif op_type_case == 'return_conf':
             lbn = op_conf.name + '/' + op_type_pb2.out
+            #TODO: cur_job_lbn_2_output_remote_blob can be remove, take in's dtype and shape 
             assert lbn in cur_job_lbn_2_output_remote_blob
             dtype = OF_TO_ONNX_DTYPE[cur_job_lbn_2_output_remote_blob[lbn].dtype]
             shape = cur_job_lbn_2_output_remote_blob[lbn].shape 
+            lbn = getattr(op_type_pb2, 'in') #use in as the return name
             outputs.append(helper.make_tensor_value_info(lbn, dtype, shape))
         elif op_type_case == 'variable_conf':
             lbn = op_conf.name + '/' + op_type_pb2.out
@@ -181,17 +200,17 @@ def Prepare4OnnxGraph(model_load_dir):
             assert os.path.isfile(path)
             weight = np.fromfile(path, dtype=OF_TO_NUMPY_DTYPE[op_type_pb2.data_type])
             initializers.append(helper.make_tensor(lbn, dtype, shape, weight))
-            print(lbn)
         else:
             nodes.append(_op_conf2onnx_node(op_conf))
     return nodes, inputs, outputs, initializers
 
+
 @oneflow_export('export_onnx')
-def SaveOnnxModelProto(model_load_dir, save_path='model.onnx'):
+def SaveOnnxModelProto(model_load_dir, save_path='model.onnx', as_text=False):
     #TODO another option, load model from memory
     opset_id = OperatorSetIdProto()
     opset_id.domain = ''
-    opset_id.version = 9
+    opset_id.version = 11 
     global cur_job_lbn_2_output_remote_blob
     job_name = ''
     for key, v in cur_job_lbn_2_output_remote_blob.items():
@@ -202,7 +221,8 @@ def SaveOnnxModelProto(model_load_dir, save_path='model.onnx'):
     graph_pb2 = helper.make_graph(nodes, job_name, inputs, outputs, initializer=initializers)
     model = helper.make_model(graph_pb2, ir_version=4, opset_imports=[opset_id],
                               producer_name='oneflow')
-    return model
+    checker.check_model(model)
+    save_protobuf(save_path, model, as_text)
 
 
 global cur_job_op_confs
