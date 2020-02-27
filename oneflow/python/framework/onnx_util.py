@@ -30,8 +30,17 @@ def ClearIRNodes():
     cur_job_op_confs = []
 
 
-def _of_op_type_case2onnx_op_type(op_type_case):
-    return op_type_case
+OF_TO_ONNX_DTYPE = {
+    data_type_pb2.kFloat:TensorProto.FLOAT,
+    data_type_pb2.kInt32:TensorProto.INT32,
+    #TODO support more dtypes 
+}
+
+OF_TO_NUMPY_DTYPE = {
+    data_type_pb2.kFloat:np.float32,
+    data_type_pb2.kInt32:np.int32,
+    #TODO support more dtypes 
+}
 
 _enroll_input_bns_in_op = {'axpy_conf': 'y'}
 
@@ -79,43 +88,69 @@ def _is_out(op_type_case, field_name):
     else:
         return False
 
-def PrepareOnnxArgs(op_conf):
+
+OF_OP_TYPE2ONNX_OP_TYPE = {
+    'conv_2d_conf': 'Conv',
+    'max_pooling_2d_conf': 'MaxPool',
+    'average_pooling_2d_conf': 'AveragePool',
+}
+
+def _get_onnx_op_type(op_type_case):
+    if op_type_case in OF_OP_TYPE2ONNX_OP_TYPE:
+        return OF_OP_TYPE2ONNX_OP_TYPE[op_type_case]
+    else:
+        return op_type_case[:-5].title().replace('_', '')
+
+
+def _of_field2onnx_attr(op_type, field, value):
+    #if field.label == descriptor.FieldDescriptor.LABEL_REPEATED:
+    #    print("{} is repeated".format(field.name), value)
+    print(op_type, field.name, value, type(value))
+    takeit = True
+    if op_type == 'Conv' or 'Pool' in op_type:
+        if field.name == 'padding':
+            #onnx support NOTSET, SAME_UPPER, SAME_LOWER or VALID
+            return True, 'auto_pad', 'NOTSET' if value != 'VALID' else 'VALID'
+        elif field.name == 'kernal_size' or field.name == 'pool_size':
+            return True, 'kernel_shape', value
+        elif field.name == 'dilation_rate':
+            return True, 'dilations', value
+        elif field.name == 'strides':
+            return True, 'strides', value
+        else:
+            takeit = False # ignore other fields
+    elif op_type == 'Reshape':
+        assert field.name == 'shape'
+        return True, field.name, value.dim
+    return takeit, field.name, value 
+
+
+def _op_conf2onnx_node(op_conf):
+    # there are 2 options:
+    # 1. convert of op_type_case to onnx one bye one
+    # 2. convert of field to onnx attr one bye one, this may be better may be dirty somewhere
     op_type_case = op_conf.WhichOneof('op_type')
-    print(op_type_case)
     op_type_pb2 = getattr(op_conf, op_type_case)
-    op_type = _of_op_type_case2onnx_op_type(op_type_case)
+    onnx_op_type = _get_onnx_op_type(op_type_case)
 
     fields = op_type_pb2.ListFields()
-    inputs = []
-    outputs = []
-    attr = {}
+    input_names = []
+    output_names = []
+    attr = {'group': 1}  
     try:
         for field, value in fields:
-            #TODO repeated io: 
-            if field.label == descriptor.FieldDescriptor.LABEL_REPEATED:
-                print("{} is repeated".format(field.name), value)
             if _is_in(op_type_case, field.name):
-                inputs.append(value)
+                input_names.append(value)
             elif _is_out(op_type_case, field.name):
-                outputs.append('{}/{}'.format(op_conf.name, value))
+                output_names.append('{}/{}'.format(op_conf.name, value))
             else:
-                attr[field.name] = 'TBD'#value #TODO of field to onnx attr
+                takeit, attr_name, attr_value = _of_field2onnx_attr(onnx_op_type, field, value)
+                if takeit:
+                    attr[field.name] = attr_value
     except ValueError as e:
         raise SerializeToJsonError('Failed to serialize {0} field: {1}.'.format(field.name, e))
-    return op_type, inputs, outputs, attr
 
-
-OF_TO_ONNX_DTYPE = {
-    data_type_pb2.kFloat:TensorProto.FLOAT,
-    data_type_pb2.kInt32:TensorProto.INT32,
-    #TODO support more dtypes 
-}
-
-OF_TO_NUMPY_DTYPE = {
-    data_type_pb2.kFloat:np.float32,
-    data_type_pb2.kInt32:np.int32,
-    #TODO support more dtypes 
-}
+    return helper.make_node(onnx_op_type, input_names, output_names, name=op_conf.name, **attr)
 
 def Prepare4OnnxGraph(model_load_dir):
     inputs = []
@@ -138,7 +173,6 @@ def Prepare4OnnxGraph(model_load_dir):
             dtype = OF_TO_ONNX_DTYPE[cur_job_lbn_2_output_remote_blob[lbn].dtype]
             shape = cur_job_lbn_2_output_remote_blob[lbn].shape 
             outputs.append(helper.make_tensor_value_info(lbn, dtype, shape))
-            print('outputs', outputs[-1])
         elif op_type_case == 'variable_conf':
             lbn = op_conf.name + '/' + op_type_pb2.out
             dtype = OF_TO_ONNX_DTYPE[op_type_pb2.data_type]
@@ -146,11 +180,10 @@ def Prepare4OnnxGraph(model_load_dir):
             path = os.path.join(model_load_dir, op_conf.name, op_type_pb2.out)
             assert os.path.isfile(path)
             weight = np.fromfile(path, dtype=OF_TO_NUMPY_DTYPE[op_type_pb2.data_type])
-            print(weight.shape, shape)
             initializers.append(helper.make_tensor(lbn, dtype, shape, weight))
+            print(lbn)
         else:
-            #TODO
-            print('nodes', op_conf)
+            nodes.append(_op_conf2onnx_node(op_conf))
     return nodes, inputs, outputs, initializers
 
 @oneflow_export('export_onnx')
