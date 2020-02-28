@@ -123,8 +123,8 @@ def _of_field2onnx_attr(op_type, field, value):
     if op_type == 'Conv' or 'Pool' in op_type:
         if field.name == 'padding':
             #onnx support NOTSET, SAME_UPPER, SAME_LOWER or VALID
-            return True, 'auto_pad', 'NOTSET' if value != 'VALID' else 'VALID'
-        elif field.name == 'kernal_size' or field.name == 'pool_size':
+            return True, 'auto_pad', 'SAME_UPPER' if value.lower() != 'valid' else 'VALID'
+        elif field.name == 'kernel_size' or field.name == 'pool_size':
             return True, 'kernel_shape', value
         elif field.name == 'dilation_rate':
             return True, 'dilations', value
@@ -206,7 +206,7 @@ def Prepare4OnnxGraph(model_load_dir):
 
 
 @oneflow_export('export_onnx')
-def SaveOnnxModelProto(model_load_dir, save_path='model.onnx', as_text=False):
+def SaveOnnxModelProto(model_load_dir, save_path='model.onnx', as_text=False, save_readable=True):
     #TODO another option, load model from memory
     opset_id = OperatorSetIdProto()
     opset_id.domain = ''
@@ -223,6 +223,11 @@ def SaveOnnxModelProto(model_load_dir, save_path='model.onnx', as_text=False):
                               producer_name='oneflow')
     checker.check_model(model)
     save_protobuf(save_path, model, as_text)
+    
+    if save_readable:
+        txt = helper.printable_graph(model.graph)
+        with open(save_path+'.graph', 'w') as f:
+            f.write(txt)
 
 
 global cur_job_op_confs
