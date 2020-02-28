@@ -123,7 +123,7 @@ def _of_field2onnx_attr(op_type, field, value):
     if op_type == 'Conv' or 'Pool' in op_type:
         if field.name == 'padding':
             #onnx support NOTSET, SAME_UPPER, SAME_LOWER or VALID
-            return True, 'auto_pad', 'SAME_UPPER' if value.lower() != 'valid' else 'VALID'
+            return True, 'auto_pad', 'SAME_LOWER' if value.lower() != 'valid' else 'VALID'
         elif field.name == 'kernel_size' or field.name == 'pool_size':
             return True, 'kernel_shape', value
         elif field.name == 'dilation_rate':
