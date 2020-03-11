@@ -15,6 +15,8 @@ include(cocoapi)
 include(half)
 include(json)
 include(re2)
+include(flatbuffers)
+include(lz4)
 
 if (WITH_XLA)
   include(tensorflow)
@@ -91,6 +93,8 @@ set(oneflow_third_party_libs
     ${OPENCV_STATIC_LIBRARIES}
     ${COCOAPI_STATIC_LIBRARIES}
     ${RE2_LIBRARIES}
+    ${FLATBUFFERS_STATIC_LIBRARIES}
+    ${LZ4_STATIC_LIBRARIES}
 )
 
 if(WIN32)
@@ -123,6 +127,8 @@ set(oneflow_third_party_dependencies
   half_copy_headers_to_destination
   json_copy_headers_to_destination
   re2
+  lz4_copy_libs_to_destination
+  lz4_copy_headers_to_destination
 )
 
 
@@ -141,6 +147,8 @@ list(APPEND ONEFLOW_INCLUDE_SRC_DIRS
     ${HALF_INCLUDE_DIR}
     ${JSON_INCLUDE_DIR}
     ${RE2_INCLUDE_DIR}
+    ${FLATBUFFERS_INCLUDE_DIR}
+    ${LZ4_INCLUDE_DIR}
 )
 
 if (BUILD_CUDA)
