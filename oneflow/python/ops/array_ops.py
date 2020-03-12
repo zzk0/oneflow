@@ -15,7 +15,7 @@ from oneflow.python.oneflow_export import oneflow_export
 
 
 @oneflow_export("gather")
-def gather(params, indices, validate_indices=None, axis=None, batch_dims=0, name=None):
+def gather(params, indices, validate_indices=None, axis=None, batch_dims=0, name=None, no_duplicates_in_indices=False):
     op_conf = op_conf_util.OperatorConf()
     if name is None:
         op_conf.name = id_util.UniqueStr("Gather_")
@@ -45,6 +45,7 @@ def gather(params, indices, validate_indices=None, axis=None, batch_dims=0, name
         op_conf.gather_conf.indices = indices.logical_blob_name
         op_conf.gather_conf.out = "out"
         op_conf.gather_conf.axis = axis
+        op_conf.gather_conf.no_duplicates_in_indices = no_duplicates_in_indices
 
     compile_context.CurJobAddOp(op_conf)
     lbi = logical_blob_id_util.LogicalBlobId()
