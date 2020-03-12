@@ -47,7 +47,6 @@ class LazyAdamMdUpdateKernelUtil<DeviceType::kCPU, T> final {
       v[i] = beta2 * v[i] + (1 - beta2) * model_diff_val * model_diff_val;
       model[i] = model[i] - local_learning_rate * m[i] / (std::sqrt(v[i]) + epsilon);
     }
-
     *beta1_t *= beta1;
     *beta2_t *= beta2;
   }
