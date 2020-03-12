@@ -6,10 +6,12 @@ namespace oneflow {
 namespace {
 
 template<typename T, typename K, typename IDX>
-__global__ void UpdateGpu(T beta, int64_t feature_size, int64_t lower_bound, int64_t upper_bound,
-                          const IDX* num_unique_instance, const float* learning_rate,
-                          const K* indices, const T* values, T* model, T* momentum) {
-  const int64_t n = *num_unique_instance * feature_size;
+__global__ void UpdateGpu(int64_t num_instances, T beta, int64_t feature_size, int64_t lower_bound,
+                          int64_t upper_bound, const IDX* num_unique_instance,
+                          const float* learning_rate, const K* indices, const T* values, T* model,
+                          T* momentum) {
+  const int64_t n = num_unique_instance == nullptr ? num_instances * feature_size
+                                                   : *num_unique_instance * feature_size;
   const float lr = *learning_rate;
   CUDA_1D_KERNEL_LOOP(i, n) {
     const K instance_id = indices[i / feature_size];
@@ -39,9 +41,9 @@ void IndexedSlicesMomentumMdUpdateKernelUtil<DeviceType::kGPU, T, K, IDX>::Updat
     int64_t upper_bound, const IDX* num_unique_instance, const int64_t* train_step,
     const float* learning_rate, const K* indices, const T* values, T* model, T* momentum) {
   UpdateGpu<T, K><<<BlocksNum4ThreadsNum(num_instance * feature_size), kCudaThreadsNumPerBlock, 0,
-                    ctx->cuda_stream()>>>(beta, feature_size, lower_bound, upper_bound,
-                                          num_unique_instance, learning_rate, indices, values,
-                                          model, momentum);
+                    ctx->cuda_stream()>>>(num_instance, beta, feature_size, lower_bound,
+                                          upper_bound, num_unique_instance, learning_rate, indices,
+                                          values, model, momentum);
 }
 
 #define INSTANTIATE_INDEXED_SLICES_MOMENTUM_MODEL_UPDATE_KERNEL_UTIL_GPU(                 \
