@@ -25,6 +25,7 @@ void IndexedSlicesOptimizerRewritePass::Apply(const OpGraph& op_graph,
     std::string indices_lbn;
     std::string values_lbn;
     std::string model_op_name;
+    bool no_duplicates_in_indices = false;
     std::function<void(OperatorConf * new_optimizer_op_conf, const std::string& indices,
                        const std::string& values)>
         BuildOptimizer;
@@ -39,6 +40,7 @@ void IndexedSlicesOptimizerRewritePass::Apply(const OpGraph& op_graph,
         indices_lbn = unsorted_segment_sum_conf.segment_ids();
         values_lbn = unsorted_segment_sum_conf.data();
       }
+      no_duplicates_in_indices = unsorted_segment_sum_conf.no_duplicates_in_segment_ids();
     } else {
       return;
     }
@@ -75,6 +77,7 @@ void IndexedSlicesOptimizerRewritePass::Apply(const OpGraph& op_graph,
         new_optimizer_conf->set_model_diff_values(values);
         new_optimizer_conf->set_model(old_optimizer_conf.model());
         new_optimizer_conf->set_learning_rate(old_optimizer_conf.learning_rate());
+        new_optimizer_conf->set_no_duplicates_in_indices(no_duplicates_in_indices);
       };
     } else if (dst_op_conf.has_momentum_model_update_conf()) {
       const MomentumModelUpdateOpConf& old_optimizer_conf =
@@ -92,6 +95,7 @@ void IndexedSlicesOptimizerRewritePass::Apply(const OpGraph& op_graph,
         new_optimizer_conf->set_train_step(old_optimizer_conf.train_step());
         new_optimizer_conf->set_learning_rate(old_optimizer_conf.learning_rate());
         new_optimizer_conf->set_beta(old_optimizer_conf.user_conf().momentum_conf().beta());
+        new_optimizer_conf->set_no_duplicates_in_indices(no_duplicates_in_indices);
       };
     } else if (dst_op_conf.has_lazy_adam_model_update_conf()) {
       const LazyAdamModelUpdateOpConf& old_optimizer_conf =
@@ -112,6 +116,7 @@ void IndexedSlicesOptimizerRewritePass::Apply(const OpGraph& op_graph,
         new_optimizer_conf->set_beta1(old_optimizer_conf.user_conf().lazy_adam_conf().beta1());
         new_optimizer_conf->set_beta2(old_optimizer_conf.user_conf().lazy_adam_conf().beta2());
         new_optimizer_conf->set_epsilon(old_optimizer_conf.user_conf().lazy_adam_conf().epsilon());
+        new_optimizer_conf->set_no_duplicates_in_indices(no_duplicates_in_indices);
       };
     } else {
       return;
