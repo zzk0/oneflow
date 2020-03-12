@@ -8,6 +8,10 @@ struct UnsortedSegmentSumKernelUtil<DeviceType::kCPU, T, K> final {
                                  int64_t num_segment_ids, int64_t num_segments,
                                  int64_t outer_dim_size, int64_t inner_dim_size,
                                  int64_t segment_id_offset, T* out);
+  static void UnsortedSegmentSumNoDuplicates(DeviceCtx* ctx, const K* segment_ids, const T* data,
+                                             int64_t num_segment_ids, int64_t num_segments,
+                                             int64_t outer_dim_size, int64_t inner_dim_size,
+                                             int64_t segment_id_offset, T* out);
 };
 
 template<typename T, typename K>
@@ -27,6 +31,17 @@ void UnsortedSegmentSumKernelUtil<DeviceType::kCPU, T, K>::UnsortedSegmentSum(
     }
   }
 }
+
+template<typename T, typename K>
+void UnsortedSegmentSumKernelUtil<DeviceType::kCPU, T, K>::UnsortedSegmentSumNoDuplicates(
+    DeviceCtx* ctx, const K* segment_ids, const T* data, int64_t num_segment_ids,
+    int64_t num_segments, int64_t outer_dim_size, int64_t inner_dim_size, int64_t segment_id_offset,
+    T* out) {
+  UnsortedSegmentSumKernelUtil<DeviceType::kCPU, T, K>::UnsortedSegmentSum(
+      ctx, segment_ids, data, num_segment_ids, num_segments, outer_dim_size, inner_dim_size,
+      segment_id_offset, out);
+}
+
 #define INITIATE_UNSORTED_SEGMENT_SUM_KERNEL_UTIL_CPU(in_type_pair, index_type_pair)             \
   template struct UnsortedSegmentSumKernelUtil<DeviceType::kCPU, OF_PP_PAIR_FIRST(in_type_pair), \
                                                OF_PP_PAIR_FIRST(index_type_pair)>;
