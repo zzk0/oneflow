@@ -21,12 +21,13 @@ __global__ void GatherForwardGpu(const IDX elem_cnt, const K* indices, const T* 
                                  NdIndexOffsetHelper<IDX, 3> in_offset_helper,
                                  NdIndexOffsetHelper<IDX, 3> out_offset_helper) {
   CUDA_1D_KERNEL_LOOP_T(IDX, i, elem_cnt) {
-    IDX outer_idx, indices_idx, inner_idx;
-    out_offset_helper.OffsetToNdIndex(i, &outer_idx, &indices_idx, &inner_idx);
+    IDX in_out_idx[3];
+    out_offset_helper.OffsetToNdIndex(i, in_out_idx);
     assert(indices[indices_idx] >= 0);
-    const IDX idx = indices[indices_idx] - offset;
+    const IDX idx = indices[in_out_idx[1]] - offset;
     if (idx >= 0 && idx < gather_dim_size) {
-      const IDX in_offset = in_offset_helper.NdIndexToOffset(outer_idx, idx, inner_idx);
+      in_out_idx[1] = idx;
+      const IDX in_offset = in_offset_helper.NdIndexToOffset(in_out_idx);
       out[i] = in[in_offset];
     } else {
       out[i] = 0;
