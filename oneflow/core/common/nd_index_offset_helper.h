@@ -31,6 +31,14 @@ class NdIndexOffsetHelper {
     return NdIndexToOffset(const_cast<const T*>(index));
   }
 
+  OF_DEVICE_FUNC T NdIndexToOffset(std::initializer_list<T> index) const {
+    static_assert(index.size() <= N, "");
+    T offset = 0;
+#pragma unroll
+    for (int i = 0; i < index.size(); ++i) { offset += index[i] * stride_[i]; }
+    return offset;
+  }
+
   OF_DEVICE_FUNC T NdIndexToOffset(int n, const T* index) const {
     assert(n <= N);
     T offset = 0;
@@ -58,6 +66,17 @@ class NdIndexOffsetHelper {
     for (int i = 0; i < n; ++i) {
       T idx = remaining / stride_[i];
       index[i] = idx;
+      remaining = remaining - idx * stride_[i];
+    }
+  }
+
+  OF_DEVICE_FUNC void OffsetToNdIndex(T offset, std::initializer_list<T*> index) const {
+    static_assert(index.size() <= N, "");
+    T remaining = offset;
+#pragma unroll
+    for (int i = 0; i < index.size(); ++i) {
+      T idx = remaining / stride_[i];
+      *index[i] = idx;
       remaining = remaining - idx * stride_[i];
     }
   }
