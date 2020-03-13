@@ -21,7 +21,6 @@ TEST(NdIndexOffsetHelper, test) {
     helper.OffsetToNdIndex(offset0, 1, dims0.data());
     ASSERT_EQ(expected0, dims0);
     ASSERT_EQ(offset0, helper.NdIndexToOffset(d0));
-    ASSERT_EQ(offset0, helper.NdIndexToOffset(expected0.data()));
     ASSERT_EQ(offset0, helper.NdIndexToOffset(1, expected0.data()));
 
     for (int64_t d1 = 0; d1 < d1_max; ++d1) {
@@ -36,7 +35,6 @@ TEST(NdIndexOffsetHelper, test) {
       helper.OffsetToNdIndex(offset1, 2, dims1.data());
       ASSERT_EQ(expected1, dims1);
       ASSERT_EQ(offset1, helper.NdIndexToOffset(d0, d1));
-      ASSERT_EQ(offset1, helper.NdIndexToOffset(expected1.data()));
       ASSERT_EQ(offset1, helper.NdIndexToOffset(2, expected1.data()));
 
       for (int64_t d2 = 0; d2 < d2_max; ++d2) {
