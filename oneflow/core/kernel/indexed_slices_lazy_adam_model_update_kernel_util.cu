@@ -6,11 +6,12 @@ namespace oneflow {
 namespace {
 
 template<typename T, typename K, typename IDX>
-__global__ void UpdateGpu(T beta1, T beta2, T epsilon, int64_t feature_size, int64_t lower_bound,
-                          int64_t upper_bound, const IDX* num_unique_instance,
-                          const float* learning_rate, const K* indices, const T* values, T* model,
-                          T* m, T* v) {
-  const int64_t n = *num_unique_instance * feature_size;
+__global__ void UpdateGpu(const int64_t num_instance, T beta1, T beta2, T epsilon,
+                          int64_t feature_size, int64_t lower_bound, int64_t upper_bound,
+                          const IDX* num_unique_instance, const float* learning_rate,
+                          const K* indices, const T* values, T* model, T* m, T* v) {
+  const int64_t n = (num_unique_instance == nullptr) ? num_instance * feature_size
+                                                     : *num_unique_instance * feature_size;
   CUDA_1D_KERNEL_LOOP(i, n) {
     const K instance_id = indices[i / feature_size];
     if (instance_id >= lower_bound && instance_id < upper_bound) {
@@ -54,9 +55,9 @@ void IndexedSlicesLazyAdamMdUpdateKernelUtil<DeviceType::kGPU, T, K, IDX>::Updat
     const int64_t* train_step, const float* learning_rate, const K* indices, const T* values,
     T* model, T* m, T* v) {
   UpdateGpu<T, K><<<BlocksNum4ThreadsNum(num_instance * feature_size), kCudaThreadsNumPerBlock, 0,
-                    ctx->cuda_stream()>>>(beta1, beta2, epsilon, feature_size, lower_bound,
-                                          upper_bound, num_unique_instance, learning_rate, indices,
-                                          values, model, m, v);
+                    ctx->cuda_stream()>>>(num_instance, beta1, beta2, epsilon, feature_size,
+                                          lower_bound, upper_bound, num_unique_instance,
+                                          learning_rate, indices, values, model, m, v);
 }
 
 template<typename T, typename K, typename IDX>

@@ -1151,6 +1151,7 @@ message GatherOpConf {
   required string indices = 2;
   required string out = 3;
   optional int64 axis = 4 [default = 0];
+  optional bool no_duplicates_in_indices = 5 [default = false];
 }
 
 message GatherMs0OpConf {
@@ -1165,6 +1166,7 @@ message UnsortedSegmentSumOpConf {
   required string out = 3;
   required int64 axis = 4;
   required int64 num_segments = 5;
+  optional bool no_duplicates_in_segment_ids = 6 [default = false];
 }
 
 message GatherMs0GradOpConf {
@@ -1770,6 +1772,7 @@ message IndexedSlicesNaiveModelUpdateOpConf {
   required string model_diff_values = 2;
   required string model = 3;
   required string learning_rate = 4;
+  optional bool no_duplicates_in_indices = 5 [default = false];
 }
 
 message IndexedSlicesMomentumModelUpdateOpConf {
@@ -1780,6 +1783,7 @@ message IndexedSlicesMomentumModelUpdateOpConf {
   required string train_step = 5;
   required string learning_rate = 6;
   optional float beta = 7 [default = 0.9];
+  optional bool no_duplicates_in_indices = 8 [default = false];
 }
 
 message IndexedSlicesLazyAdamModelUpdateOpConf {
@@ -1793,6 +1797,7 @@ message IndexedSlicesLazyAdamModelUpdateOpConf {
   optional float beta1 = 8 [default = 0.9];
   optional float beta2 = 9 [default = 0.999];
   optional float epsilon = 10 [default = 1e-8];
+  optional bool no_duplicates_in_indices = 11 [default = false];
 }
 
 message DecodeOneRecFieldConf {

@@ -41,14 +41,25 @@ void IndexedSlicesMomentumMdUpdateKernel<device_type, T, K>::ForwardDataContent(
       this->kernel_conf().indexed_slices_momentum_model_update_conf().lower_bound();
   const int64_t upper_bound =
       this->kernel_conf().indexed_slices_momentum_model_update_conf().upper_bound();
-  ReduceSumUtilT::ReduceSum(ctx.device_ctx, num_indices, feature_size, diff_indices->dptr<K>(),
-                            diff_values->dptr<T>(), num_unique_diff_indices->mut_dptr<int32_t>(),
-                            unique_diff_indices->mut_dptr<K>(), unique_diff_values->mut_dptr<T>(),
-                            unique_workspace->mut_dptr(), unique_workspace->ByteSizeOfBlobBody());
+  const K* unique_diff_indices_ptr = nullptr;
+  const T* unique_diff_values_ptr = nullptr;
+  const int32_t* num_unique_indices_ptr = nullptr;
+  if (conf.no_duplicates_in_indices()) {
+    unique_diff_indices_ptr = diff_indices->dptr<K>();
+    unique_diff_values_ptr = diff_values->dptr<T>();
+  } else {
+    ReduceSumUtilT::ReduceSum(ctx.device_ctx, num_indices, feature_size, diff_indices->dptr<K>(),
+                              diff_values->dptr<T>(), num_unique_diff_indices->mut_dptr<int32_t>(),
+                              unique_diff_indices->mut_dptr<K>(), unique_diff_values->mut_dptr<T>(),
+                              unique_workspace->mut_dptr(), unique_workspace->ByteSizeOfBlobBody());
+    unique_diff_indices_ptr = unique_diff_indices->dptr<K>();
+    unique_diff_values_ptr = unique_diff_values->mut_dptr<T>();
+    num_unique_indices_ptr = unique_diff_indices->dptr<int32_t>();
+  }
   MdUpdateUtilT::Update(ctx.device_ctx, beta, num_indices, feature_size, lower_bound, upper_bound,
-                        num_unique_diff_indices->mut_dptr<int32_t>(), train_step_ptr,
-                        learning_rate_ptr, unique_diff_indices->dptr<K>(),
-                        unique_diff_values->dptr<T>(), BnInOp2Blob("model")->mut_dptr<T>(),
+                        num_unique_indices_ptr, train_step_ptr, learning_rate_ptr,
+                        unique_diff_indices_ptr, unique_diff_values_ptr,
+                        BnInOp2Blob("model")->mut_dptr<T>(),
                         BnInOp2Blob("momentum")->mut_dptr<T>());
 }
 

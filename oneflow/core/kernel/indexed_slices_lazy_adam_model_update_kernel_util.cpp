@@ -9,7 +9,8 @@ struct IndexedSlicesLazyAdamMdUpdateKernelUtil<DeviceType::kCPU, T, K, IDX> {
                      const IDX* num_unique_instance, const int64_t* train_step,
                      const float* learning_rate, const K* indices, const T* values, T* model, T* m,
                      T* v) {
-    const int64_t n = *num_unique_instance * feature_size;
+    const int64_t n = num_unique_instance == nullptr ? num_instance * feature_size
+                                                     : *num_unique_instance * feature_size;
     for (int64_t i = 0; i < n; ++i) {
       const K instance_id = indices[i / feature_size];
       if (instance_id >= lower_bound && instance_id < upper_bound) {

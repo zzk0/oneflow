@@ -11,6 +11,10 @@ struct UnsortedSegmentSumKernelUtil final {
                                  int64_t num_segment_ids, int64_t num_segments,
                                  int64_t outer_dim_size, int64_t inner_dim_size,
                                  int64_t segment_id_offset, T* out);
+  static void UnsortedSegmentSumNoDuplicates(DeviceCtx* ctx, const K* segment_ids, const T* data,
+                                             int64_t num_segment_ids, int64_t num_segments,
+                                             int64_t outer_dim_size, int64_t inner_dim_size,
+                                             int64_t segment_id_offset, T* out);
 };
 
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700 && CUDA_VERSION >= 10000

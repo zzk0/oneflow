@@ -40,6 +40,21 @@ __global__ void UnsortedSegmentSumGpu(const IDX data_elem_cnt, const K* segment_
   }
 }
 
+template<typename T, typename K, typename IDX>
+__global__ void UnsortedSegmentSumNoDuplicatesGpu(const IDX data_elem_cnt, const K* segment_ids,
+                                                  const IDX num_segment_ids, const T* data,
+                                                  const IDX num_segments, const IDX inner_dim_size,
+                                                  T* out, const IDX segment_id_offset) {
+  CUDA_1D_KERNEL_LOOP_T(IDX, i, data_elem_cnt) {
+    const T val = data[i];
+    if (val != static_cast<T>(0)) {
+      const int64_t out_offset = GetOutOffset<K, IDX>(i, segment_ids, num_segment_ids, num_segments,
+                                                      inner_dim_size, segment_id_offset);
+      if (out_offset >= 0) { *(out + out_offset) += val; }
+    }
+  }
+}
+
 bool IsSafeUseIndex32(const int64_t num_segment_ids, const int64_t num_segments,
                       const int64_t outer_dim_size, const int64_t inner_dim_size) {
   const int64_t data_elem_cnt = outer_dim_size * num_segment_ids * inner_dim_size;
@@ -68,6 +83,23 @@ struct UnsortedSegmentSumKernelUtil<DeviceType::kGPU, T, K> final {
               segment_id_offset);
     }
   }
+  static void UnsortedSegmentSumNoDuplicates(DeviceCtx* ctx, const K* segment_ids, const T* data,
+                                             int64_t num_segment_ids, int64_t num_segments,
+                                             int64_t outer_dim_size, int64_t inner_dim_size,
+                                             int64_t segment_id_offset, T* out) {
+    const int64_t data_elem_cnt = outer_dim_size * num_segment_ids * inner_dim_size;
+    if (IsSafeUseIndex32(num_segment_ids, num_segments, outer_dim_size, inner_dim_size)) {
+      UnsortedSegmentSumNoDuplicatesGpu<T, K, int32_t>
+          <<<BlocksNum4ThreadsNum(data_elem_cnt), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+              data_elem_cnt, segment_ids, num_segment_ids, data, num_segments, inner_dim_size, out,
+              segment_id_offset);
+    } else {
+      UnsortedSegmentSumNoDuplicatesGpu<T, K, int64_t>
+          <<<BlocksNum4ThreadsNum(data_elem_cnt), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
+              data_elem_cnt, segment_ids, num_segment_ids, data, num_segments, inner_dim_size, out,
+              segment_id_offset);
+    }
+  }
 };
 
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700 && CUDA_VERSION >= 10000
@@ -78,6 +110,15 @@ struct UnsortedSegmentSumKernelUtil<DeviceType::kGPU, float16, K> final {
                                  int64_t outer_dim_size, int64_t inner_dim_size,
                                  int64_t segment_id_offset, float16* out) {
     UnsortedSegmentSumKernelUtil<DeviceType::kGPU, half, K>::UnsortedSegmentSum(
+        ctx, segment_ids, reinterpret_cast<const half*>(data), num_segment_ids, num_segments,
+        outer_dim_size, inner_dim_size, segment_id_offset, reinterpret_cast<half*>(out));
+  }
+  static void UnsortedSegmentSumNoDuplicates(DeviceCtx* ctx, const K* segment_ids,
+                                             const float16* data, int64_t num_segment_ids,
+                                             int64_t num_segments, int64_t outer_dim_size,
+                                             int64_t inner_dim_size, int64_t segment_id_offset,
+                                             float16* out) {
+    UnsortedSegmentSumKernelUtil<DeviceType::kGPU, half, K>::UnsortedSegmentSumNoDuplicates(
         ctx, segment_ids, reinterpret_cast<const half*>(data), num_segment_ids, num_segments,
         outer_dim_size, inner_dim_size, segment_id_offset, reinterpret_cast<half*>(out));
   }
