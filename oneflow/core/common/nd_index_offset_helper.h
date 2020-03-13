@@ -50,6 +50,17 @@ class NdIndexOffsetHelper {
     return NdIndexToOffset(n, const_cast<const T*>(index));
   }
 
+  template<class... Ts>
+  OF_DEVICE_FUNC T NdIndexToOffset(Ts&&... args) const {
+    constexpr int n = sizeof...(args);
+    static_assert(n <= N, "");
+    T index[n] = {args...};
+    T offset = 0;
+#pragma unroll
+    for (int i = 0; i < n; ++i) { offset += index[i] * stride_[i]; }
+    return offset;
+  }
+
   OF_DEVICE_FUNC void OffsetToNdIndex(T offset, T* index) const {
     T remaining = offset;
 #pragma unroll
@@ -70,14 +81,23 @@ class NdIndexOffsetHelper {
     }
   }
 
-  OF_DEVICE_FUNC void OffsetToNdIndex(T offset, std::initializer_list<T*> index) const {
-    static_assert(index.size() <= N, "");
+
+  template<class... Ts>
+  OF_DEVICE_FUNC void OffsetToNdIndex(T offset, Ts&... args) const {
+    constexpr int n = sizeof...(args);
+    static_assert(n <= N, "");
+    T* index[n] = {&args...};
     T remaining = offset;
 #pragma unroll
-    for (int i = 0; i < index.size(); ++i) {
+    for (int i = 0; i < n - 1; ++i) {
       T idx = remaining / stride_[i];
       *index[i] = idx;
       remaining = remaining - idx * stride_[i];
+    }
+    if (n == N) {
+      *index[n - 1] = remaining;
+    } else {
+      *index[n - 1] = remaining / stride_[n - 1];
     }
   }
 
