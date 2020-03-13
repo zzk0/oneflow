@@ -2,6 +2,7 @@
 #include "oneflow/core/kernel/kernel_util.cuh"
 #include "oneflow/core/kernel/kernel.h"
 #include <assert.h>
+#include "oneflow/core/common/nd_index_offset_helper.h"
 
 namespace oneflow {
 
@@ -14,33 +15,21 @@ Shape GetFlatShape(const ShapeView& shape, int64_t axis) {
   return Shape({shape.Count(0, axis), shape.At(axis), shape.Count(axis + 1)});
 }
 
-template<typename K, typename IDX>
-__device__ IDX GetInOffset(const IDX out_offset, const K* indices, const IDX num_indices,
-                           const IDX gather_dim_size, const IDX inner_dim_size, const IDX offset) {
-  const IDX outer_dim_elem_cnt = num_indices * inner_dim_size;
-  const IDX outer_idx = out_offset / outer_dim_elem_cnt;
-  const IDX indices_idx = out_offset % outer_dim_elem_cnt / inner_dim_size;
-  const IDX inner_idx = out_offset % inner_dim_size;
-  assert(indices[indices_idx] >= 0);
-  const IDX idx = indices[indices_idx] - offset;
-  if (idx >= 0 && idx < gather_dim_size) {
-    return outer_idx * gather_dim_size * inner_dim_size + idx * inner_dim_size + inner_idx;
-  } else {
-    return -1;
-  }
-}
-
 template<typename T, typename K, typename IDX>
-__global__ void GatherForwardGpu(const IDX elem_cnt, const K* indices, const IDX num_indices,
-                                 const T* in, const IDX gather_dim_size, const IDX inner_dim_size,
-                                 T* out, const IDX offset) {
+__global__ void GatherForwardGpu(const IDX elem_cnt, const K* indices, const T* in,
+                                 const IDX gather_dim_size, T* out, const IDX offset,
+                                 NdIndexOffsetHelper<IDX, 3> in_offset_helper,
+                                 NdIndexOffsetHelper<IDX, 3> out_offset_helper) {
   CUDA_1D_KERNEL_LOOP_T(IDX, i, elem_cnt) {
-    const IDX in_offset =
-        GetInOffset<K, IDX>(i, indices, num_indices, gather_dim_size, inner_dim_size, offset);
-    if (in_offset < 0) {
-      out[i] = 0;
-    } else {
+    IDX outer_idx, indices_idx, inner_idx;
+    out_offset_helper.OffsetToNdIndex(i, &outer_idx, &indices_idx, &inner_idx);
+    assert(indices[indices_idx] >= 0);
+    const IDX idx = indices[indices_idx] - offset;
+    if (idx >= 0 && idx < gather_dim_size) {
+      const IDX in_offset = in_offset_helper.NdIndexToOffset(outer_idx, idx, inner_idx);
       out[i] = in[in_offset];
+    } else {
+      out[i] = 0;
     }
   }
 }
@@ -59,15 +48,25 @@ struct GatherKernelUtilImpl<DeviceType::kGPU, T, K> final {
                       const Shape& flat_in_shape, T* out, const int64_t offset) {
     const int64_t out_elem_cnt = flat_in_shape.At(0) * num_indices * flat_in_shape.At(2);
     if (IsSafeUseIndex32(flat_in_shape, num_indices)) {
+      NdIndexOffsetHelper<int32_t, 3> in_offset_helper(static_cast<int32_t>(flat_in_shape.At(0)),
+                                                       static_cast<int32_t>(flat_in_shape.At(1)),
+                                                       static_cast<int32_t>(flat_in_shape.At(2)));
+      NdIndexOffsetHelper<int32_t, 3> out_offset_helper(static_cast<int32_t>(flat_in_shape.At(0)),
+                                                        static_cast<int32_t>(num_indices),
+                                                        static_cast<int32_t>(flat_in_shape.At(2)));
       GatherForwardGpu<T, K, int32_t>
           <<<BlocksNum4ThreadsNum(out_elem_cnt), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
-              out_elem_cnt, indices, num_indices, in, flat_in_shape.At(1), flat_in_shape.At(2), out,
-              offset);
+              out_elem_cnt, indices, in, flat_in_shape.At(1), out, offset, in_offset_helper,
+              out_offset_helper);
     } else {
+      NdIndexOffsetHelper<int64_t, 3> in_offset_helper(flat_in_shape.At(0), flat_in_shape.At(1),
+                                                       flat_in_shape.At(2));
+      NdIndexOffsetHelper<int64_t, 3> out_offset_helper(flat_in_shape.At(0), num_indices,
+                                                        flat_in_shape.At(2));
       GatherForwardGpu<T, K, int64_t>
           <<<BlocksNum4ThreadsNum(out_elem_cnt), kCudaThreadsNumPerBlock, 0, ctx->cuda_stream()>>>(
-              out_elem_cnt, indices, num_indices, in, flat_in_shape.At(1), flat_in_shape.At(2), out,
-              offset);
+              out_elem_cnt, indices, in, flat_in_shape.At(1), out, offset, in_offset_helper,
+              out_offset_helper);
     }
   }
 };
