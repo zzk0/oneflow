@@ -19,21 +19,11 @@ class NdIndexOffsetHelper {
 
   OF_DEVICE_FUNC ~NdIndexOffsetHelper() = default;
 
-  template<class... Ts>
-  OF_DEVICE_FUNC T NdIndexToOffset(Ts&&... args) const {
-    constexpr int n = sizeof...(args);
-    static_assert(n <= N, "");
-    T index[n] = {args...};
-    T offset = 0;
-#pragma unroll
-    for (int i = 0; i < n; ++i) { offset += index[i] * stride_[i]; }
-    return offset;
-  }
-
   OF_DEVICE_FUNC T NdIndexToOffset(const T* index) const {
     T offset = 0;
 #pragma unroll
-    for (int i = 0; i < N; ++i) { offset += index[i] * stride_[i]; }
+    for (int i = 0; i < N - 1; ++i) { offset += index[i] * stride_[i]; }
+    offset += index[N - 1];
     return offset;
   }
 
@@ -52,33 +42,23 @@ class NdIndexOffsetHelper {
     return NdIndexToOffset(n, const_cast<const T*>(index));
   }
 
-  template<class... Ts>
-  OF_DEVICE_FUNC void OffsetToNdIndex(T offset, Ts*... args) const {
-    constexpr int n = sizeof...(args);
-    static_assert(n <= N, "");
-    T* index[n] = {args...};
-    T remaining = offset;
-#pragma unroll
-    for (int i = 0; i < n; ++i) {
-      *index[i] = remaining / stride_[i];
-      remaining = remaining % stride_[i];
-    }
-  }
-
   OF_DEVICE_FUNC void OffsetToNdIndex(T offset, T* index) const {
     T remaining = offset;
 #pragma unroll
-    for (int i = 0; i < N; ++i) {
-      index[i] = remaining / stride_[i];
-      remaining = remaining % stride_[i];
+    for (int i = 0; i < N - 1; ++i) {
+      T idx = remaining / stride_[i];
+      index[i] = idx;
+      remaining = remaining - idx * stride_[i];
     }
+    index[N - 1] = remaining;
   }
 
   OF_DEVICE_FUNC void OffsetToNdIndex(T offset, int n, T* index) const {
     T remaining = offset;
     for (int i = 0; i < n; ++i) {
-      index[i] = remaining / stride_[i];
-      remaining = remaining % stride_[i];
+      T idx = remaining / stride_[i];
+      index[i] = idx;
+      remaining = remaining - idx * stride_[i];
     }
   }
 
