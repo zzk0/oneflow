@@ -1,5 +1,5 @@
 # warning: never share the container image this dockerfile produces
-ARG CUDA=10
+ARG CUDA=9
 
 FROM nvidia/cuda:${CUDA}.0-cudnn7-devel-centos7
 RUN yum update -y && yum install -y epel-release
@@ -9,6 +9,7 @@ RUN yum update -y && yum install -y rdma-core-devel \
     cmake3 \
     make \
     git \
+    python3-devel \
     centos-release-scl \
     swig
 RUN ln -sf /usr/bin/cmake3 /usr/bin/cmake
@@ -53,7 +54,7 @@ COPY tools /workspace/tools
 
 RUN if [ "${USE_PYTHON_3_OR_2}" -eq 2 ] ; then cmake -DTHIRD_PARTY=OFF -DPY3=OFF .. && make -j $(nproc) ; fi
 
-RUN if [ "${USE_PYTHON_3_OR_2}" -eq 3 ] ; then cmake -DTHIRD_PARTY=OFF -DPY3=ON .. && make -j $(nproc) ; fi
+RUN if [ "${USE_PYTHON_3_OR_2}" -eq 3 ] ; then cmake -DTHIRD_PARTY=OFF -DPY3=ON -DPython3_INCLUDE_DIR=/usr/include/python3.6m -DPython3_LIBRARY=/usr/lib64/python3.6 .. && make -j $(nproc) ; fi
 
 ## BUILD WHEEL
 WORKDIR /workspace
