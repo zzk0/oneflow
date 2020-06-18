@@ -51,6 +51,18 @@ bool TriggerWarmup(const LearningRateScheduleOpConf& conf, double lr, int64_t tr
   }
 }
 
+int64_t WarmupBatches(const LearningRateScheduleOpConf& conf) {
+  if (!conf.has_warmup_conf()) { return 0L; }
+  const WarmupConf& warmup_conf = conf.warmup_conf();
+  if (warmup_conf.has_constant_conf()) {
+    return warmup_conf.constant_conf().warmup_batches();
+  } else if (warmup_conf.has_linear_conf()) {
+    return warmup_conf.linear_conf().warmup_batches();
+  } else {
+    UNIMPLEMENTED();
+  }
+}
+
 double GetWarmupLearningRate(const WarmupConf& conf, double lr, int64_t train_step) {
   if (conf.has_constant_conf()) {
     return ConstantWarmupLearningRate(conf.constant_conf(), lr, train_step);
@@ -181,8 +193,10 @@ void LearningRateScheduleKernel::ForwardDataContent(
   if (TriggerWarmup(conf, learning_rate, train_step)) {
     learning_rate = GetWarmupLearningRate(conf.warmup_conf(), learning_rate, train_step);
   } else if (conf.has_learning_rate_decay()) {
-    learning_rate = GetDecayedLearningRate(conf.learning_rate_decay(), learning_rate, train_step);
+    learning_rate = GetDecayedLearningRate(conf.learning_rate_decay(), learning_rate, 
+                                           train_step - WarmupBatches(conf));
   }
+  LOG(INFO) << "learning_rate " << learning_rate;
   *BnInOp2Blob("out")->mut_dptr<float>() = learning_rate;
 }
 
