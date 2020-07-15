@@ -65,6 +65,12 @@ class UserOp(object):
         assert len(blobs) == 1
         return blobs[0]
 
+    def ReturnOutput(self):
+        return self.SoleOutputBlob()
+
+    def ReturnOutputList(self):
+        return self.RemoteBlobList()
+
 
 @oneflow_export("user_op_builder")
 def api_user_op_builder(op_name):
