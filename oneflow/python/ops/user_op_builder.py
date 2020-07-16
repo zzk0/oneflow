@@ -41,6 +41,17 @@ class UserOp(object):
         raise NotImplementedError
 
     def RemoteBlobList(self):
+        return self.ReturnOutputList()
+
+    def SoleOutputBlob(self):
+        return self.ReturnOutput()
+
+    def ReturnOutput(self):
+        blobs = self.ReturnOutputList()
+        assert len(blobs) == 1
+        return blobs[0]
+
+    def ReturnOutputList(self):
         remote_blob_list = []
         for k in self.op_conf_.user_conf.output:
             if k not in self.output_arg_key_list_:
@@ -59,17 +70,6 @@ class UserOp(object):
                 remote_blob_list.append(self.MakeRemoteBlob(lbi))
 
         return tuple(remote_blob_list)
-
-    def SoleOutputBlob(self):
-        blobs = self.RemoteBlobList()
-        assert len(blobs) == 1
-        return blobs[0]
-
-    def ReturnOutput(self):
-        return self.SoleOutputBlob()
-
-    def ReturnOutputList(self):
-        return self.RemoteBlobList()
 
 
 @oneflow_export("user_op_builder")
@@ -232,7 +232,8 @@ class UserOpConfBuilder(object):
         assert isinstance(num, int) and num >= 1
         out_lbns = []
         for i in range(num):
-            lbn = "{}/{}_{}".format(self.user_op_.op_conf_.name, output_name, i)
+            lbn = "{}/{}_{}".format(self.user_op_.op_conf_.name,
+                                    output_name, i)
             out_lbns.append(lbn)
         self.user_op_.op_conf_.user_conf.output[output_name].s[:] = out_lbns
         self.user_op_.output_arg_key_list_.append(output_name)
@@ -307,13 +308,15 @@ class UserOpConfBuilder(object):
             if attr_type_name != "":
                 assert attr_type_name == "AttrTypeListDataType"
             assert isinstance(attr_value, (tuple, list))
-            assert all(isinstance(x, int) and x in oneflow.dtypes for x in attr_value)
+            assert all(isinstance(x, int)
+                       and x in oneflow.dtypes for x in attr_value)
             attribute.at_list_data_type.val[:] = list(attr_value)
         elif attr_type == user_op_attr_util.kAtListShape:
             if attr_type_name != "":
                 assert attr_type_name == "AttrTypeListShape"
             assert isinstance(attr_value, (tuple, list))
-            assert all(isinstance(x, tuple) or isinstance(x, list) for x in attr_value)
+            assert all(isinstance(x, tuple) or isinstance(x, list)
+                       for x in attr_value)
             for i in range(len(attr_value)):
                 shape = shape_util.ShapeProto()
                 shape.dim[:] = list(attr_value[i])
