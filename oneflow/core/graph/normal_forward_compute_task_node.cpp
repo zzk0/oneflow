@@ -55,7 +55,8 @@ void NormalForwardCompTaskNode::ProduceAllRegstsAndBindEdges() {
   size_t mem_block_num = RegstNum4OpSameOutputBlob(op.op_conf().op_type_case());
   if (op.op_conf().has_user_conf()) {
     const std::string& op_type_name = op.op_conf().user_conf().op_type_name();
-    const auto* op_reg_result = user_op::UserOpRegistryMgr::Get().GetOpRegistryResult(op_type_name);
+    const auto* op_reg_result =
+        user_op::UserOpRegistryMgr::Get()->GetOpRegistryResult(op_type_name);
     CHECK(op_reg_result != nullptr) << "op_type_name " << op_type_name << " not register";
     if (op_reg_result->same_output_regst_num > 0) {
       mem_block_num = op_reg_result->same_output_regst_num;

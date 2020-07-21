@@ -59,7 +59,7 @@ Maybe<bool> IsOpTypeCaseCpuSupportOnly(int64_t op_type_case) {
 
 Maybe<bool> IsOpTypeNameCpuSupportOnly(const std::string& op_type_name) {
   const user_op::OpRegistryResult* val =
-      user_op::UserOpRegistryMgr::Get().GetOpRegistryResult(op_type_name);
+      user_op::UserOpRegistryMgr::Get()->GetOpRegistryResult(op_type_name);
   CHECK_OR_RETURN(val != nullptr) << "op_type_name " << op_type_name << " not register";
   return val->cpu_only_supported;
 }

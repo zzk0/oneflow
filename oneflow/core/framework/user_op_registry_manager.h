@@ -15,9 +15,8 @@ class UserOpRegistryMgr final {
   UserOpRegistryMgr() {}
 
  public:
-  UserOpRegistryMgr(UserOpRegistryMgr const&) = delete;
-  UserOpRegistryMgr& operator=(UserOpRegistryMgr const&) = delete;
-  static UserOpRegistryMgr& Get();
+  OF_DISALLOW_COPY_AND_MOVE(UserOpRegistryMgr);
+  static UserOpRegistryMgr* Get();
 
  public:
   OpRegistry CheckAndGetOpRegistry(const std::string& op_type_name);
@@ -42,7 +41,7 @@ class UserOpRegistryMgr final {
 template<typename RegistryT>
 struct UserOpRegisterTrigger final {
   UserOpRegisterTrigger(RegistryT& registry) {
-    UserOpRegistryMgr::Get().Register(registry.Finish().GetResult());
+    UserOpRegistryMgr::Get()->Register(registry.Finish().GetResult());
   }
 };
 
@@ -53,18 +52,18 @@ struct UserOpRegisterTrigger final {
 #define REGISTER_USER_OP(name)                                                                \
   static ::oneflow::user_op::UserOpRegisterTrigger<::oneflow::user_op::OpRegistry> OF_PP_CAT( \
       g_register_trigger, __COUNTER__) =                                                      \
-      ::oneflow::user_op::UserOpRegistryMgr::Get().CheckAndGetOpRegistry(name)
+      ::oneflow::user_op::UserOpRegistryMgr::Get()->CheckAndGetOpRegistry(name)
 
 #define REGISTER_CPU_ONLY_USER_OP(name) REGISTER_USER_OP(name).SupportCpuOnly()
 
 #define REGISTER_USER_OP_GRAD(name)                                                               \
   static ::oneflow::user_op::UserOpRegisterTrigger<::oneflow::user_op::OpGradRegistry> OF_PP_CAT( \
       g_register_trigger, __COUNTER__) =                                                          \
-      ::oneflow::user_op::UserOpRegistryMgr::Get().CheckAndGetOpGradRegistry(name)
+      ::oneflow::user_op::UserOpRegistryMgr::Get()->CheckAndGetOpGradRegistry(name)
 
 #define REGISTER_USER_KERNEL(name)                                                       \
   static ::oneflow::user_op::UserOpRegisterTrigger<::oneflow::user_op::OpKernelRegistry> \
       OF_PP_CAT(g_register_trigger, __COUNTER__) =                                       \
-          ::oneflow::user_op::UserOpRegistryMgr::Get().CheckAndGetOpKernelRegistry(name)
+          ::oneflow::user_op::UserOpRegistryMgr::Get()->CheckAndGetOpKernelRegistry(name)
 
 #endif  // ONEFLOW_CORE_FRAMEWORK_USER_OP_REGISTRY_MANAGER_H_

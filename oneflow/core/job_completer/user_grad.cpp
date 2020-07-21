@@ -13,7 +13,7 @@ Maybe<void> GenerateBackwardOpConf(
   CHECK(op.op_conf().has_user_conf());
   const UserOpConf& user_conf = op.op_conf().user_conf();
   const user_op::OpGradRegistryResult* val =
-      user_op::UserOpRegistryMgr::Get().GetOpGradRegistryResult(user_conf.op_type_name());
+      user_op::UserOpRegistryMgr::Get()->GetOpGradRegistryResult(user_conf.op_type_name());
   if (val == nullptr) {
     return Error::GradientFunctionNotFound() << PbMessage2TxtString(op.op_conf());
   }

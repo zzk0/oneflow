@@ -10,9 +10,9 @@ namespace oneflow {
 
 namespace user_op {
 
-UserOpRegistryMgr& UserOpRegistryMgr::Get() {
+UserOpRegistryMgr* UserOpRegistryMgr::Get() {
   static UserOpRegistryMgr mgr;
-  return mgr;
+  return &mgr;
 }
 
 OpRegistry UserOpRegistryMgr::CheckAndGetOpRegistry(const std::string& op_type_name) {

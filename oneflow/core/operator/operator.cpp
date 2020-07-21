@@ -586,7 +586,7 @@ bool IsCpuOnly(const OperatorConf& op_conf) {
   if (*std::unique_ptr<CpuOnly>(ptr)) { return true; }
   if (!op_conf.has_user_conf()) { return false; }
   auto* registration_val =
-      user_op::UserOpRegistryMgr::Get().GetOpRegistryResult(op_conf.user_conf().op_type_name());
+      user_op::UserOpRegistryMgr::Get()->GetOpRegistryResult(op_conf.user_conf().op_type_name());
   CHECK_NOTNULL(registration_val);
   return registration_val->cpu_only_supported;
 }

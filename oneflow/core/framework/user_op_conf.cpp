@@ -284,7 +284,7 @@ Maybe<void> AddUserOpConfOutputDefaultArg(const UserOpDef& op_def, OperatorConf*
 Maybe<long long> GetUserOpAttrTypeImpl(const std::string& op_type_name,
                                        const std::string& attr_name) {
   const user_op::OpRegistryResult* val =
-      user_op::UserOpRegistryMgr::Get().GetOpRegistryResult(op_type_name);
+      user_op::UserOpRegistryMgr::Get()->GetOpRegistryResult(op_type_name);
   CHECK_OR_RETURN(val) << " Cannot find op " << op_type_name;
   const UserOpDef& op_def = val->op_def;
   for (int32_t i = 0; i < op_def.attr_size(); ++i) {
@@ -298,7 +298,7 @@ Maybe<OperatorConf> CheckAndCompleteUserOpConfImpl(const OperatorConf& op_conf) 
   OperatorConf ret = op_conf;
   UserOpConf* user_conf = ret.mutable_user_conf();
   const user_op::OpRegistryResult* val =
-      user_op::UserOpRegistryMgr::Get().GetOpRegistryResult(user_conf->op_type_name());
+      user_op::UserOpRegistryMgr::Get()->GetOpRegistryResult(user_conf->op_type_name());
   CHECK_OR_RETURN(val) << " Cannot find op_type_name: " << user_conf->op_type_name();
   const UserOpDef& op_def = val->op_def;
 

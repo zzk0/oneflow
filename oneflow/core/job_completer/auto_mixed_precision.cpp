@@ -42,7 +42,7 @@ std::string Container2Str(const ContainerT& container,
 
 void VerifyAMPList(const AMPList& amp_list) {
   for (const auto& op_type : amp_list) {
-    CHECK(user_op::UserOpRegistryMgr::Get().GetOpRegistryResult(op_type) != nullptr)
+    CHECK(user_op::UserOpRegistryMgr::Get()->GetOpRegistryResult(op_type) != nullptr)
         << "Cannot find " << op_type << " of AutoMixedPrecision list in OpRegistry.";
   }
 }

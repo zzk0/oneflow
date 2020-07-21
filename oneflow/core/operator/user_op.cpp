@@ -262,7 +262,7 @@ void UserOp::InitFromOpConf() {
   }
   EnrollTmpBn(GenRepeatedBn("tmp_buffer", 0));
   val_ =
-      user_op::UserOpRegistryMgr::Get().GetOpRegistryResult(op_conf().user_conf().op_type_name());
+      user_op::UserOpRegistryMgr::Get()->GetOpRegistryResult(op_conf().user_conf().op_type_name());
   if (val_ != nullptr) {
     user_op::UserOpConfWrapper user_conf_wrapper(op_conf());
     user_op::GetInputArgModifier GetInputArgModifierFn =
@@ -296,7 +296,7 @@ Maybe<void> UserOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> 
   UserOpInferContext infer_ctx(op_conf(), parallel_ctx, sbp_signature, job_desc(),
                                GetBlobDesc4BnInOp);
   const user_op::OpKernelRegistryResult* kernel_reg_val =
-      JUST(user_op::UserOpRegistryMgr::Get().GetOpKernelRegistryResult(
+      JUST(user_op::UserOpRegistryMgr::Get()->GetOpKernelRegistryResult(
           op_conf().user_conf().op_type_name(),
           UserOpKernelRegContext(this, GetBlobDesc4BnInOp, parallel_ctx)));
   CHECK_OR_RETURN(kernel_reg_val != nullptr)
