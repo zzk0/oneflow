@@ -27,8 +27,28 @@ def dense(
     model_distribute=distribute_util.broadcast(),
 ):
     r"""
-    Analogous to `tf.keras.layers.Dense <https://www.tensorflow.org/api_docs/python/tf/keras/layers/Dense>`_
+    dense layer or fully-connected layer
 
+    Args:
+        inputs: A 2D input `Blob`.
+        units: A positive integer for the dimensionality of the output space.
+        activation: Activation function (default: None).
+        use_bias: A boolean specifies whether to use a bias vector (default: True).
+        kernel_intializer: Initializer for the kernel weights matrix (default: None).
+        bias_initializer: Initializer for the bias vector (default: None).
+        kernel_regularizer: Regularizer for the kernel weights matrix (default: None).
+        bias_regularizer: Regularizer for the bias vector (default: None).
+        trainable: A boolean specifies whether to train the variables (default: True).
+        name: This layer's name (default: None).
+        model_distribute: Define the way to ditribute the model (default: distribute_util.broadcast()).
+
+    Returns:
+        A N-D `Blob` with the shape of (batch_size, units).  
+
+    Raises:
+        ValueError: The dimension of input `Blob` must be less than 2.
+        VauleError: Model distribute must be in auto, broadcast, split.
+        ValueError: The input must be a 2D `Blob` when the model distribute is split.
     """
     in_shape = inputs.shape
     in_num_axes = len(in_shape)
@@ -113,6 +133,41 @@ def conv2d(
     weight_name=None,
     bias_name=None,
 ):
+    r"""
+    2D convolution layer.
+
+    Args:
+        inputs: A 4D input `Blob`.
+        filters: An integer specifies the dimensionality of the output space. 
+        kernel_size: An integer or tuple/list specifies the height and width of the convolution window. When it is an integer, a square window is applied to the input (default: 1).
+        strides:  An integer or tuple/list specifies the strides of the convolution window along the height and width. When it is an integer, the same value for the all spatial dimesions is applied (default: 1).
+        padding: "VALID" or "SAME" (default: "VALID").?????
+        data_format: A string specifies the format of the input `Blob`, one of "NCHW" or "NHWC" (default: "NCHW"). "NCHW" cooresponds to channels_first, i.e. the input `Blob` with shape (batch_size, channels, height, width). \ 
+            "NHWC" cooresponds to channels_last, i.e. the input `Blob` with shape (batch_size, height, width, channels).
+        dilation_rate: An integer or tuple/list specifies the dilation rate for the dilated convolution. When it is an integer, the same dilation rate is applied for the all dimensions (default: 1).
+        groups: A positive integer specifies number of groups for the Group conv (default: 1).
+        activation: Activation function (default: None).
+        use_bias: A boolean specifies whether to use a bias vector (default: True).
+        kernel_initializer: Initializer for the kernel weights matrix (default: None).
+        bias_initializer: Initializer for the bias vector (default: None).
+        kernel_regularizer: Regularizer for the kernel weights matrix (default: None).
+        bias_regularizer: Regularizer for the bias vector (default: None).
+        trainable: A boolean specifies whether to train variables (default: True).
+        name: This layer's name (default: None).
+        weight_name: This weight's name (default: None).
+        bias_name: This bias's name (default: None).
+
+    Returns:
+        A 4D `Blob` with the shape of (batch_size, filters, new_height, new_width).  
+
+    Raises:
+        ValueError: If the type of kernel_size is not one of integer, list, tuple. 
+        ValueError: The number of groups must be positive and number of filters must be divisible by it. 
+        ValueError: If data_format is not one of 'NCHW', 'NHWC'. 
+        ValueError: If number of input channels is not divisible by number of groups or less than number of groups.
+        ValueError: Number of group must be one when data_format is 'NHWC'.
+    """
+
     name_prefix = name if name is not None else id_util.UniqueStr("Conv2D_")
     if isinstance(kernel_size, int):
         kernel_size = (kernel_size, kernel_size)
@@ -196,9 +251,22 @@ def layer_norm(
     name=None,
 ):
     r"""
-    Analogous to `tf.keras.layers.LayerNormalization <https://www.tensorflow.org/api_docs/python/tf/keras/layers/LayerNormalization>`_
+    layer normalization
 
+    Args:
+        inputs: Input `Blob`.
+        center: A boolean specifies whether to shift input `Blob` (default: True).
+        scale: A boolean specifies whether to scaleinput `Blob` (default: True).
+        trainable: A boolean specifies whether to train variables (default: True).
+        begin_norm_axis: An integer specifies which axis to normalize at first (default: 1).
+        begin_params_axis: An integer (default: -1).
+        epsilon: A small float is added to avoid division by zero (default: 1e-5).
+        name: This layer's name (default: None).
+
+    Returns:
+        A normalized `Blob` with same shape of input. 
     """
+
     name = name if name is not None else id_util.UniqueStr("LayerNorm_")
     op = (
         flow.user_op_builder(name)
@@ -246,6 +314,21 @@ def layer_norm(
 def layer_norm_grad(
     dy, x, mean, inv_variance, begin_norm_axis=1, name=None,
 ):
+    r"""
+    layer normalization
+
+    Args:
+        dy: Upstream derivstives.
+        x: Input `Blob`.
+        mean: Mean over neurons.
+        inv_variance: Variance over neurons.
+        begin_norm_axis: An integer specifies which axis to normalize at first (default: 1). 
+        name: This layer's name (default: None).
+
+    Returns:
+        Gradient with respect to input `Blob`. 
+    """
+
     name = name if name is not None else id_util.UniqueStr("LayerNormGrad_")
     op = (
         flow.user_op_builder(name)
@@ -265,6 +348,21 @@ def layer_norm_grad(
 def layer_norm_param_grad(
     dy, norm, gamma, begin_params_axis=-1, name=None,
 ):
+    r"""
+        backward pass for layer normalization
+
+    Args:
+        dy: Upstream derivstives.
+        norm: Normalized output. 
+        gamma: Scale parameter.  
+        begin_params_axis: From which parameters to begin with (default: -1). 
+        name: This layer's name (default: None).
+
+    Returns:
+        normalized_diff: Gradient with respect to input `Blob`.
+        beta_diff: Gradient with respect to shift parameter beta.
+        gamma_diff: Gradient with respect to scale parameter gamma.
+    """
     name = name if name is not None else id_util.UniqueStr("LayerNormGrad_")
     normalized_diff, beta_diff, gamma_diff, reduce_buf = (
         flow.user_op_builder(name)
@@ -303,8 +401,30 @@ def batch_normalization(
     name=None,
 ):
     r"""
-    Analogous to `tf.keras.layers.BatchNormalization <https://www.tensorflow.org/api_docs/python/tf/keras/layers/BatchNormalization>`_
+    batch normalization
 
+    Args:
+        inputs: Input `Blob`.
+        axis: An int specifies the aixs that should be normalized (default: -1). Default is -1, which normalizes the last axis.
+        momentum: A float specifies the momontum for the moving average (default: 0.99).
+        epsilon: A small float added to avoid division by zero (default: 0.001).
+        center: A boolean specifies whether to add offset to normalized `Blob` (default: True).
+        scale: A boolean specifies whether to multiply normalized `Blob` by gamma (default: True).
+        beta_initializer: Initializer for beta (default: None).
+        gamma_initializer: Initializer for gamma (default: None).
+        beta_regularizer: Regularizer for beta (default: None).
+        gamma_regularizer: Regularizer for gamma (default: None).
+        moving_mean_initializer: Initializer for moving mean (default: None).
+        moving_variance_initializer: Initializer for moving variance (default: None).
+        trainable: A boolean specifies whether to train variables (default: True).
+        training: A boolean specifies whether now is training the model (default: True). 
+        name: This layer's name (default: None).
+
+    Returns:
+        A `Blob` with same shape of input. 
+
+    Raises:
+        ValueError: If axis is out of dimension of input.
     """
     assert axis >= -len(inputs.shape) and axis < len(inputs.shape)
     if axis < 0:
