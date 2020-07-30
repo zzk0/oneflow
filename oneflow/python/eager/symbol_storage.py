@@ -92,23 +92,23 @@ def SetSymbol4SerializedOpNodeSignature(serialized_op_node_signature, symbol):
 serialized_op_node_signature2symbol = {}
 
 
-def HasSymbol4JobConf(job_conf):
-    global job_conf_id2symbol
-    return id(job_conf) in job_conf_id2symbol
+def HasSymbol4SerializedJobConf(serialized_job_conf):
+    global serialized_job_conf2symbol
+    return serialized_job_conf in serialized_job_conf2symbol
 
 
-def GetSymbol4JobConf(job_conf):
-    global job_conf_id2symbol
-    return job_conf_id2symbol[id(job_conf)]
+def GetSymbol4SerializedJobConf(serialized_job_conf):
+    global serialized_job_conf2symbol
+    return serialized_job_conf2symbol[serialized_job_conf]
 
 
-def SetSymbol4JobConf(job_conf, symbol):
-    assert not HasSymbol4JobConf(job_conf)
-    global job_conf_id2symbol
-    job_conf_id2symbol[id(job_conf)] = symbol
+def SetSymbol4SerializedJobConf(serialized_job_conf, symbol):
+    assert not HasSymbol4SerializedJobConf(serialized_job_conf)
+    global serialized_job_conf2symbol
+    serialized_job_conf2symbol[serialized_job_conf] = symbol
 
 
-job_conf_id2symbol = {}
+serialized_job_conf2symbol = {}
 
 
 def HasSymbol4SerializedParallelConf(serialized_parallel_conf):

@@ -37,15 +37,14 @@ import numpy as np
 import os
 
 
-def Interpret(op_attribute, parallel_conf, blob_register):
+def Interpret(op_attribute, blob_register):
+    assert op_attribute.parallel_signature.HasField("op_parallel_desc_symbol_id")
+    pd_sym_id = op_attribute.parallel_signature.op_parallel_desc_symbol_id
+    parallel_conf = symbol_storage.GetSymbol4Id(pd_sym_id).parallel_conf
     if op_attribute.op_conf.HasField("cast_to_mirrored_conf"):
         return MirroredCast(op_attribute, blob_register)
     if op_attribute.op_conf.HasField("cast_from_mirrored_conf"):
         return MirroredCast(op_attribute, blob_register)
-    if type(parallel_conf) is str:
-        parallel_conf = text_format.Parse(parallel_conf, placement_pb.ParallelConf())
-    else:
-        assert isinstance(parallel_conf, placement_pb.ParallelConf)
     if op_attribute.op_conf.HasField("distribute_split_conf"):
         return DistributeSplitOrClone(op_attribute, parallel_conf, blob_register)
     if op_attribute.op_conf.HasField("distribute_clone_conf"):

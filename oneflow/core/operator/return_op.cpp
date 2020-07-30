@@ -59,7 +59,9 @@ Maybe<void> ReturnOp::InferSbpSignature(
 }
 
 Symbol<OperatorConf> ReturnOp::GetOpConfWithoutOpNameAndLbn() const {
-  return SymbolOf(this->op_conf());
+  OperatorConf op_conf(this->op_conf());
+  op_conf.set_name("undefined-op-name");
+  return SymbolOf(op_conf);
 }
 
 REGISTER_OP(OperatorConf::kReturnConf, ReturnOp);

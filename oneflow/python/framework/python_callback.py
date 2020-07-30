@@ -53,11 +53,9 @@ class PythonCallback(oneflow_internal.ForeignCallback):
             print(traceback.format_exc())
             raise e
 
-    def EagerInterpretCompletedOp(self, op_attribute_str, parallel_conf_str):
+    def EagerInterpretCompletedOp(self, op_attribute_str):
         try:
-            interpreter_callback.InterpretCompletedOp(
-                op_attribute_str, parallel_conf_str
-            )
+            interpreter_callback.InterpretCompletedOp(op_attribute_str)
         except Exception as e:
             print(traceback.format_exc())
             raise e

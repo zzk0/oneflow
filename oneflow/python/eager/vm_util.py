@@ -38,6 +38,7 @@ import oneflow.python.framework.python_callback as python_callback
 import oneflow.python.framework.session_context as session_ctx
 from oneflow.python.eager.opkernel_object import OpKernelObject
 import oneflow.python.vm.id_util as vm_id_util
+from google.protobuf import text_format
 
 
 def PhysicalRun(build):
@@ -66,6 +67,11 @@ def _Run(build, id_generator, run_api, release_object):
             id_generator, release_object, instruction_list, eager_symbol_list
         )
     )
+    if len(eager_symbol_list.eager_symbol) > 0:
+        print(
+            "symbol_list:",
+            set(x.WhichOneof("eager_symbol_type") for x in eager_symbol_list.eager_symbol),
+        )
     run_api(instruction_list, eager_symbol_list)
     instruction_list.ClearField("instruction")
     eager_symbol_list.ClearField("eager_symbol")
@@ -310,17 +316,18 @@ class InstructionsBuilder(object):
         return symbol
 
     def GetJobConfSymbol(self, job_conf):
-        if symbol_storage.HasSymbol4JobConf(job_conf):
-            return symbol_storage.GetSymbol4JobConf(job_conf)
+        serialized_job_conf = text_format.MessageToString(job_conf)
+        if symbol_storage.HasSymbol4SerializedJobConf(serialized_job_conf):
+            return symbol_storage.GetSymbol4SerializedJobConf(serialized_job_conf)
         symbol_id = self._NewSymbolId4JobConf(job_conf)
         symbol = symbol_util.Symbol(symbol_id, job_conf)
         symbol_storage.SetSymbol4Id(symbol_id, symbol)
-        symbol_storage.SetSymbol4JobConf(job_conf, symbol)
+        symbol_storage.SetSymbol4SerializedJobConf(serialized_job_conf, symbol)
         return symbol
 
     def GetParallelDescSymbol(self, parallel_conf):
         device_tag = parallel_conf.device_tag
-        serialized_parallel_conf = parallel_conf.SerializeToString()
+        serialized_parallel_conf = text_format.MessageToString(parallel_conf)
         if symbol_storage.HasSymbol4SerializedParallelConf(serialized_parallel_conf):
             return symbol_storage.GetSymbol4SerializedParallelConf(
                 serialized_parallel_conf
@@ -334,10 +341,10 @@ class InstructionsBuilder(object):
         return symbol
 
     def GetScopeSymbol(self, scope_proto, parent_scope_symbol=None):
-        symbol_id = self._NewSymbolId4Scope(scope_proto)
-        serialized_scope_proto = scope_proto.SerializeToString()
+        serialized_scope_proto = text_format.MessageToString(scope_proto)
         if symbol_storage.HasSymbol4SerializedScopeProto(serialized_scope_proto):
             return symbol_storage.GetSymbol4SerializedScopeProto(serialized_scope_proto)
+        symbol_id = self._NewSymbolId4Scope(scope_proto)
         symbol = scope_util.ScopeSymbol(symbol_id, scope_proto, parent_scope_symbol)
         symbol_storage.SetSymbol4Id(symbol_id, symbol)
         symbol_storage.SetSymbol4SerializedScopeProto(serialized_scope_proto, symbol)
@@ -524,7 +531,7 @@ class InstructionsBuilder(object):
         self.instruction_list_.instruction.append(instruction)
 
     def _GetOpConfSymbol(self, op_conf):
-        serialized_op_conf = op_conf.SerializeToString()
+        serialized_op_conf = text_format.MessageToString(op_conf)
         if symbol_storage.HasSymbol4SerializedOpConf(serialized_op_conf):
             return symbol_storage.GetSymbol4SerializedOpConf(serialized_op_conf)
         symbol_id = self._NewSymbolId4OpConf(op_conf)
@@ -548,7 +555,9 @@ class InstructionsBuilder(object):
         new_op_node_signature.parallel_signature.CopyFrom(
             op_attribute.parallel_signature
         )
-        serialized_op_node_signature = new_op_node_signature.SerializeToString()
+        serialized_op_node_signature = text_format.MessageToString(
+            new_op_node_signature
+        )
         if symbol_storage.HasSymbol4SerializedOpNodeSignature(
             serialized_op_node_signature
         ):
@@ -682,8 +691,7 @@ class InstructionsBuilder(object):
 
     def _NewSymbolId4Scope(self, scope_proto):
         symbol_id = self._NewSymbolId()
-        scope_proto.symbol_id = symbol_id
-        self._NewScopeSymbol(scope_proto)
+        self._NewScopeSymbol(symbol_id, scope_proto)
         return symbol_id
 
     def _NewSymbolId4JobConf(self, job_conf):
@@ -825,13 +833,13 @@ class InstructionsBuilder(object):
         eager_symbol.parallel_conf_symbol.CopyFrom(parallel_conf)
         self.eager_symbol_list_.eager_symbol.append(eager_symbol)
 
-    def _NewScopeSymbol(self, scope_proto):
+    def _NewScopeSymbol(self, symbol_id, scope_proto):
         instruction = instr_util.InstructionProto()
         instruction.instr_type_name = "InitScopeSymbol"
-        instruction.operand.append(_InitSymbolOperand(scope_proto.symbol_id))
+        instruction.operand.append(_InitSymbolOperand(symbol_id))
         self.instruction_list_.instruction.append(instruction)
         eager_symbol = eager_symbol_util.EagerSymbol()
-        eager_symbol.symbol_id = scope_proto.symbol_id
+        eager_symbol.symbol_id = symbol_id
         eager_symbol.scope_symbol.CopyFrom(scope_proto)
         self.eager_symbol_list_.eager_symbol.append(eager_symbol)
 

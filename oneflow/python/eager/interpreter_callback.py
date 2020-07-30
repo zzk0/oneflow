@@ -59,15 +59,15 @@ def MirroredCast(op_attribute_str, parallel_conf_str):
     )
 
 
-def InterpretCompletedOp(op_attribute_str, parallel_conf_str):
+def InterpretCompletedOp(op_attribute_str):
     op_attribute = text_format.Parse(op_attribute_str, op_attribute_pb.OpAttribute())
     blob_register = gradient_util.GetDefaultBackwardBlobRegister()
-    _InterpretCompletedOp(op_attribute, parallel_conf_str, blob_register)
+    _InterpretCompletedOp(op_attribute, blob_register)
     gradient_util.ReleaseUnusedBlobObject(op_attribute, blob_register)
 
 
-def _InterpretCompletedOp(op_attribute, parallel_conf_str, blob_register):
-    return op_executor.Interpret(op_attribute, parallel_conf_str, blob_register)
+def _InterpretCompletedOp(op_attribute, blob_register):
+    return op_executor.Interpret(op_attribute, blob_register)
 
 
 def _MirroredCastAndAddOutputBlobReleaser(op_attribute, blob_register):

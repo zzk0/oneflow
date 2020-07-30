@@ -65,7 +65,7 @@ def LazyOpKernelInfer(add_and_infer, op_conf, opkernel_object):
 def EagerForward(add_and_infer, op_conf, scope_symbol=None):
     op_attribute = add_and_infer(op_conf, scope_symbol)
     parallel_conf = scope_symbol.device_parallel_desc_symbol.parallel_conf
-    op_executor.Interpret(op_attribute, parallel_conf, blob_register)
+    op_executor.Interpret(op_attribute, blob_register)
     bw_blob_register = gradient_util.GetDefaultBackwardBlobRegister()
     gradient_util.TrySetBackwardUsedBlobObject(
         op_attribute, blob_register, bw_blob_register
