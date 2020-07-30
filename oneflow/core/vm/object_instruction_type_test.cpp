@@ -44,7 +44,7 @@ TEST(ControlStreamType, new_object) {
   auto vm = ObjectMsgPtr<VirtualMachine>::NewFrom(&allocator, vm_desc.Get());
   InstructionMsgList list;
   TestUtil::NewObject(&list, "cpu", "0:0");
-  ASSERT_TRUE(vm->pending_msg_list().empty());
+  ASSERT_TRUE(vm->mut_pending_msg_list()->empty());
   vm->Receive(&list);
   while (!vm->Empty()) {
     vm->Schedule();
@@ -61,7 +61,7 @@ TEST(ControlStreamType, delete_object) {
   int64_t logical_object_id = TestUtil::NewObject(&list, "cpu", "0:0");
   list.EmplaceBack(
       NewInstruction("DeleteObject")->add_mut_operand(logical_object_id, AllMirroredObject()));
-  ASSERT_TRUE(vm->pending_msg_list().empty());
+  ASSERT_TRUE(vm->mut_pending_msg_list()->empty());
   vm->Receive(&list);
   while (!vm->Empty()) {
     vm->Schedule();

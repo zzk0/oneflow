@@ -28,8 +28,8 @@ OneflowVM::OneflowVM(const Resource& resource, int64_t this_machine_id)
 }
 
 void OneflowVM::Run(const std::shared_ptr<vm::InstructionMsgList>& instruction_msg_list) {
-  scheduler_thread_.AddWork([this, instruction_msg_list] {
-    mut_vm()->Receive(instruction_msg_list.get());
+  mut_vm()->Receive(instruction_msg_list.get());
+  scheduler_thread_.AddWork([this] {
     while (!mut_vm()->Empty()) { mut_vm()->Schedule(); }
   });
 }

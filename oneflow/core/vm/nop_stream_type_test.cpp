@@ -65,11 +65,11 @@ void TestNopStreamTypeNoArgument(
   InstructionMsgList list;
   auto nop_instr_msg = NewInstruction("Nop");
   list.PushBack(nop_instr_msg.Mutable());
-  ASSERT_TRUE(vm->pending_msg_list().empty());
+  ASSERT_TRUE(vm->mut_pending_msg_list()->empty());
   vm->Receive(&list);
-  ASSERT_EQ(vm->pending_msg_list().size(), 1 * 2);
+  ASSERT_EQ(vm->mut_pending_msg_list()->size(), 1 * 2);
   vm->Schedule();
-  ASSERT_TRUE(vm->pending_msg_list().empty());
+  ASSERT_TRUE(vm->mut_pending_msg_list()->empty());
   ASSERT_EQ(vm->waiting_instruction_list().size(), 0);
   ASSERT_EQ(vm->active_stream_list().size(), 1 * 2);
   auto* thread_ctx = FindNopThreadCtx(vm.Mutable());
@@ -101,7 +101,7 @@ void TestNopStreamTypeOneArgument(
   auto nop1_instr_msg = NewInstruction("Nop");
   nop1_instr_msg->add_mut_operand(object_id);
   list.PushBack(nop1_instr_msg.Mutable());
-  ASSERT_TRUE(vm->pending_msg_list().empty());
+  ASSERT_TRUE(vm->mut_pending_msg_list()->empty());
   vm->Receive(&list);
   while (!vm->Empty()) {
     vm->Schedule();

@@ -104,8 +104,15 @@ class TrivialObjectMsgMutexedList {
  public:
   using value_type = typename LinkField::struct_type;
 
-  std::size_t size() const { return list_head_.size(); }
-  bool empty() const { return list_head_.empty(); }
+  std::size_t size() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return list_head_.size();
+  }
+  bool empty() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return list_head_.empty();
+  }
+  bool ThreadUnsafeEmpty() const { return list_head_.ThreadUnsafeEmpty(); }
 
   void __Init__() { list_head_.__Init__(); }
 

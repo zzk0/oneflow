@@ -399,8 +399,7 @@ void VirtualMachine::Schedule() {
     TryReleaseFinishedInstructions(stream, /*out*/ ready_instruction_list);
     if (stream->running_instruction_list().empty()) { active_stream_list->Erase(stream); }
   }
-  auto* waiting_instruction_list = mut_waiting_instruction_list();
-  if (pending_msg_list().size() > 0) {
+  if (!pending_msg_list().ThreadUnsafeEmpty()) {
     TmpPendingInstrMsgList tmp_pending_msg_list;
     mut_pending_msg_list()->MoveTo(&tmp_pending_msg_list);
     FilterAndRunSourceInstructions(&tmp_pending_msg_list);
@@ -408,7 +407,7 @@ void VirtualMachine::Schedule() {
     MakeInstructions(&tmp_pending_msg_list, /*out*/ &new_instruction_list);
     ConsumeMirroredObjects(mut_id2logical_object(), &new_instruction_list);
     FilterReadyInstructions(&new_instruction_list, /*out*/ ready_instruction_list);
-    new_instruction_list.MoveTo(waiting_instruction_list);
+    new_instruction_list.MoveTo(mut_waiting_instruction_list());
   }
   DispatchAndPrescheduleInstructions(ready_instruction_list);
 }
@@ -419,9 +418,9 @@ void VirtualMachine::CloseAllThreads() {
   }
 }
 
-bool VirtualMachine::Empty() const {
-  return pending_msg_list().empty() && waiting_instruction_list().empty()
-         && active_stream_list().empty();
+bool VirtualMachine::Empty() {
+  return pending_msg_list().ThreadUnsafeEmpty() && mut_waiting_instruction_list()->empty()
+         && mut_active_stream_list()->empty();
 }
 
 }  // namespace vm

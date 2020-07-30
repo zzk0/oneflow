@@ -108,6 +108,11 @@ class EmbeddedListHead {
     CHECK_EQ(list_empty, size_empty);
     return size_empty;
   }
+  bool ThreadUnsafeEmpty() const {
+    bool list_empty = (&Begin() == &End());
+    bool size_empty = (size_ == 0);
+    return list_empty && size_empty;
+  }
   void CheckSize() const {
     size_t link_size = 0;
     for (EmbeddedListLink* iter = container_.next(); iter != &container_; iter = iter->next()) {
