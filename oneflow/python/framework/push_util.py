@@ -170,12 +170,20 @@ def _MakeInputOpConfAndRetLbi(arg_blob_def):
 
 
 class FeedContext(object):
-    def __init__(self, op_arg_parallel_attr, arg_ndarray, rank=0):
+    def __init__(self, op_arg_parallel_attr, arg_ndarray, rank=0, balanced_range=None):
         self.op_arg_parallel_attr_ = op_arg_parallel_attr
         self.arg_ndarray_ = arg_ndarray
         self.rank_ = rank
         # balanced_range is used in split_parallel
         self.balanced_range_ = None
+
+    def Clone(self):
+        return FeedContext(
+            self.op_arg_parallel_attr_,
+            self.arg_ndarray_,
+            self.rank_,
+            self.balanced_range_,
+        )
 
     def set_rank(self, rank):
         self.rank_ = rank
@@ -258,6 +266,7 @@ def _FeedValueToInputPhysicalBlob(feed_ctx, blob_def, blob_object):
 
 
 def _MakeFeedBlobCallback(feed_ctx, blob_def, blob_object):
+    feed_ctx = feed_ctx.Clone()
     if isinstance(blob_def, input_blob_def.FixedTensorDef):
 
         def FeedBlob(ofblob):

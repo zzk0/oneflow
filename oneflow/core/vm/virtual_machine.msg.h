@@ -42,6 +42,7 @@ OBJECT_MSG_BEGIN(VirtualMachine);
   OF_PUBLIC void Receive(InstructionMsgList* instr_list);
   OF_PUBLIC void Receive(ObjectMsgPtr<InstructionMsg>&& instruction_msg);
   OF_PUBLIC void Schedule();
+  OF_PUBLIC void CloseAllThreads();
   OF_PUBLIC bool Empty() const;
   OF_PUBLIC const std::shared_ptr<ParallelDesc>& GetInstructionParallelDesc(const InstructionMsg&);
   OF_PUBLIC MirroredObject* MutMirroredObject(int64_t logical_object_id, int64_t global_device_id);

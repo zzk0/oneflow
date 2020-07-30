@@ -27,8 +27,6 @@ limitations under the License.
 namespace oneflow {
 namespace vm {
 
-using InstructionMsgList = OBJECT_MSG_LIST(InstructionMsg, instr_msg_link);
-
 ObjectMsgPtr<InstructionMsg> NewInstruction(const std::string& instr_type_name) {
   return ObjectMsgPtr<InstructionMsg>::New(instr_type_name);
 }
@@ -41,18 +39,13 @@ Maybe<void> Run(const std::string& instruction_list_str) {
 }
 
 Maybe<void> Run(const InstructionListProto& instruction_list_proto) {
-  InstructionMsgList instr_msg_list;
+  auto instr_msg_list = std::make_shared<InstructionMsgList>();
   for (const auto& instr_proto : instruction_list_proto.instruction()) {
     auto instr_msg = ObjectMsgPtr<InstructionMsg>::New(instr_proto);
-    instr_msg_list.EmplaceBack(std::move(instr_msg));
+    instr_msg_list->EmplaceBack(std::move(instr_msg));
   }
   auto* oneflow_vm = JUST(GlobalMaybe<OneflowVM>());
-  auto* vm = oneflow_vm->mut_vm();
-  vm->Receive(&instr_msg_list);
-  while (!vm->Empty()) {
-    vm->Schedule();
-    oneflow_vm->TryReceiveAndRun();
-  }
+  oneflow_vm->Run(instr_msg_list);
   return Maybe<void>::Ok();
 }
 

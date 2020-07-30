@@ -413,6 +413,12 @@ void VirtualMachine::Schedule() {
   DispatchAndPrescheduleInstructions(ready_instruction_list);
 }
 
+void VirtualMachine::CloseAllThreads() {
+  OBJECT_MSG_LIST_FOR_EACH_PTR(mut_thread_ctx_list(), thread_ctx) {
+    thread_ctx->mut_pending_instruction_list()->Close();
+  }
+}
+
 bool VirtualMachine::Empty() const {
   return pending_msg_list().empty() && waiting_instruction_list().empty()
          && active_stream_list().empty();
