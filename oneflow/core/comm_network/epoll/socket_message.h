@@ -35,8 +35,8 @@ limitations under the License.
 namespace oneflow {
 
 #define SOCKET_MSG_TYPE_SEQ                         \
-  OF_PP_MAKE_TUPLE_SEQ(RequestWrite, request_write) \
-  OF_PP_MAKE_TUPLE_SEQ(RequestRead, request_read)   \
+  OF_PP_MAKE_TUPLE_SEQ(PleaseWrite, please_write)   \
+  OF_PP_MAKE_TUPLE_SEQ(PleaseRead, please_read)     \
   OF_PP_MAKE_TUPLE_SEQ(Actor, actor)
 
 enum class SocketMsgType {
@@ -45,14 +45,14 @@ enum class SocketMsgType {
 #undef MAKE_ENTRY
 };
 
-struct RequestWriteMsg {
+struct PleaseWriteMsg {
   void* src_token;
   int64_t dst_machine_id;
   void* dst_token;
   void* read_id;
 };
 
-struct RequestReadMsg {
+struct PleaseReadMsg {
   void* src_token;
   void* dst_token;
   void* read_id;

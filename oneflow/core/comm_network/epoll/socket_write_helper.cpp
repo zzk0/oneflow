@@ -23,8 +23,8 @@ limitations under the License.
 namespace oneflow {
 
 SocketWriteHelper::~SocketWriteHelper() {
-  delete cur_msg_queue_;
-  cur_msg_queue_ = nullptr;
+  delete working_msg_queue_;
+  working_msg_queue_ = nullptr;
   {
     std::unique_lock<std::mutex> lck(pending_msg_queue_mtx_);
     delete pending_msg_queue_;
@@ -38,7 +38,7 @@ SocketWriteHelper::SocketWriteHelper(int sockfd, IOEventPoller* poller) {
   PCHECK(queue_not_empty_fd_ != -1);
   poller->AddFdWithOnlyReadHandler(queue_not_empty_fd_,
                                    std::bind(&SocketWriteHelper::ProcessQueueNotEmptyEvent, this));
-  cur_msg_queue_ = new std::queue<SocketMsg>;
+  working_msg_queue_ = new std::queue<SocketMsg>;
   pending_msg_queue_ = new std::queue<SocketMsg>;
   cur_write_handle_ = &SocketWriteHelper::InitMsgWriteHandle;
   write_ptr_ = nullptr;
@@ -71,15 +71,15 @@ void SocketWriteHelper::WriteUntilMsgQueueEmptyOrSocketNotWriteable() {
 }
 
 bool SocketWriteHelper::InitMsgWriteHandle() {
-  if (cur_msg_queue_->empty()) {
+  if (working_msg_queue_->empty()) {
     {
       std::unique_lock<std::mutex> lck(pending_msg_queue_mtx_);
-      std::swap(cur_msg_queue_, pending_msg_queue_);
+      std::swap(working_msg_queue_, pending_msg_queue_);
     }
-    if (cur_msg_queue_->empty()) { return false; }
+    if (working_msg_queue_->empty()) { return false; }
   }
-  cur_msg_ = cur_msg_queue_->front();
-  cur_msg_queue_->pop();
+  cur_msg_ = working_msg_queue_->front();
+  working_msg_queue_->pop();
   write_ptr_ = reinterpret_cast<const char*>(&cur_msg_);
   write_size_ = sizeof(cur_msg_);
   cur_write_handle_ = &SocketWriteHelper::MsgHeadWriteHandle;
@@ -124,12 +124,12 @@ void SocketWriteHelper::SetStatusWhenMsgBodyDone() {
   cur_write_handle_ = &SocketWriteHelper::InitMsgWriteHandle;
 }
 
-void SocketWriteHelper::SetStatusWhenRequestWriteMsgHeadDone() {
+void SocketWriteHelper::SetStatusWhenPleaseWriteMsgHeadDone() {
   cur_write_handle_ = &SocketWriteHelper::InitMsgWriteHandle;
 }
 
-void SocketWriteHelper::SetStatusWhenRequestReadMsgHeadDone() {
-  const void* src_token = cur_msg_.request_read_msg.src_token;
+void SocketWriteHelper::SetStatusWhenPleaseReadMsgHeadDone() {
+  const void* src_token = cur_msg_.please_read_msg.src_token;
   auto src_mem_desc = static_cast<const SocketMemDesc*>(src_token);
   write_ptr_ = reinterpret_cast<const char*>(src_mem_desc->mem_ptr);
   write_size_ = src_mem_desc->byte_size;

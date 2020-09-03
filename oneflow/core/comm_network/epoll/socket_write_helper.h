@@ -55,7 +55,7 @@ class SocketWriteHelper final {
   int sockfd_;
   int queue_not_empty_fd_;
 
-  std::queue<SocketMsg>* cur_msg_queue_;
+  std::queue<SocketMsg>* working_msg_queue_;
 
   std::mutex pending_msg_queue_mtx_;
   std::queue<SocketMsg>* pending_msg_queue_;
