@@ -1546,17 +1546,37 @@ def softmax(
     if need_transpose:
         logits = flow.transpose(logits, perm=permute)
 
-    out = (
-        flow.user_op_builder(
-            name if name is not None else id_util.UniqueStr("Softmax_")
+    name = name if name is not None else id_util.UniqueStr("Softmax_")
+    if logits.distribute is distribute_util.split(len(logits.shape) - 1):  # model split
+        global_max = flow.math.two_stage_reduce_max(
+            logits,
+            axis=[len(logits.shape) - 1],
+            keepdims=True,
+            name=name + "_two_stage_reduce_max",
         )
-        .Op("softmax")
-        .Input("in", [logits])
-        .Output("out")
-        .Build()
-        .InferAndTryRun()
-        .RemoteBlobList()[0]
-    )
+        exp_val = flow.math.exp(
+            logits - global_max.with_distribute(flow.distribute.broadcast())
+        )
+        val_sum = flow.math.reduce_sum(
+            exp_val,
+            axis=[len(logits.shape) - 1],
+            keepdims=True,
+            name=name + "_reduce_sum",
+        )
+        val_sum = val_sum.with_distribute(flow.distribute.broadcast())
+        out = exp_val / val_sum
+    else:
+        out = (
+            flow.user_op_builder(
+                name if name is not None else id_util.UniqueStr("Softmax_")
+            )
+            .Op("softmax")
+            .Input("in", [logits])
+            .Output("out")
+            .Build()
+            .InferAndTryRun()
+            .RemoteBlobList()[0]
+        )
 
     if need_transpose:
         out = flow.transpose(out, perm=permute)
@@ -1825,22 +1845,25 @@ def sparse_softmax_cross_entropy_with_logits(
         assert len(labels.shape) == len(logits.shape) - 1
 
     if logits.distribute is distribute_util.split(len(logits.shape) - 1):
-        prob, out = (
-            flow.user_op_builder(
-                name
-                if name is not None
-                else id_util.UniqueStr("SparseSoftmaxCrossEntropyMs_")
+        if flow.eager_execution_enabled():
+            return sparse_cross_entropy(labels=labels, prediction=softmax(logits))
+        else:
+            prob, out = (
+                flow.user_op_builder(
+                    name
+                    if name is not None
+                    else id_util.UniqueStr("SparseSoftmaxCrossEntropyMs_")
+                )
+                .Op("sparse_softmax_cross_entropy_ms")
+                .Input("prediction", [logits])
+                .Input("label", [labels])
+                .Output("prob")
+                .Output("out")
+                .Attr("depth", int(logits.shape[-1]))
+                .Build()
+                .InferAndTryRun()
+                .RemoteBlobList()
             )
-            .Op("sparse_softmax_cross_entropy_ms")
-            .Input("prediction", [logits])
-            .Input("label", [labels])
-            .Output("prob")
-            .Output("out")
-            .Attr("depth", int(logits.shape[-1]))
-            .Build()
-            .InferAndTryRun()
-            .RemoteBlobList()
-        )
     else:
         prob, out = (
             flow.user_op_builder(
