@@ -65,6 +65,13 @@ if (WITH_XLA OR WITH_TENSORRT)
   list(APPEND oneflow_all_src ${oneflow_xrt_src})
 endif()
 
+file(GLOB_RECURSE oneflow_python_api_src "${PROJECT_SOURCE_DIR}/oneflow/api/*.*")
+foreach(oneflow_python_api_single_file ${oneflow_python_api_src})
+  if("${oneflow_python_api_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/api/.*\\.pybind\\.cpp$")
+    list(APPEND oneflow_all_src ${oneflow_python_api_single_file})
+  endif()
+endforeach()
+
 foreach(oneflow_single_file ${oneflow_all_src})
   # Verify whether this file is for other platforms
   set(exclude_this OFF)
@@ -120,6 +127,16 @@ foreach(oneflow_single_file ${oneflow_all_src})
     set(group_this ON)
   endif()
 
+  if("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/api/.*\\.pybind\\.cpp$")
+    list(APPEND of_pybind_obj_cc ${oneflow_single_file})
+    set(group_this ON)
+  endif()
+
+  if("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/python/.*\\.pybind\\.cpp$")
+    list(APPEND of_pybind_obj_cc ${oneflow_single_file})
+    set(group_this ON)
+  endif()
+  
   if("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/(core|user|xrt)/.*\\.cpp$")
     if("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/(core|user|xrt)/.*_test\\.cpp$")
       # test file
@@ -231,7 +248,8 @@ RELATIVE_SWIG_GENERATE_CPP(SWIG_SRCS SWIG_HDRS
                           ${of_all_rel_swigs})
 
 # PYBIND11_SRCS must be put before oneflow/api/python/init.cpp, and PYBIND_REGISTRY_CC must be the last arg, otherwise it will compile error
-pybind11_add_module(oneflow_internal ${PYBIND11_SRCS} ${PROJECT_SOURCE_DIR}/oneflow/api/python/init.cpp ${of_pybind_obj_cc} ${SWIG_SRCS} ${SWIG_HDRS} ${of_main_cc} ${PYBIND_REGISTRY_CC})
+pybind11_add_module(oneflow_internal ${PYBIND11_SRCS} ${PROJECT_SOURCE_DIR}/oneflow/api/python/init.cpp ${of_pybind_obj_cc} ${SWIG_SRCS} ${SWIG_HDRS} ${of_main_cc}
+                   ${PROJECT_SOURCE_DIR}/oneflow/api/python/util/of_api_registry.cpp ${PYBIND_REGISTRY_CC})
 add_dependencies(oneflow_internal of_cfgobj)
 set_target_properties(oneflow_internal PROPERTIES PREFIX "_")
 set_target_properties(oneflow_internal PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/python_scripts/oneflow")
