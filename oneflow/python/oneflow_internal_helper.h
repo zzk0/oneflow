@@ -53,43 +53,43 @@ limitations under the License.
 
 namespace oneflow {
 
-Maybe<void> RegisterForeignCallbackOnlyOnce(ForeignCallback* callback) {
+inline Maybe<void> RegisterForeignCallbackOnlyOnce(ForeignCallback* callback) {
   CHECK_ISNULL_OR_RETURN(Global<ForeignCallback>::Get()) << "foreign callback registered";
   Global<ForeignCallback>::SetAllocated(callback);
   return Maybe<void>::Ok();
 }
 
-Maybe<void> RegisterWatcherOnlyOnce(ForeignWatcher* watcher) {
+inline Maybe<void> RegisterWatcherOnlyOnce(ForeignWatcher* watcher) {
   CHECK_ISNULL_OR_RETURN(Global<ForeignWatcher>::Get()) << "foreign watcher registered";
   Global<ForeignWatcher>::SetAllocated(watcher);
   return Maybe<void>::Ok();
 }
 
-Maybe<bool> IsOpTypeCaseCpuSupportOnly(int64_t op_type_case) {
+inline Maybe<bool> IsOpTypeCaseCpuSupportOnly(int64_t op_type_case) {
   using OnlyCpuSupport = OnlyCpuSupportPredicator;
   CHECK_OR_RETURN(IsClassRegistered<OnlyCpuSupport>(op_type_case))
       << ": op_type_case = " << op_type_case;
   return static_cast<bool>(*std::unique_ptr<OnlyCpuSupport>(NewObj<OnlyCpuSupport>(op_type_case)));
 }
 
-Maybe<bool> IsOpTypeNameCpuSupportOnly(const std::string& op_type_name) {
+inline Maybe<bool> IsOpTypeNameCpuSupportOnly(const std::string& op_type_name) {
   const user_op::OpRegistryResult* val =
       user_op::UserOpRegistryMgr::Get().GetOpRegistryResult(op_type_name);
   CHECK_OR_RETURN(val != nullptr) << "op_type_name " << op_type_name << " not register";
   return val->cpu_only_supported;
 }
 
-Maybe<std::string> CurrentResource() {
+inline Maybe<std::string> CurrentResource() {
   CHECK_NOTNULL_OR_RETURN((Global<ResourceDesc, ForSession>::Get()));
   return PbMessage2TxtString(Global<ResourceDesc, ForSession>::Get()->resource());
 }
 
-Maybe<std::string> EnvResource() {
+inline Maybe<std::string> EnvResource() {
   CHECK_NOTNULL_OR_RETURN((Global<ResourceDesc, ForEnv>::Get()));
   return PbMessage2TxtString(Global<ResourceDesc, ForEnv>::Get()->resource());
 }
 
-Maybe<void> InitEnv(const std::string& env_proto_str) {
+inline Maybe<void> InitEnv(const std::string& env_proto_str) {
   EnvProto env_proto;
   CHECK_OR_RETURN(TxtString2PbMessage(env_proto_str, &env_proto))
       << "failed to parse env_proto" << env_proto_str;
@@ -102,19 +102,19 @@ Maybe<void> InitEnv(const std::string& env_proto_str) {
   return Maybe<void>::Ok();
 }
 
-Maybe<void> DestroyEnv() {
+inline Maybe<void> DestroyEnv() {
   if (Global<EnvGlobalObjectsScope>::Get() == nullptr) { return Maybe<void>::Ok(); }
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   ClusterInstruction::MasterSendHalt();
   return Maybe<void>::Ok();
 }
 
-void FixCpuDeviceNum(ConfigProto* config_proto) {
+inline void FixCpuDeviceNum(ConfigProto* config_proto) {
   if (config_proto->resource().cpu_device_num() > 0) { return; }
   config_proto->mutable_resource()->set_cpu_device_num(std::thread::hardware_concurrency());
 }
 
-Maybe<void> InitGlobalSession(const std::string& config_proto_str) {
+inline Maybe<void> InitGlobalSession(const std::string& config_proto_str) {
   CHECK_NOTNULL_OR_RETURN(Global<EnvDesc>::Get()) << "env not found";
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
 
@@ -133,14 +133,14 @@ Maybe<void> InitGlobalSession(const std::string& config_proto_str) {
   return Maybe<void>::Ok();
 }
 
-Maybe<void> DestroyGlobalSession() {
+inline Maybe<void> DestroyGlobalSession() {
   if (Global<SessionGlobalObjectsScope>::Get() == nullptr) { return Maybe<void>::Ok(); }
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   Global<SessionGlobalObjectsScope>::Delete();
   return Maybe<void>::Ok();
 }
 
-Maybe<void> StartGlobalSession() {
+inline Maybe<void> StartGlobalSession() {
   CHECK_NOTNULL_OR_RETURN(Global<SessionGlobalObjectsScope>::Get()) << "session not found";
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   const JobSet& job_set = Global<LazyJobBuildAndInferCtxMgr>::Get()->job_set();
@@ -156,13 +156,13 @@ Maybe<void> StartGlobalSession() {
   return Maybe<void>::Ok();
 }
 
-Maybe<std::string> GetSerializedStructureGraph() {
+inline Maybe<std::string> GetSerializedStructureGraph() {
   const auto* job_ctx_mgr = Global<LazyJobBuildAndInferCtxMgr>::Get();
   CHECK_NOTNULL_OR_RETURN(job_ctx_mgr);
   return job_ctx_mgr->structure_graph();
 }
 
-Maybe<void> StopGlobalSession() {
+inline Maybe<void> StopGlobalSession() {
   if (Global<Oneflow>::Get() == nullptr) { return Maybe<void>::Ok(); }
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   CHECK_NOTNULL_OR_RETURN(Global<Oneflow>::Get());
@@ -171,7 +171,7 @@ Maybe<void> StopGlobalSession() {
   return Maybe<void>::Ok();
 }
 
-Maybe<std::string> GetSerializedInterUserJobInfo() {
+inline Maybe<std::string> GetSerializedInterUserJobInfo() {
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   CHECK_NOTNULL_OR_RETURN(Global<Oneflow>::Get());
   CHECK_NOTNULL_OR_RETURN(Global<InterUserJobInfo>::Get());
@@ -180,19 +180,19 @@ Maybe<std::string> GetSerializedInterUserJobInfo() {
   return ret;
 }
 
-Maybe<std::string> GetSerializedJobSet() {
+inline Maybe<std::string> GetSerializedJobSet() {
   const auto* job_ctx_mgr = Global<LazyJobBuildAndInferCtxMgr>::Get();
   CHECK_NOTNULL_OR_RETURN(job_ctx_mgr);
   return PbMessage2TxtString(job_ctx_mgr->job_set());
 }
 
-Maybe<std::string> GetFunctionConfigDef() {
+inline Maybe<std::string> GetFunctionConfigDef() {
   std::string ret;
   google::protobuf::TextFormat::PrintToString(GlobalFunctionConfigDef(), &ret);
   return ret;
 }
 
-Maybe<void> LaunchJob(const std::shared_ptr<oneflow::ForeignJobInstance>& cb) {
+inline Maybe<void> LaunchJob(const std::shared_ptr<oneflow::ForeignJobInstance>& cb) {
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   CHECK_NOTNULL_OR_RETURN(Global<Oneflow>::Get());
   const auto& job_name = cb->job_name();
@@ -209,7 +209,7 @@ Maybe<void> LaunchJob(const std::shared_ptr<oneflow::ForeignJobInstance>& cb) {
   return Maybe<void>::Ok();
 }
 
-Maybe<std::string> GetSerializedMachineId2DeviceIdListOFRecord(
+inline Maybe<std::string> GetSerializedMachineId2DeviceIdListOFRecord(
     const std::string& parallel_conf_str) {
   ParallelConf parallel_conf;
   CHECK_OR_RETURN(TxtString2PbMessage(parallel_conf_str, &parallel_conf))
@@ -217,7 +217,7 @@ Maybe<std::string> GetSerializedMachineId2DeviceIdListOFRecord(
   return PbMessage2TxtString(*JUST(ParseMachineAndDeviceIdList(parallel_conf)));
 }
 
-Maybe<void> CacheInt8Calibration() {
+inline Maybe<void> CacheInt8Calibration() {
 #ifdef WITH_TENSORRT
   xrt::tensorrt::CacheInt8Calibration();
 #else
@@ -226,7 +226,7 @@ Maybe<void> CacheInt8Calibration() {
   return Maybe<void>::Ok();
 }
 
-Maybe<void> WriteInt8Calibration(const std::string& path) {
+inline Maybe<void> WriteInt8Calibration(const std::string& path) {
 #ifdef WITH_TENSORRT
   xrt::tensorrt::CacheInt8Calibration();
   xrt::tensorrt::WriteInt8Calibration(path);
@@ -236,17 +236,17 @@ Maybe<void> WriteInt8Calibration(const std::string& path) {
   return Maybe<void>::Ok();
 }
 
-Maybe<long long> GetUserOpAttrType(const std::string& op_type_name, const std::string& attr_name) {
+inline Maybe<long long> GetUserOpAttrType(const std::string& op_type_name, const std::string& attr_name) {
   return JUST(GetUserOpAttrTypeImpl(op_type_name, attr_name));
 }
 
-Maybe<std::string> CheckAndCompleteUserOpConf(const std::string& op_conf_str) {
+inline Maybe<std::string> CheckAndCompleteUserOpConf(const std::string& op_conf_str) {
   OperatorConf op_conf;
   CHECK_OR_RETURN(TxtString2PbMessage(op_conf_str, &op_conf)) << "operator conf parse failed";
   return PbMessage2TxtString(*JUST(CheckAndCompleteUserOpConfImpl(op_conf)));
 }
 
-Maybe<std::string> InferOpConf(const std::string& op_conf_str,
+inline Maybe<std::string> InferOpConf(const std::string& op_conf_str,
                                const std::string& upstream_signature_str) {
   OperatorConf op_conf;
   CHECK_OR_RETURN(TxtString2PbMessage(op_conf_str, &op_conf)) << "OperatorConf parse failed";
@@ -261,7 +261,7 @@ Maybe<std::string> InferOpConf(const std::string& op_conf_str,
   return PbMessage2TxtString(*op_attribute);
 }
 
-Maybe<long> GetOpParallelSymbolId(const std::string& op_conf_str) {
+inline Maybe<long> GetOpParallelSymbolId(const std::string& op_conf_str) {
   OperatorConf op_conf;
   CHECK_OR_RETURN(TxtString2PbMessage(op_conf_str, &op_conf)) << "OperatorConf parse failed";
   CHECK_OR_RETURN(op_conf.has_scope_symbol_id());
@@ -269,39 +269,39 @@ Maybe<long> GetOpParallelSymbolId(const std::string& op_conf_str) {
   return JUST(scope.GetParallelDescSymbolId(op_conf));
 }
 
-Maybe<void> RunLogicalInstruction(const std::string& instruction_list_str,
+inline Maybe<void> RunLogicalInstruction(const std::string& instruction_list_str,
                                   const std::string& eager_symbol_list_str) {
   return Global<eager::EagerOneflow>::Get()->RunLogicalInstruction(instruction_list_str,
                                                                    eager_symbol_list_str);
 }
 
-Maybe<void> RunPhysicalInstruction(const std::string& instruction_list_str,
+inline Maybe<void> RunPhysicalInstruction(const std::string& instruction_list_str,
                                    const std::string& eager_symbol_list_str) {
   return Global<eager::EagerOneflow>::Get()->RunPhysicalInstruction(instruction_list_str,
                                                                     eager_symbol_list_str);
 }
 
-Maybe<long long> CurrentMachineId() {
+inline Maybe<long long> CurrentMachineId() {
   CHECK_NOTNULL_OR_RETURN(Global<MachineCtx>::Get());
   return Global<MachineCtx>::Get()->this_machine_id();
 }
 
-Maybe<long long> NewLogicalObjectId() {
+inline Maybe<long long> NewLogicalObjectId() {
   CHECK_OR_RETURN(JUST(GlobalMaybe<MachineCtx>())->IsThisMachineMaster());
   return vm::IdUtil::NewLogicalObjectId();
 }
 
-Maybe<long long> NewLogicalSymbolId() {
+inline Maybe<long long> NewLogicalSymbolId() {
   CHECK_OR_RETURN(JUST(GlobalMaybe<MachineCtx>())->IsThisMachineMaster());
   return vm::IdUtil::NewLogicalSymbolId();
 }
 
-Maybe<long long> NewPhysicalObjectId() {
+inline Maybe<long long> NewPhysicalObjectId() {
   CHECK_NOTNULL_OR_RETURN(Global<MachineCtx>::Get());
   return vm::IdUtil::NewPhysicalObjectId(Global<MachineCtx>::Get()->this_machine_id());
 }
 
-Maybe<long long> NewPhysicalSymbolId() {
+inline Maybe<long long> NewPhysicalSymbolId() {
   CHECK_NOTNULL_OR_RETURN(Global<MachineCtx>::Get());
   return vm::IdUtil::NewPhysicalSymbolId(Global<MachineCtx>::Get()->this_machine_id());
 }

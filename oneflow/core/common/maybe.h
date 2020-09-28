@@ -64,6 +64,16 @@ class Maybe<T, typename std::enable_if<!(std::is_same<T, void>::value || std::is
       return default_for_error;
     }
   }
+  template<typename Type = T>
+  std::pair<Type, std::shared_ptr<cfg::ErrorProto>> GetDataAndErrorProto(
+      const Type& default_for_error) const {
+    if (IsOk()) {
+      return std::make_pair(*Data_YouAreNotAllowedToCallThisFuncOutsideThisFile(),
+                            std::make_shared<cfg::ErrorProto>(ErrorProto()));
+    } else {
+      return std::make_pair(default_for_error, std::make_shared<cfg::ErrorProto>(*error()));
+    }
+  }
 
  private:
   EitherPtr<T, ErrorProto> data_or_error_;
@@ -96,6 +106,14 @@ class Maybe<T, typename std::enable_if<std::is_same<T, void>::value>::type> fina
       google::protobuf::TextFormat::PrintToString(ErrorProto(), error_str);
     } else {
       google::protobuf::TextFormat::PrintToString(*error(), error_str);
+    }
+  }
+
+  std::shared_ptr<cfg::ErrorProto> GetDataAndErrorProto() const {
+    if (IsOk()) {
+      return std::make_shared<cfg::ErrorProto>(ErrorProto());
+    } else {
+      return std::make_shared<cfg::ErrorProto>(*error());
     }
   }
 
@@ -139,6 +157,16 @@ class Maybe<T, typename std::enable_if<std::is_scalar<T>::value>::type> final {
     }
   }
 
+  std::pair<T, std::shared_ptr<cfg::ErrorProto>> GetDataAndErrorProto(
+      const T& default_for_error) const {
+    if (IsOk()) {
+      return std::make_pair(Data_YouAreNotAllowedToCallThisFuncOutsideThisFile(),
+                            std::make_shared<cfg::ErrorProto>(ErrorProto()));
+    } else {
+      return std::make_pair(default_for_error, std::make_shared<cfg::ErrorProto>(*error()));
+    }
+  }
+
  private:
   void CheckError() const { CHECK_NE(error()->error_type_case(), ErrorProto::ERROR_TYPE_NOT_SET); }
 
@@ -170,6 +198,10 @@ class Maybe<T, typename std::enable_if<!(std::is_same<T, void>::value || std::is
 
   T GetDataAndSerializedErrorProto(std::string* error_str) const {
     return *maybe_ptr_.GetDataAndSerializedErrorProto(error_str, static_cast<PtrT>(nullptr));
+  }
+
+  std::pair<T, std::shared_ptr<cfg::ErrorProto>> GetDataAndErrorProto() const {
+    return *maybe_ptr_.GetDataAndErrorProto(static_cast<PtrT>(nullptr));
   }
 
  private:
