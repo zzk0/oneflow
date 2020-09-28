@@ -19,6 +19,7 @@ limitations under the License.
 #include <sstream>
 #include <vector>
 #include "oneflow/core/common/error.pb.h"
+#include "oneflow/core/common/error.cfg.h"
 
 namespace oneflow {
 
