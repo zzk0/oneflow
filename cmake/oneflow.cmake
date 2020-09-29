@@ -138,7 +138,9 @@ foreach(oneflow_single_file ${oneflow_all_src})
   endif()
   
   if("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/(core|user|xrt)/.*\\.cpp$")
-    if("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/(core|user|xrt)/.*_test\\.cpp$")
+    if("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/core/transport/transport_test_main\\.cpp$")
+      list(APPEND of_transport_test_cc ${oneflow_single_file})
+    elseif("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/(core|user|xrt)/.*_test\\.cpp$")
       # test file
       list(APPEND of_all_test_cc ${oneflow_single_file})
     elseif("${oneflow_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/oneflow/.*\\.pybind\\.cpp$")
@@ -249,8 +251,9 @@ RELATIVE_SWIG_GENERATE_CPP(SWIG_SRCS SWIG_HDRS
 
 # PYBIND11_SRCS must be put before oneflow/api/python/init.cpp, and PYBIND_REGISTRY_CC must be the last arg, otherwise it will compile error
 pybind11_add_module(oneflow_internal ${PYBIND11_SRCS} ${PROJECT_SOURCE_DIR}/oneflow/api/python/init.cpp ${of_pybind_obj_cc} ${SWIG_SRCS} ${SWIG_HDRS} ${of_main_cc}
-                   ${PROJECT_SOURCE_DIR}/oneflow/api/python/util/of_api_registry.cpp ${PYBIND_REGISTRY_CC})
+                   ${PROJECT_SOURCE_DIR}/oneflow/api/python/of_api_registry.cpp ${PYBIND_REGISTRY_CC})
 add_dependencies(oneflow_internal of_cfgobj)
+                        
 set_target_properties(oneflow_internal PROPERTIES PREFIX "_")
 set_target_properties(oneflow_internal PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/python_scripts/oneflow")
 target_link_libraries(oneflow_internal PRIVATE ${of_libs} ${of_cfgobj} ${oneflow_third_party_libs})
@@ -344,6 +347,16 @@ if(BUILD_TESTING)
     endif()
   endif()
 endif()
+
+# build transport_test
+foreach(cc ${of_transport_test_cc})
+  get_filename_component(transport_test_name ${cc} NAME_WE)
+  string(CONCAT transport_test_exe_name ${transport_test_name} _exe)
+  oneflow_add_executable(${transport_test_exe_name} ${cc})
+  target_link_libraries(${transport_test_exe_name} ${of_libs} ${oneflow_third_party_libs})
+  set_target_properties(${transport_test_exe_name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
+endforeach()
+
 
 # build include
 set(ONEFLOW_INCLUDE_DIR "${PROJECT_BINARY_DIR}/python_scripts/oneflow/include")
