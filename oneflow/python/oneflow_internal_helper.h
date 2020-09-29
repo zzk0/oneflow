@@ -237,7 +237,8 @@ inline Maybe<void> WriteInt8Calibration(const std::string& path) {
   return Maybe<void>::Ok();
 }
 
-inline Maybe<long long> GetUserOpAttrType(const std::string& op_type_name, const std::string& attr_name) {
+inline Maybe<long long> GetUserOpAttrType(const std::string& op_type_name,
+                                          const std::string& attr_name) {
   return JUST(GetUserOpAttrTypeImpl(op_type_name, attr_name));
 }
 
@@ -248,7 +249,7 @@ inline Maybe<std::string> CheckAndCompleteUserOpConf(const std::string& op_conf_
 }
 
 inline Maybe<std::string> InferOpConf(const std::string& op_conf_str,
-                               const std::string& upstream_signature_str) {
+                                      const std::string& upstream_signature_str) {
   OperatorConf op_conf;
   CHECK_OR_RETURN(TxtString2PbMessage(op_conf_str, &op_conf)) << "OperatorConf parse failed";
   CHECK_OR_RETURN(op_conf.has_scope_symbol_id());
@@ -271,13 +272,13 @@ inline Maybe<long> GetOpParallelSymbolId(const std::string& op_conf_str) {
 }
 
 inline Maybe<void> RunLogicalInstruction(const std::string& instruction_list_str,
-                                  const std::string& eager_symbol_list_str) {
+                                         const std::string& eager_symbol_list_str) {
   return Global<eager::EagerOneflow>::Get()->RunLogicalInstruction(instruction_list_str,
                                                                    eager_symbol_list_str);
 }
 
 inline Maybe<void> RunPhysicalInstruction(const std::string& instruction_list_str,
-                                   const std::string& eager_symbol_list_str) {
+                                          const std::string& eager_symbol_list_str) {
   return Global<eager::EagerOneflow>::Get()->RunPhysicalInstruction(instruction_list_str,
                                                                     eager_symbol_list_str);
 }

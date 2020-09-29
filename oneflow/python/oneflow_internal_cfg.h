@@ -25,11 +25,13 @@ std::shared_ptr<::oneflow::cfg::ErrorProto> RegisterForeignCallbackOnlyOnce(
   return oneflow::RegisterForeignCallbackOnlyOnce(callback).GetDataAndErrorProto();
 }
 
-std::shared_ptr<::oneflow::cfg::ErrorProto> RegisterWatcherOnlyOnce(oneflow::ForeignWatcher* watcher) {
+std::shared_ptr<::oneflow::cfg::ErrorProto> RegisterWatcherOnlyOnce(
+    oneflow::ForeignWatcher* watcher) {
   return oneflow::RegisterWatcherOnlyOnce(watcher).GetDataAndErrorProto();
 }
 
-std::pair<bool, std::shared_ptr<::oneflow::cfg::ErrorProto>> IsOpTypeCaseCpuSupportOnly(int64_t op_type_case) {
+std::pair<bool, std::shared_ptr<::oneflow::cfg::ErrorProto>> IsOpTypeCaseCpuSupportOnly(
+    int64_t op_type_case) {
   return oneflow::IsOpTypeCaseCpuSupportOnly(op_type_case).GetDataAndErrorProto(false);
 }
 
@@ -70,7 +72,7 @@ bool IsSessionInited() {
 }
 
 std::shared_ptr<::oneflow::cfg::ErrorProto> InitGlobalSession(const std::string& config_proto_str) {
-//   using namespace oneflow;
+  //   using namespace oneflow;
   return ::oneflow::InitGlobalSession(config_proto_str).GetDataAndErrorProto();
 }
 
@@ -86,7 +88,8 @@ std::shared_ptr<::oneflow::cfg::ErrorProto> StopGlobalSession() {
   return oneflow::StopGlobalSession().GetDataAndErrorProto();
 }
 
-std::pair<std::string, std::shared_ptr<::oneflow::cfg::ErrorProto>> GetSerializedInterUserJobInfo() {
+std::pair<std::string, std::shared_ptr<::oneflow::cfg::ErrorProto>>
+GetSerializedInterUserJobInfo() {
   return oneflow::GetSerializedInterUserJobInfo().GetDataAndErrorProto(std::string(""));
 }
 
@@ -102,7 +105,8 @@ std::pair<std::string, std::shared_ptr<::oneflow::cfg::ErrorProto>> GetFunctionC
   return oneflow::GetFunctionConfigDef().GetDataAndErrorProto(std::string(""));
 }
 
-std::shared_ptr<::oneflow::cfg::ErrorProto> LaunchJob(const std::shared_ptr<oneflow::ForeignJobInstance>& cb) {
+std::shared_ptr<::oneflow::cfg::ErrorProto> LaunchJob(
+    const std::shared_ptr<oneflow::ForeignJobInstance>& cb) {
   return oneflow::LaunchJob(cb).GetDataAndErrorProto();
 }
 
@@ -112,8 +116,8 @@ GetMachine2DeviceIdListOFRecordFromParallelConf(const std::string& parallel_conf
       .GetDataAndErrorProto(std::string(""));
 }
 
-std::pair<long, std::shared_ptr<::oneflow::cfg::ErrorProto>> GetUserOpAttrType(const std::string& op_type_name,
-                                                                   const std::string& attr_name) {
+std::pair<long, std::shared_ptr<::oneflow::cfg::ErrorProto>> GetUserOpAttrType(
+    const std::string& op_type_name, const std::string& attr_name) {
   return oneflow::GetUserOpAttrType(op_type_name, attr_name).GetDataAndErrorProto(0LL);
 }
 
@@ -138,14 +142,14 @@ std::pair<std::string, std::shared_ptr<::oneflow::cfg::ErrorProto>> CheckAndComp
       .GetDataAndErrorProto(std::string(""));
 }
 
-std::shared_ptr<::oneflow::cfg::ErrorProto> RunLogicalInstruction(const std::string& vm_instruction_list,
-                                                       const std::string& eager_symbol_list_str) {
+std::shared_ptr<::oneflow::cfg::ErrorProto> RunLogicalInstruction(
+    const std::string& vm_instruction_list, const std::string& eager_symbol_list_str) {
   return oneflow::RunLogicalInstruction(vm_instruction_list, eager_symbol_list_str)
       .GetDataAndErrorProto();
 }
 
-std::shared_ptr<::oneflow::cfg::ErrorProto> RunPhysicalInstruction(const std::string& vm_instruction_list,
-                                                        const std::string& eager_symbol_list_str) {
+std::shared_ptr<::oneflow::cfg::ErrorProto> RunPhysicalInstruction(
+    const std::string& vm_instruction_list, const std::string& eager_symbol_list_str) {
   return oneflow::RunPhysicalInstruction(vm_instruction_list, eager_symbol_list_str)
       .GetDataAndErrorProto();
 }
@@ -292,6 +296,6 @@ std::shared_ptr<::oneflow::cfg::ErrorProto> WriteInt8Calibration(const std::stri
   return oneflow::WriteInt8Calibration(path).GetDataAndErrorProto();
 }
 
-} // namespace oneflow_api
+}  // namespace oneflow_api
 
-} // namespace oneflow
+}  // namespace oneflow

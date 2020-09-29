@@ -13,11 +13,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-#include "oneflow/api/python/util/of_api_registry.h"
+#include "oneflow/api/python/of_api_registry.h"
 #include "oneflow/python/oneflow_internal_cfg.h"
 
 ONEFLOW_API_PYBIND11_MODULE("", m) {
-
   // RegisterForeignCallbackOnlyOnce
   // RegisterWatcherOnlyOnce
   m.def("IsOpTypeCaseCpuSupportOnly", &::oneflow::oneflow_api::IsOpTypeCaseCpuSupportOnly);
@@ -72,5 +71,4 @@ ONEFLOW_API_PYBIND11_MODULE("", m) {
   // OfBlob_CurMutTensorCopyShapeFrom
   m.def("CacheInt8Calibration", &::oneflow::oneflow_api::CacheInt8Calibration);
   // WriteInt8Calibration
-
 }
