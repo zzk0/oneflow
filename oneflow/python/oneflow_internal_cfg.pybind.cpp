@@ -20,15 +20,15 @@ ONEFLOW_API_PYBIND11_MODULE("", m) {
   // RegisterForeignCallbackOnlyOnce
   // RegisterWatcherOnlyOnce
   m.def("IsOpTypeCaseCpuSupportOnly", &::oneflow::oneflow_api::IsOpTypeCaseCpuSupportOnly);
-  // IsOpTypeNameCpuSupportOnly
+  m.def("IsOpTypeNameCpuSupportOnly", &::oneflow::oneflow_api::IsOpTypeNameCpuSupportOnly);
   m.def("CurrentResource", &::oneflow::oneflow_api::CurrentResource);
   m.def("EnvResource", &::oneflow::oneflow_api::EnvResource);
   m.def("EnableEagerEnvironment", &::oneflow::oneflow_api::EnableEagerEnvironment);
   m.def("IsEnvInited", &::oneflow::oneflow_api::IsEnvInited);
-  // InitEnv
+  m.def("InitEnv", &::oneflow::oneflow_api::InitEnv);
   m.def("DestroyEnv", &::oneflow::oneflow_api::DestroyEnv);
   m.def("IsSessionInited", &::oneflow::oneflow_api::IsSessionInited);
-  // InitGlobalSession
+  m.def("InitGlobalSession", &::oneflow::oneflow_api::InitGlobalSession);
   m.def("DestroyGlobalSession", &::oneflow::oneflow_api::DestroyGlobalSession);
   m.def("StartGlobalSession", &::oneflow::oneflow_api::StartGlobalSession);
   m.def("StopGlobalSession", &::oneflow::oneflow_api::StopGlobalSession);
@@ -37,14 +37,15 @@ ONEFLOW_API_PYBIND11_MODULE("", m) {
   m.def("GetSerializedStructureGraph", &::oneflow::oneflow_api::GetSerializedStructureGraph);
   m.def("GetFunctionConfigDef", &::oneflow::oneflow_api::GetFunctionConfigDef);
   // LaunchJob
-  // GetMachine2DeviceIdListOFRecordFromParallelConf
-  // GetUserOpAttrType
-  // InferOpConf
+  m.def("GetMachine2DeviceIdListOFRecordFromParallelConf",
+        &::oneflow::oneflow_api::GetMachine2DeviceIdListOFRecordFromParallelConf);
+  m.def("GetUserOpAttrType", &::oneflow::oneflow_api::GetUserOpAttrType);
+  m.def("InferOpConf", &::oneflow::oneflow_api::InferOpConf);
   m.def("IsInterfaceOpTypeCase", &::oneflow::oneflow_api::IsInterfaceOpTypeCase);
-  // GetOpParallelSymbolId
-  // CheckAndCompleteUserOpConf
-  // RunLogicalInstruction
-  // RunPhysicalInstruction
+  m.def("GetOpParallelSymbolId", &::oneflow::oneflow_api::GetOpParallelSymbolId);
+  m.def("CheckAndCompleteUserOpConf", &::oneflow::oneflow_api::CheckAndCompleteUserOpConf);
+  m.def("RunLogicalInstruction", &::oneflow::oneflow_api::RunLogicalInstruction);
+  m.def("RunPhysicalInstruction", &::oneflow::oneflow_api::RunPhysicalInstruction);
   m.def("CurrentMachineId", &::oneflow::oneflow_api::CurrentMachineId);
   m.def("NewLogicalObjectId", &::oneflow::oneflow_api::NewLogicalObjectId);
   m.def("NewLogicalSymbolId", &::oneflow::oneflow_api::NewLogicalSymbolId);
@@ -53,7 +54,10 @@ ONEFLOW_API_PYBIND11_MODULE("", m) {
   m.def("Ofblob_GetDataType", &::oneflow::oneflow_api::Ofblob_GetDataType);
   m.def("OfBlob_NumAxes", &::oneflow::oneflow_api::OfBlob_NumAxes);
   // OfBlob_CopyShapeFromNumpy
+  m.def("OfBlob_CopyShapeFromNumpy", &::oneflow::oneflow_api::OfBlob_CopyShapeFromNumpy);
   // OfBlob_CopyShapeToNumpy
+  m.def("OfBlob_CopyShapeToNumpy", &::oneflow::oneflow_api::OfBlob_CopyShapeToNumpy);
+
   m.def("OfBlob_IsDynamic", &::oneflow::oneflow_api::OfBlob_IsDynamic);
   m.def("OfBlob_IsTensorList", &::oneflow::oneflow_api::OfBlob_IsTensorList);
   m.def("OfBlob_TotalNumOfTensors", &::oneflow::oneflow_api::OfBlob_TotalNumOfTensors);
@@ -64,11 +68,17 @@ ONEFLOW_API_PYBIND11_MODULE("", m) {
   m.def("OfBlob_IncTensorIterator", &::oneflow::oneflow_api::OfBlob_IncTensorIterator);
   m.def("OfBlob_CurTensorIteratorEqEnd", &::oneflow::oneflow_api::OfBlob_CurTensorIteratorEqEnd);
   // OfBlob_CopyStaticShapeTo
+  m.def("OfBlob_CopyStaticShapeTo", &::oneflow::oneflow_api::OfBlob_CopyStaticShapeTo);
   // OfBlob_CurTensorCopyShapeTo
+  m.def("OfBlob_CopyStaticShapeTo", &::oneflow::oneflow_api::OfBlob_CopyStaticShapeTo);
+
   m.def("OfBlob_ClearTensorLists", &::oneflow::oneflow_api::OfBlob_ClearTensorLists);
   m.def("OfBlob_AddTensor", &::oneflow::oneflow_api::OfBlob_AddTensor);
   m.def("OfBlob_CurMutTensorAvailable", &::oneflow::oneflow_api::OfBlob_CurMutTensorAvailable);
   // OfBlob_CurMutTensorCopyShapeFrom
+  m.def("OfBlob_CurMutTensorCopyShapeFrom",
+        &::oneflow::oneflow_api::OfBlob_CurMutTensorCopyShapeFrom);
+
   m.def("CacheInt8Calibration", &::oneflow::oneflow_api::CacheInt8Calibration);
-  // WriteInt8Calibration
+  m.def("WriteInt8Calibration", &::oneflow::oneflow_api::WriteInt8Calibration);
 }

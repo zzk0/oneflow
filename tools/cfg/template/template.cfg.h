@@ -458,6 +458,9 @@ class _{{ util.class_name(cls) }}_ {
     return  {{ util.field_name(field) }}_.Mutable(index);
   }
 {% if util.field_is_message_type(field) %}
+  {{ util.field_type_name_with_cfg_namespace(field) }}* add_{{ util.field_name(field) }}() {
+    return {{ util.field_name(field) }}_.Add();
+  }
 {% else %}
   void add_{{ util.field_name(field) }}(const {{ util.field_type_name_with_cfg_namespace(field) }}& value) {
     return {{ util.field_name(field) }}_.Add(value);
@@ -735,6 +738,10 @@ class Const{{ util.class_name(cls) }} {
   bool __Empty__() const {
     return !*data_;
   }
+{% for oneof in util.message_type_oneofs(cls) %}
+  static const _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }} {{ util.oneof_name(oneof).upper() }}_NOT_SET;
+{% endfor %}{# oneof enum #}
+
 {% for field in util.message_type_fields(cls) %}
 {% if util.field_has_required_or_optional_label(field) %}
   // required or optional field {{ util.field_name(field) }}
@@ -810,6 +817,7 @@ class Const{{ util.class_name(cls) }} {
 {% for oneof in util.message_type_oneofs(cls) %}
   using {{ util.oneof_enum_name(oneof) }} = _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }};
   {{ util.oneof_enum_name(oneof) }} {{ util.oneof_name(oneof) }}_case() const {
+  // _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }} {{ util.oneof_name(oneof) }}_case() const {
     return __SharedPtrOrDefault__()->{{ util.oneof_name(oneof) }}_case();
   }
 
@@ -929,6 +937,9 @@ class {{ util.class_name(cls) }} final : public Const{{ util.class_name(cls) }} 
   }
   ::std::shared_ptr<{{ util.field_type_name_with_cfg_namespace(field) }}> shared_mutable_{{ util.field_name(field) }}(::std::size_t index) {
     return mutable_{{ util.field_name(field) }}(index)->__SharedMutable__();
+  }
+  {{ util.field_type_name_with_cfg_namespace(field) }}* add_{{ util.field_name(field) }}() {
+    return __SharedPtr__()->add_{{ util.field_name(field) }}();
   }
 {% else %}
   void add_{{ util.field_name(field) }}(const {{ util.field_type_name_with_cfg_namespace(field) }}& value) {

@@ -181,6 +181,9 @@ class ProtoReflectionUtil:
     def field_is_message_type(self, field):
         return field.message_type is not None
 
+    def field_is_string(self, field):
+        return self.field_type_name(field) == "::std::string"
+
     def field_message_type_name(self, field):
         package = field.message_type.file.package
         return (field.message_type.full_name)[len(package) + 1 :].replace(".", "_")
