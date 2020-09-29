@@ -1,12 +1,9 @@
 /*
 Copyright 2020 The OneFlow Authors. All rights reserved.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,9 +12,9 @@ limitations under the License.
 */
 #ifndef ONEFLOW_API_PYTHON_UTIL_OF_API_REGISTRY_H_
 #define ONEFLOW_API_PYTHON_UTIL_OF_API_REGISTRY_H_
-#include <glog/logging.h>
 #include <pybind11/pybind11.h>
 #include <map>
+#include <vector>
 #include <functional>
 
 namespace oneflow {
@@ -32,7 +29,7 @@ class OneflowModuleRegistry {
  private:
   void BuildSubModule(const std::string& module_path, pybind11::module& m,
                       const std::function<void(pybind11::module&)>& build_sub_module);
-  static std::map<std::string, std::function<void(pybind11::module&)>> sub_module_;
+  static std::map<std::string, std::vector<std::function<void(pybind11::module&)>>> sub_module_;
 };
 
 }  // namespace oneflow

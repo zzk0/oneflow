@@ -1,12 +1,9 @@
 /*
 Copyright 2020 The OneFlow Authors. All rights reserved.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,15 +14,18 @@ limitations under the License.
 
 namespace oneflow {
 
-std::map<std::string, std::function<void(pybind11::module&)>> OneflowModuleRegistry::sub_module_;
+std::map<std::string, std::vector<std::function<void(pybind11::module&)>>>
+    OneflowModuleRegistry::sub_module_;
 
 void OneflowModuleRegistry::Register(std::string module_path,
                                      std::function<void(pybind11::module&)> build_sub_module) {
-  CHECK(sub_module_.emplace(module_path, build_sub_module).second) << "Registered failed";
+  sub_module_[module_path].emplace_back(build_sub_module);
 }
 
 void OneflowModuleRegistry::ImportAll(pybind11::module& m) {
-  for (auto& pair : sub_module_) { BuildSubModule(pair.first, m, pair.second); }
+  for (auto& pair : sub_module_) {
+    for (auto& build_sub_module : pair.second) { BuildSubModule(pair.first, m, build_sub_module); }
+  }
 }
 
 void OneflowModuleRegistry::BuildSubModule(
