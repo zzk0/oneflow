@@ -739,7 +739,9 @@ class Const{{ util.class_name(cls) }} {
     return !*data_;
   }
 {% for oneof in util.message_type_oneofs(cls) %}
-  static const _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }} {{ util.oneof_name(oneof).upper() }}_NOT_SET;
+  using {{ util.oneof_enum_name(oneof) }} = _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }};
+  // static const _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }} {{ util.oneof_name(oneof).upper() }}_NOT_SET;
+  // using _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }}::{{ util.oneof_name(oneof).upper() }}_NOT_SET;
 {% endfor %}{# oneof enum #}
 
 {% for field in util.message_type_fields(cls) %}
@@ -815,7 +817,6 @@ class Const{{ util.class_name(cls) }} {
 {% endif %}{# field label type #}
 {% endfor %}{# field #}
 {% for oneof in util.message_type_oneofs(cls) %}
-  using {{ util.oneof_enum_name(oneof) }} = _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }};
   {{ util.oneof_enum_name(oneof) }} {{ util.oneof_name(oneof) }}_case() const {
   // _{{ util.class_name(cls) }}_::{{ util.oneof_enum_name(oneof) }} {{ util.oneof_name(oneof) }}_case() const {
     return __SharedPtrOrDefault__()->{{ util.oneof_name(oneof) }}_case();
