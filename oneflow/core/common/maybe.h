@@ -130,7 +130,7 @@ class Maybe<T, typename std::enable_if<std::is_same<T, void>::value>::type> fina
  private:
   Maybe() : error_or_plain_(nullptr) {}
   void CheckError() const {
-    CHECK_NE(this->error()->error_type_case(), cfg::_ErrorProto_::ERROR_TYPE_NOT_SET);
+    CHECK_NE(this->error()->error_type_case(), cfg::ErrorProto::ERROR_TYPE_NOT_SET);
   }
 
   SharedOrPlain<cfg::ErrorProto, void*> error_or_plain_;
@@ -185,7 +185,7 @@ class Maybe<T, typename std::enable_if<std::is_scalar<T>::value>::type> final {
 
  private:
   void CheckError() const {
-    CHECK_NE(this->error()->error_type_case(), cfg::_ErrorProto_::ERROR_TYPE_NOT_SET);
+    CHECK_NE(this->error()->error_type_case(), cfg::ErrorProto::ERROR_TYPE_NOT_SET);
   }
 
   SharedOrPlain<cfg::ErrorProto, T> error_or_plain_;
