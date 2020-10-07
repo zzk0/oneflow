@@ -71,21 +71,21 @@ bool IsSessionInited() {
   return Global<SessionGlobalObjectsScope>::Get() != nullptr;
 }
 
-std::shared_ptr<::oneflow::cfg::ErrorProto> InitGlobalSession(const std::string& config_proto_str) {
+std::shared_ptr<::oneflow::cfg::ErrorProto> InitLazyGlobalSession(const std::string& config_proto_str) {
   //   using namespace oneflow;
-  return ::oneflow::InitGlobalSession(config_proto_str).GetDataAndErrorProto();
+  return ::oneflow::InitLazyGlobalSession(config_proto_str).GetDataAndErrorProto();
 }
 
-std::shared_ptr<::oneflow::cfg::ErrorProto> DestroyGlobalSession() {
-  return oneflow::DestroyGlobalSession().GetDataAndErrorProto();
+std::shared_ptr<::oneflow::cfg::ErrorProto> DestroyLazyGlobalSession() {
+  return oneflow::DestroyLazyGlobalSession().GetDataAndErrorProto();
 }
 
-std::shared_ptr<::oneflow::cfg::ErrorProto> StartGlobalSession() {
-  return oneflow::StartGlobalSession().GetDataAndErrorProto();
+std::shared_ptr<::oneflow::cfg::ErrorProto> StartLazyGlobalSession() {
+  return oneflow::StartLazyGlobalSession().GetDataAndErrorProto();
 }
 
-std::shared_ptr<::oneflow::cfg::ErrorProto> StopGlobalSession() {
-  return oneflow::StopGlobalSession().GetDataAndErrorProto();
+std::shared_ptr<::oneflow::cfg::ErrorProto> StopLazyGlobalSession() {
+  return oneflow::StopLazyGlobalSession().GetDataAndErrorProto();
 }
 
 std::pair<std::string, std::shared_ptr<::oneflow::cfg::ErrorProto>>
