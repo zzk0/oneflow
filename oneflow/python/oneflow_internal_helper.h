@@ -115,7 +115,7 @@ inline void FixCpuDeviceNum(ConfigProto* config_proto) {
   config_proto->mutable_resource()->set_cpu_device_num(std::thread::hardware_concurrency());
 }
 
-inline Maybe<void> InitGlobalSession(const std::string& config_proto_str) {
+inline Maybe<void> InitLazyGlobalSession(const std::string& config_proto_str) {
   CHECK_NOTNULL_OR_RETURN(Global<EnvDesc>::Get()) << "env not found";
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
 
@@ -134,14 +134,14 @@ inline Maybe<void> InitGlobalSession(const std::string& config_proto_str) {
   return Maybe<void>::Ok();
 }
 
-inline Maybe<void> DestroyGlobalSession() {
+inline Maybe<void> DestroyLazyGlobalSession() {
   if (Global<SessionGlobalObjectsScope>::Get() == nullptr) { return Maybe<void>::Ok(); }
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   Global<SessionGlobalObjectsScope>::Delete();
   return Maybe<void>::Ok();
 }
 
-inline Maybe<void> StartGlobalSession() {
+inline Maybe<void> StartLazyGlobalSession() {
   CHECK_NOTNULL_OR_RETURN(Global<SessionGlobalObjectsScope>::Get()) << "session not found";
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   const JobSet& job_set = Global<LazyJobBuildAndInferCtxMgr>::Get()->job_set();
@@ -163,7 +163,7 @@ inline Maybe<std::string> GetSerializedStructureGraph() {
   return job_ctx_mgr->structure_graph();
 }
 
-inline Maybe<void> StopGlobalSession() {
+inline Maybe<void> StopLazyGlobalSession() {
   if (Global<Oneflow>::Get() == nullptr) { return Maybe<void>::Ok(); }
   CHECK_OR_RETURN(Global<MachineCtx>::Get()->IsThisMachineMaster());
   CHECK_NOTNULL_OR_RETURN(Global<Oneflow>::Get());
