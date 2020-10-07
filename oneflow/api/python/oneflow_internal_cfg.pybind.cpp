@@ -28,10 +28,10 @@ ONEFLOW_API_PYBIND11_MODULE("", m) {
   m.def("InitEnv", &::oneflow::oneflow_api::InitEnv);
   m.def("DestroyEnv", &::oneflow::oneflow_api::DestroyEnv);
   m.def("IsSessionInited", &::oneflow::oneflow_api::IsSessionInited);
-  m.def("InitGlobalSession", &::oneflow::oneflow_api::InitGlobalSession);
-  m.def("DestroyGlobalSession", &::oneflow::oneflow_api::DestroyGlobalSession);
-  m.def("StartGlobalSession", &::oneflow::oneflow_api::StartGlobalSession);
-  m.def("StopGlobalSession", &::oneflow::oneflow_api::StopGlobalSession);
+  m.def("InitLazyGlobalSession", &::oneflow::oneflow_api::InitLazyGlobalSession);
+  m.def("DestroyLazyGlobalSession", &::oneflow::oneflow_api::DestroyLazyGlobalSession);
+  m.def("StartLazyGlobalSession", &::oneflow::oneflow_api::StartLazyGlobalSession);
+  m.def("StopLazyGlobalSession", &::oneflow::oneflow_api::StopLazyGlobalSession);
   m.def("GetSerializedInterUserJobInfo", &::oneflow::oneflow_api::GetSerializedInterUserJobInfo);
   m.def("GetSerializedJobSet", &::oneflow::oneflow_api::GetSerializedJobSet);
   m.def("GetSerializedStructureGraph", &::oneflow::oneflow_api::GetSerializedStructureGraph);
