@@ -27,7 +27,7 @@ from test_util import type_name_to_np_type
 
 
 def compare_with_np(
-    device_type, label_type, num_classes, device_num_sample, batch_size
+    device_type, label_type, num_classes, num_sample, batch_size
 ):
     assert device_type in ["gpu", "cpu"]
     flow.clear_default_session()
@@ -59,7 +59,7 @@ def compare_with_np(
             maped_label, sampled_label, sampled_weight = flow.partial_fc_sample(
                 weight=x.with_distribute(weight_distribute),
                 label=labels.with_distribute(lebels_distribute),
-                num_sample=device_num_sample,
+                num_sample=num_sample,
             )
         with flow.scope.placement(device_type, "0:0"):
             sampled_weight = flow.identity(sampled_weight)
@@ -86,6 +86,7 @@ def compare_with_np(
 
     gpu_num = 4
     device_class_num = num_classes / gpu_num
+    device_num_sample = num_sample / gpu_num
     global_sample_labels_list = []
     np_mapped_label = []
     label_map = {}
@@ -141,7 +142,7 @@ class TestPartialFc(flow.unittest.TestCase):
         arg_dict["device_type"] = ["gpu"]
         arg_dict["label_type"] = ["int32"]
         arg_dict["num_classes"] = [200]
-        arg_dict["device_num_sample"] = [24]
+        arg_dict["device_num_sample"] = [96]
         arg_dict["batch_size"] = [64]
         for arg in GenArgList(arg_dict):
             compare_with_np(*arg)
