@@ -109,8 +109,8 @@ class TmpBufferManager final {
 
 class PartialFcSampleOpKernelState final : public user_op::OpKernelState {
  public:
-  PartialFcSampleOpKernelState(DeviceCtx* ctx, int64_t lower, int64_t upper)
-      : lower_(lower), upper_(upper) {
+  PartialFcSampleOpKernelState(DeviceCtx* ctx, int64_t lower, int64_t upper, int64_t num_sample_per_rank)
+      : lower_(lower), upper_(upper), num_sample_per_rank_(num_sample_per_rank) {
     CHECK_NOTNULL(ctx);
     OF_CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
     OF_CURAND_CHECK(
@@ -121,11 +121,13 @@ class PartialFcSampleOpKernelState final : public user_op::OpKernelState {
 
   int64_t lower() const { return lower_; }
   int64_t upper() const { return upper_; }
+  int64_t num_sample_per_rank() const { return num_sample_per_rank_; }
   curandGenerator_t& gen() { return curand_generator_; }
 
  private:
   const int64_t lower_;
   const int64_t upper_;
+  const int64_t num_sample_per_rank_;
   curandGenerator_t curand_generator_;
 };
 
@@ -169,15 +171,18 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     const SbpParallel& in_sbp = ctx->SbpParallel4ArgNameAndIndex("weight", 0);
     const TensorDesc* in_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("weight", 0);
     const int64_t class_num = in_logical_desc->shape().At(0);
+    const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
+    const int64_t parallel_num = ctx->parallel_ctx().parallel_num();
+    const int64_t num_sample_per_rank = RoundUp(num_sample, parallel_num) / parallel_num;
     if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == 0
-        && ctx->parallel_ctx().parallel_num() > 1) {
+        && parallel_num > 1) {
       CHECK(ctx->SbpParallel4ArgNameAndIndex("label", 0).has_broadcast_parallel());
-      BalancedSplitter bs(class_num, ctx->parallel_ctx().parallel_num());
+      BalancedSplitter bs(class_num, parallel_num);
       return std::make_shared<PartialFcSampleOpKernelState>(
           ctx->device_ctx(), bs.At(ctx->parallel_ctx().parallel_id()).begin(),
-          bs.At(ctx->parallel_ctx().parallel_id()).end());
+          bs.At(ctx->parallel_ctx().parallel_id()).end(), num_sample_per_rank);
     } else {
-      return std::make_shared<PartialFcSampleOpKernelState>(ctx->device_ctx(), 0, class_num);
+      return std::make_shared<PartialFcSampleOpKernelState>(ctx->device_ctx(), 0, class_num, num_sample_per_rank);
     }
   }
 
@@ -189,7 +194,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     user_op::Tensor* sampled_label = ctx->Tensor4ArgNameAndIndex("sampled_label", 0);
     user_op::Tensor* sampled_weight = ctx->Tensor4ArgNameAndIndex("sampled_weight", 0);
     user_op::Tensor* tmp_buffer = ctx->Tensor4ArgNameAndIndex("tmp_buffer", 0);
-    const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
+
     const int64_t batch_size = label->shape().At(0);
     const int64_t num_classes = weight->shape().At(0);
     TmpBufferManager<K> buffer_manager(tmp_buffer->mut_dptr(), num_classes);
@@ -197,10 +202,11 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     auto* kernel_state = dynamic_cast<PartialFcSampleOpKernelState*>(state);
     CHECK_NOTNULL(kernel_state);
     CHECK_EQ(weight->shape().At(0), kernel_state->upper() - kernel_state->lower());
-    int64_t upper_bound = kernel_state->upper();
-    int64_t lower_bound = kernel_state->lower();
+    const int64_t upper_bound = kernel_state->upper();
+    const int64_t lower_bound = kernel_state->lower();
     OF_CURAND_CHECK(
         curandGenerate(kernel_state->gen(), buffer_manager.RandValuePtr(), num_classes));
+    const int64_t num_sample = kernel_state->num_sample_per_rank();
     InitBuffer<<<BlocksNum4ThreadsNum(num_classes), kCudaThreadsNumPerBlock, 0,
                  ctx->device_ctx()->cuda_stream()>>>(num_classes, buffer_manager.RandValuePtr(),
                                                      buffer_manager.LabelBufferPtr(),

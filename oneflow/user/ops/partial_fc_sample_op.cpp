@@ -26,9 +26,8 @@ REGISTER_USER_OP("partial_fc_sample")
     .Attr<int64_t>("num_sample")
     .SetTensorDescInferFn([](user_op::InferContext* ctx) -> Maybe<void> {
       const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
-      // const int32_t parallel_num = ctx->parallel_ctx().parallel_num();
-      // const int64_t num_sample_per_rank = RoundUp(num_sample, parallel_num) / parallel_num;
-      const int64_t num_sample_per_rank = num_sample;
+      const int64_t parallel_num = ctx->parallel_ctx().parallel_num();
+      const int64_t num_sample_per_rank = RoundUp(num_sample, parallel_num) / parallel_num;
       const user_op::TensorDesc* weight = ctx->TensorDesc4ArgNameAndIndex("weight", 0);
       const user_op::TensorDesc* label = ctx->TensorDesc4ArgNameAndIndex("label", 0);
       user_op::TensorDesc* sampled_weight = ctx->TensorDesc4ArgNameAndIndex("sampled_weight", 0);
