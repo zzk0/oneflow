@@ -109,7 +109,8 @@ class TmpBufferManager final {
 
 class PartialFcSampleOpKernelState final : public user_op::OpKernelState {
  public:
-  PartialFcSampleOpKernelState(DeviceCtx* ctx, int64_t lower, int64_t upper, int64_t num_sample_per_rank)
+  PartialFcSampleOpKernelState(DeviceCtx* ctx, int64_t lower, int64_t upper,
+                               int64_t num_sample_per_rank)
       : lower_(lower), upper_(upper), num_sample_per_rank_(num_sample_per_rank) {
     CHECK_NOTNULL(ctx);
     OF_CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
@@ -158,6 +159,12 @@ __global__ void GetLabelMap(const int64_t n, const int64_t map_offset, const K* 
   }
 }
 
+template<typename K>
+__global__ void GetSampleLabel(const int64_t n, const int64_t offset, const K* label,
+                               K* sample_label) {
+  CUDA_1D_KERNEL_LOOP(i, n) { sample_label[i] = label[i] + offset; }
+}
+
 }  // namespace
 
 template<typename T, typename K>
@@ -174,15 +181,15 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
     const int64_t parallel_num = ctx->parallel_ctx().parallel_num();
     const int64_t num_sample_per_rank = RoundUp(num_sample, parallel_num) / parallel_num;
-    if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == 0
-        && parallel_num > 1) {
+    if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == 0 && parallel_num > 1) {
       CHECK(ctx->SbpParallel4ArgNameAndIndex("label", 0).has_broadcast_parallel());
       BalancedSplitter bs(class_num, parallel_num);
       return std::make_shared<PartialFcSampleOpKernelState>(
           ctx->device_ctx(), bs.At(ctx->parallel_ctx().parallel_id()).begin(),
           bs.At(ctx->parallel_ctx().parallel_id()).end(), num_sample_per_rank);
     } else {
-      return std::make_shared<PartialFcSampleOpKernelState>(ctx->device_ctx(), 0, class_num, num_sample_per_rank);
+      return std::make_shared<PartialFcSampleOpKernelState>(ctx->device_ctx(), 0, class_num,
+                                                            num_sample_per_rank);
     }
   }
 
@@ -221,16 +228,22 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     // check num_sample > num_pos
 
     // get sampled_label
-    Memcpy<DeviceType::kGPU>(ctx->device_ctx(), sampled_label->mut_dptr<void>(),
-                             buffer_manager.SortedLabelBufferPtr(),
-                             num_sample * GetSizeOfDataType(sampled_label->data_type()));
-
+    const bool indexed_slice_update = ctx->Attr<bool>("indexed_slice_update");
+    if (indexed_slice_update) {
+      GetSampleLabel<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,
+                       ctx->device_ctx()->cuda_stream()>>>(num_sample, lower_bound,
+                                                           buffer_manager.SortedLabelBufferPtr(),
+                                                           sampled_label->mut_dptr<K>());
+    } else {
+      Memcpy<DeviceType::kGPU>(ctx->device_ctx(), sampled_label->mut_dptr<void>(),
+                               buffer_manager.SortedLabelBufferPtr(),
+                               num_sample * GetSizeOfDataType(sampled_label->data_type()));
+    }
     // get sampled weight
     GatherKernelUtilImpl<DeviceType::kGPU, T, K>::Forward(
-        ctx->device_ctx(), sampled_label->dptr<K>(), num_sample, weight->dptr<T>(),
+        ctx->device_ctx(), buffer_manager.SortedLabelBufferPtr(), num_sample, weight->dptr<T>(),
         Shape({1, weight->shape().At(0), weight->shape().Count(1)}), sampled_weight->mut_dptr<T>(),
         0);
-
     // get LabelMap
     const int64_t map_offset = ctx->parallel_ctx().parallel_id() * num_sample;
     GetLabelMap<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,

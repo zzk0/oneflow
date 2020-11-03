@@ -21,11 +21,15 @@ import time
 flow.config.gpu_device_num(4)
 func_config = flow.FunctionConfig()
 func_config.default_data_type(flow.float)
+func_config.indexed_slices_optimizer_conf(
+    dict(include_op_names=dict(op_name=["fc7-weight"]))
+)
 num_classes = 1000000
 emb_size = 128
 batch_size = 256
 num_sample = 100000
 partial_fc = True
+indexed_slice_update = True
 
 
 @flow.global_function(type="train", function_config=func_config)
@@ -47,7 +51,10 @@ def PartialFcJob(
         labels = labels.with_distribute(flow.distribute.broadcast())
         if partial_fc:
             maped_label, sampled_label, sampled_weight = flow.partial_fc_sample(
-                weight=fc7_weight, label=labels, num_sample=num_sample,
+                weight=fc7_weight,
+                label=labels,
+                num_sample=num_sample,
+                indexed_slice_update=indexed_slice_update,
             )
             maped_label = maped_label.with_distribute(flow.distribute.broadcast())
             labels = maped_label
@@ -71,7 +78,7 @@ data = np.random.rand(batch_size, emb_size).astype(np.float32)
 check_point = flow.train.CheckPoint()
 check_point.init()
 start_time = time.time()
-for i in range(1000):
+for i in range(200):
     loss = PartialFcJob(data, labels).get()
 time = time.time() - start_time
 print("time", time)

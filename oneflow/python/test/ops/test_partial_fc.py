@@ -27,7 +27,7 @@ from test_util import type_name_to_np_type
 
 
 def compare_with_np(
-    device_type, label_type, num_classes, num_sample, batch_size
+    device_type, label_type, num_classes, num_sample, batch_size, indexed_slice_update
 ):
     assert device_type in ["gpu", "cpu"]
     flow.clear_default_session()
@@ -60,6 +60,7 @@ def compare_with_np(
                 weight=x.with_distribute(weight_distribute),
                 label=labels.with_distribute(lebels_distribute),
                 num_sample=num_sample,
+                indexed_slice_update=indexed_slice_update,
             )
         with flow.scope.placement(device_type, "0:0"):
             sampled_weight = flow.identity(sampled_weight)
@@ -94,23 +95,34 @@ def compare_with_np(
         lower = i * device_class_num
         upper = (i + 1) * device_class_num
         condition = (labels >= lower) & (labels < upper)
-        local_label = labels[condition] - lower
+        local_label = labels[condition]
         local_label = np.unique(local_label).astype(np.int32)
 
         idx_start = int(i * device_num_sample)
         idx_end = int((i + 1) * device_num_sample)
         local_sample_labels = sampled_label[idx_start:idx_end]
-        global_sample_labels = local_sample_labels + i * device_class_num
+        if indexed_slice_update:
+            global_sample_labels = local_sample_labels
+        else:
+            global_sample_labels = local_sample_labels + i * device_class_num
         global_sample_labels_list.append(global_sample_labels)
-        assert (
-            np.all(
-                (local_sample_labels >= 0) & (local_sample_labels < device_class_num)
+
+        if indexed_slice_update:
+            assert (
+                np.all((local_sample_labels >= lower) & (local_sample_labels < upper))
+                == True
             )
-            == True
-        )
+        else:
+            assert (
+                np.all(
+                    (local_sample_labels >= 0)
+                    & (local_sample_labels < device_class_num)
+                )
+                == True
+            )
         assert len(local_sample_labels) == len(np.unique(local_sample_labels))
         assert (
-            np.array_equal(local_label, local_sample_labels[0 : len(local_label)])
+            np.array_equal(local_label, global_sample_labels[0 : len(local_label)])
             == True
         )
         for j in range(len(global_sample_labels)):
@@ -144,6 +156,7 @@ class TestPartialFc(flow.unittest.TestCase):
         arg_dict["num_classes"] = [200]
         arg_dict["device_num_sample"] = [96]
         arg_dict["batch_size"] = [64]
+        arg_dict["indexed_slice_update"] = [True, False]
         for arg in GenArgList(arg_dict):
             compare_with_np(*arg)
 
