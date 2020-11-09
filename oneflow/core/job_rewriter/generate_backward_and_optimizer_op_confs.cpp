@@ -134,7 +134,7 @@ Maybe<void> GenerateBackwardAndOptimizerOpConfs::Apply(const OpGraph& op_graph,
     ClipGradient(op_graph, job_builder, ctx, &model_lbi2model_diff_lbi,
                  model_update_conf.clip_conf());
   }
-  AddOptimizerOpConf(op_graph, job_builder, model_lbi2model_diff_lbi);
+  AddOptimizerOpConf(ctx, op_graph, job_builder, model_lbi2model_diff_lbi);
   UpdateJobHelperConfProducedLbi2ConsumedDiffLbi(lbi2diff_lbi, job_builder);
   UpdateOpSbpSignatureHint(op_graph, job_builder);
   return Maybe<void>::Ok();
