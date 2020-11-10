@@ -47,22 +47,22 @@ def PartialFcJob(
     device_tag = parallel_desc_symbol.device_tag
     parallel_id = 0
     for (
-            machine_id,
-            device_ids,
+        machine_id,
+        device_ids,
     ) in parallel_desc_symbol.machine_id2device_id_list.items():
         for device_id in device_ids:
             with flow.scope.placement(
-                    device_tag, str(machine_id) + ":" + str(device_id)
+                device_tag, str(machine_id) + ":" + str(device_id)
             ):
                 fc7_weight = flow.get_variable(
-            	    name="fc7-weight"+str(parallel_id),
-            	    shape=(num_classes, emb_size),
-            	    dtype=flow.float,
-            	    initializer=flow.random_normal_initializer(mean=0.0, stddev=0.01),
-            	    trainable=True,
-            	    model_name="weight",
-            	    distribute=flow.distribute.split(0),
-            	    )
+                    name="fc7-weight" + str(parallel_id),
+                    shape=(num_classes, emb_size),
+                    dtype=flow.float,
+                    initializer=flow.random_normal_initializer(mean=0.0, stddev=0.01),
+                    trainable=True,
+                    model_name="weight",
+                    distribute=flow.distribute.split(0),
+                )
                 cur_num_sample = num_sample // parallel_desc_symbol.parallel_num
                 cur_num_classes = num_classes // parallel_desc_symbol.parallel_num
                 cur_class_offset = parallel_id * cur_num_classes
@@ -75,19 +75,19 @@ def PartialFcJob(
                     sample_offset=cur_sample_offset,
                 )
                 sampled_weight = flow.gather(params=fc7_weight, indices=sample_idx)
-                fc7 = flow.matmul(a=data_list[parallel_id], b=sampled_weight, transpose_b=True)
+                fc7 = flow.matmul(
+                    a=data_list[parallel_id], b=sampled_weight, transpose_b=True
+                )
                 fc7_out_list.append(fc7)
                 mapped_label_list.append(mapped_label)
                 parallel_id += 1
-    fc7_out = flow.advanced.distribute_concat(
-        fc7_out_list, axis=1
-    )
+    fc7_out = flow.advanced.distribute_concat(fc7_out_list, axis=1)
     mapped_label_out = flow.advanced.distribute_add(mapped_label_list)
     loss = flow.nn.sparse_softmax_cross_entropy_with_logits(
         mapped_label_out, fc7_out, name="softmax_loss"
     )
     flow.optimizer.SGD(
-                flow.optimizer.PiecewiseConstantScheduler([], [1e-4]), momentum=0
+        flow.optimizer.PiecewiseConstantScheduler([], [1e-4]), momentum=0
     ).minimize(loss)
     return loss
 

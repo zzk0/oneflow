@@ -109,8 +109,7 @@ class TmpBufferManager final {
 
 class PartialFcSampleOpKernelState final : public user_op::OpKernelState {
  public:
-  PartialFcSampleOpKernelState(DeviceCtx* ctx)
-      {
+  PartialFcSampleOpKernelState(DeviceCtx* ctx) {
     CHECK_NOTNULL(ctx);
     OF_CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
     OF_CURAND_CHECK(
@@ -202,8 +201,8 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     // check num_sample > num_pos
     // get sampled_label
     Memcpy<DeviceType::kGPU>(ctx->device_ctx(), sampled_label->mut_dptr<void>(),
-                               buffer_manager.SortedLabelBufferPtr(),
-                               num_sample * GetSizeOfDataType(sampled_label->data_type()));
+                             buffer_manager.SortedLabelBufferPtr(),
+                             num_sample * GetSizeOfDataType(sampled_label->data_type()));
     // get LabelMap
     const int64_t map_offset = ctx->Attr<int64_t>("sample_offset");
     GetLabelMap<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,
