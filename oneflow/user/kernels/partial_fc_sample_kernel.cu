@@ -167,7 +167,7 @@ __global__ void GetSampleLabel(const int64_t n, const int64_t offset, const K* l
 
 }  // namespace
 
-template<typename T, typename K>
+template<typename K>
 class PartialFcSampleGpuKernel final : public user_op::OpKernel {
  public:
   PartialFcSampleGpuKernel() = default;
