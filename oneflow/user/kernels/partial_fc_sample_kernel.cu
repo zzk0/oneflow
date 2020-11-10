@@ -227,7 +227,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
                        & (user_op::HobDataType("label", 0) == GetDataType<dtype>::value))     \
       .SetInferTmpSizeFn([](oneflow::user_op::InferContext* ctx) {                                \
         const int64_t num_classes = ctx->Attr<int64_t>("num_classes");                            \
-        TmpBufferManager<OF_PP_PAIR_FIRST(ltype_pair)> buffer_manager(nullptr, num_classes);      \
+        TmpBufferManager<dtype> buffer_manager(nullptr, num_classes);      \
         return buffer_manager.GetTotalBufferSize();                                               \
       });
 
