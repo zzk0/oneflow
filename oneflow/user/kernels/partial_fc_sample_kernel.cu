@@ -174,7 +174,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
   void Compute(user_op::KernelComputeContext* ctx, user_op::OpKernelState* state) const override {
     const user_op::Tensor* label = ctx->Tensor4ArgNameAndIndex("label", 0);
     user_op::Tensor* maped_label = ctx->Tensor4ArgNameAndIndex("maped_label", 0);
-    user_op::Tensor* sampled_label = ctx->Tensor4ArgNameAndIndex("sampled_idx", 0);
+    user_op::Tensor* sampled_label = ctx->Tensor4ArgNameAndIndex("sampled_index", 0);
     user_op::Tensor* tmp_buffer = ctx->Tensor4ArgNameAndIndex("tmp_buffer", 0);
 
     const int64_t batch_size = label->shape().At(0);
@@ -182,22 +182,18 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     const int64_t lower_bound = ctx->Attr<int64_t>("class_offset");
     const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
     TmpBufferManager<K> buffer_manager(tmp_buffer->mut_dptr(), num_classes);
-    LOG(ERROR)<<"00";
     auto* kernel_state = dynamic_cast<PartialFcSampleOpKernelState*>(state);
     CHECK_NOTNULL(kernel_state);
     OF_CURAND_CHECK(
         curandGenerate(kernel_state->gen(), buffer_manager.RandValuePtr(), num_classes));
-    LOG(ERROR)<<"01";
     InitBuffer<<<BlocksNum4ThreadsNum(num_classes), kCudaThreadsNumPerBlock, 0,
                  ctx->device_ctx()->cuda_stream()>>>(num_classes, buffer_manager.RandValuePtr(),
                                                      buffer_manager.LabelBufferPtr(),
                                                      buffer_manager.IndexBufferPtr());
-    LOG(ERROR)<<"02";
 
     IndexSetPos<<<BlocksNum4ThreadsNum(batch_size), kCudaThreadsNumPerBlock, 0,
                   ctx->device_ctx()->cuda_stream()>>>(
         batch_size, lower_bound, num_classes, label->dptr<K>(), buffer_manager.IndexBufferPtr());
-    LOG(ERROR)<<"03";
 
     SortPairs<K, K>(ctx->device_ctx()->cuda_stream(), num_classes,
                     buffer_manager.GetCubTmpStorageSize(), buffer_manager.IndexBufferPtr(),
@@ -208,17 +204,14 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     Memcpy<DeviceType::kGPU>(ctx->device_ctx(), sampled_label->mut_dptr<void>(),
                              buffer_manager.SortedLabelBufferPtr(),
                              num_sample * GetSizeOfDataType(sampled_label->data_type()));
-    LOG(ERROR)<<"1";
     // get LabelMap
     const int64_t map_offset = ctx->Attr<int64_t>("sample_offset");
     GetLabelMap<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,
                   ctx->device_ctx()->cuda_stream()>>>(num_sample, map_offset,
                                                       buffer_manager.SortedLabelBufferPtr(),
                                                       buffer_manager.LabelMapPtr());
-    LOG(ERROR)<<"2";
     Memset<DeviceType::kGPU>(ctx->device_ctx(), maped_label->mut_dptr(), 0,
                              maped_label->shape().elem_cnt() * sizeof(K));
-    LOG(ERROR)<<"3";
     GatherKernelUtilImpl<DeviceType::kGPU, K, K>::Forward(
         ctx->device_ctx(), label->dptr<K>(), batch_size, buffer_manager.LabelMapPtr(),
         Shape({1, num_classes, 1}), maped_label->mut_dptr<K>(), lower_bound);
