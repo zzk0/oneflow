@@ -220,7 +220,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
   bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
 };
 
-#define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(dtype_pair, ltype_pair)                             \
+#define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(ltype_pair)                             \
   REGISTER_USER_KERNEL("partial_fc_sample")                                                       \
       .SetCreateFn<                                                                               \
           PartialFcSampleGpuKernel<OF_PP_PAIR_FIRST(ltype_pair)>>()                               \
@@ -232,8 +232,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
         return buffer_manager.GetTotalBufferSize();                                               \
       });
 
-OF_PP_SEQ_PRODUCT_FOR_EACH_TUPLE(REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL, FLOATING_DATA_TYPE_SEQ,
-                                 INDEX_DATA_TYPE_SEQ)
+OF_PP_SEQ_PRODUCT_FOR_EACH_TUPLE(REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL, INDEX_DATA_TYPE_SEQ)
 
 }  // namespace user_op
 }  // namespace oneflow
