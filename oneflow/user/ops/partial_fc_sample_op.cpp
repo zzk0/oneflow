@@ -57,8 +57,8 @@ REGISTER_USER_OP("partial_fc_sample")
       ctx->NewBuilder()
           .Split(user_op::OpArg("weight", 0), 0)
           .Broadcast(user_op::OpArg("label", 0))
-          .PartialSum(user_op::OpArg("maped_label", 0))
-          .Split(user_op::OpArg("sampled_label", 0), 0)
+          .Broadcast(user_op::OpArg("maped_label", 0))
+          .Broadcast(user_op::OpArg("sampled_label", 0))
           .Split(user_op::OpArg("sampled_weight", 0), 0)
           .Build();
       return Maybe<void>::Ok();
@@ -87,7 +87,7 @@ REGISTER_USER_OP("partial_fc_sample_grad")
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       ctx->NewBuilder()
           .Split(user_op::OpArg("sampled_weight_diff", 0), 0)
-          .Split(user_op::OpArg("sampled_label", 0), 0)
+          .Broadcast(user_op::OpArg("sampled_label", 0))
           .Split(user_op::OpArg("weight", 0), 0)
           .Split(user_op::OpArg("weight_diff", 0), 0)
           .Build();
