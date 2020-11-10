@@ -109,8 +109,7 @@ class TmpBufferManager final {
 
 class PartialFcSampleOpKernelState final : public user_op::OpKernelState {
  public:
-  PartialFcSampleOpKernelState(DeviceCtx* ctx)
-      {
+  PartialFcSampleOpKernelState(DeviceCtx* ctx) {
     CHECK_NOTNULL(ctx);
     OF_CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
     OF_CURAND_CHECK(
@@ -202,8 +201,8 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     // check num_sample > num_pos
     // get sampled_label
     Memcpy<DeviceType::kGPU>(ctx->device_ctx(), sampled_label->mut_dptr<void>(),
-                               buffer_manager.SortedLabelBufferPtr(),
-                               num_sample * GetSizeOfDataType(sampled_label->data_type()));
+                             buffer_manager.SortedLabelBufferPtr(),
+                             num_sample * GetSizeOfDataType(sampled_label->data_type()));
     // get LabelMap
     const int64_t map_offset = ctx->Attr<int64_t>("sample_offset");
     GetLabelMap<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,
@@ -220,16 +219,15 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
   bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
 };
 
-#define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(ltype_pair)                             \
-  REGISTER_USER_KERNEL("partial_fc_sample")                                                       \
-      .SetCreateFn<                                                                               \
-          PartialFcSampleGpuKernel<OF_PP_PAIR_FIRST(ltype_pair)>>()                               \
-      .SetIsMatchedHob((user_op::HobDeviceTag() == "gpu")                                         \
-                       & (user_op::HobDataType("label", 0) == OF_PP_PAIR_SECOND(ltype_pair)))     \
-      .SetInferTmpSizeFn([](oneflow::user_op::InferContext* ctx) {                                \
-        const int64_t num_classes = ctx->Attr<int64_t>("num_classes");                            \
-        TmpBufferManager<OF_PP_PAIR_FIRST(ltype_pair)> buffer_manager(nullptr, num_classes);      \
-        return buffer_manager.GetTotalBufferSize();                                               \
+#define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(ltype_pair)                                     \
+  REGISTER_USER_KERNEL("partial_fc_sample")                                                   \
+      .SetCreateFn<PartialFcSampleGpuKernel<OF_PP_PAIR_FIRST(ltype_pair)>>()                  \
+      .SetIsMatchedHob((user_op::HobDeviceTag() == "gpu")                                     \
+                       & (user_op::HobDataType("label", 0) == OF_PP_PAIR_SECOND(ltype_pair))) \
+      .SetInferTmpSizeFn([](oneflow::user_op::InferContext* ctx) {                            \
+        const int64_t num_classes = ctx->Attr<int64_t>("num_classes");                        \
+        TmpBufferManager<OF_PP_PAIR_FIRST(ltype_pair)> buffer_manager(nullptr, num_classes);  \
+        return buffer_manager.GetTotalBufferSize();                                           \
       });
 
 OF_PP_SEQ_PRODUCT_FOR_EACH_TUPLE(REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL, INDEX_DATA_TYPE_SEQ)
