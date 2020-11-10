@@ -33,6 +33,8 @@ def partial_fc_sample(
     label: remote_blob_util.BlobDef,
     num_sample: int,
     num_classes: int,
+    class_offset: int,
+    sample_offset: int,
     name: Optional[str] = None,
 ) -> remote_blob_util.BlobDef:
 
@@ -44,6 +46,8 @@ def partial_fc_sample(
         .Input("label", [label])
         .Attr("num_sample", num_sample)
         .Attr("num_classes", num_classes)
+        .Attr("class_offset", class_offset)
+        .Attr("sample_offset", sample_offset)
         .Output("maped_label")
         .Output("sampled_index")
         .Build()

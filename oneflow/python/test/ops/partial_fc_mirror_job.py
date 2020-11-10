@@ -63,10 +63,16 @@ def PartialFcJob(
             model_name="weight",
             distribute=flow.distribute.split(0),
             )
+            cur_num_sample = num_sample // parallel_desc_symbol.parallel_num
+            cur_num_classes = num_classes // parallel_desc_symbol.parallel_num
+            cur_class_offset = parallel_id * cur_num_classes
+            cur_sample_offset = parallel_id * cur_num_sample
             sample_idx, mapped_label = flow.partial_fc_sample(
                 label=labels_list[parallel_id],
-                num_sample=num_sample,
-                num_classes=num_classes,
+                num_sample=cur_num_sample,
+                num_classes=cur_num_classes,
+                class_offset=cur_class_offset,
+                sample_offset=cur_sample_offset,
             )
             sampled_weight = flow.gather(params=fc7_weight, indices=sample_idx)
             fc7 = flow.matmul(a=data_list[parallel_id], b=sampled_weight, transpose_b=True)
