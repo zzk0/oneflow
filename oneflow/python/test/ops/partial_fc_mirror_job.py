@@ -67,7 +67,7 @@ def PartialFcJob(
             	cur_num_classes = num_classes // parallel_desc_symbol.parallel_num
             	cur_class_offset = parallel_id * cur_num_classes
             	cur_sample_offset = parallel_id * cur_num_sample
-            	sample_idx, mapped_label = flow.partial_fc_sample(
+                mapped_label, sample_idx = flow.partial_fc_sample(
             	    label=labels_list[parallel_id],
             	    num_sample=cur_num_sample,
             	    num_classes=cur_num_classes,
