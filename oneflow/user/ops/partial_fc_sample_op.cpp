@@ -23,6 +23,8 @@ REGISTER_USER_OP("partial_fc_sample")
     .Output("sampled_index")
     .Attr<int64_t>("num_classes")
     .Attr<int64_t>("num_sample")
+    .Attr<int64_t>("class_offset")
+    .Attr<int64_t>("sample_offset")
     .SetTensorDescInferFn([](user_op::InferContext* ctx) -> Maybe<void> {
       const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
       const user_op::TensorDesc* label = ctx->TensorDesc4ArgNameAndIndex("label", 0);

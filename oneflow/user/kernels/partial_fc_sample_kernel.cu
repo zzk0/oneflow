@@ -109,9 +109,8 @@ class TmpBufferManager final {
 
 class PartialFcSampleOpKernelState final : public user_op::OpKernelState {
  public:
-  PartialFcSampleOpKernelState(DeviceCtx* ctx, int64_t lower, int64_t upper,
-                               int64_t num_sample_per_rank)
-      : lower_(lower), upper_(upper), num_sample_per_rank_(num_sample_per_rank) {
+  PartialFcSampleOpKernelState(DeviceCtx* ctx)
+      {
     CHECK_NOTNULL(ctx);
     OF_CURAND_CHECK(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
     OF_CURAND_CHECK(
@@ -120,15 +119,9 @@ class PartialFcSampleOpKernelState final : public user_op::OpKernelState {
   }
   ~PartialFcSampleOpKernelState() override = default;
 
-  int64_t lower() const { return lower_; }
-  int64_t upper() const { return upper_; }
-  int64_t num_sample_per_rank() const { return num_sample_per_rank_; }
   curandGenerator_t& gen() { return curand_generator_; }
 
  private:
-  const int64_t lower_;
-  const int64_t upper_;
-  const int64_t num_sample_per_rank_;
   curandGenerator_t curand_generator_;
 };
 
@@ -175,21 +168,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
 
   std::shared_ptr<user_op::OpKernelState> CreateOpKernelState(
       user_op::KernelInitContext* ctx) const override {
-    const int64_t class_num = ctx->Attr<int64_t>("num_classes");
-    const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
-    const int64_t parallel_num = ctx->parallel_ctx().parallel_num();
-    LOG(ERROR)<<"parallel_num"<<parallel_num;
-    const int64_t num_sample_per_rank = RoundUp(num_sample, parallel_num) / parallel_num;
-    if (true) {
-      CHECK(ctx->SbpParallel4ArgNameAndIndex("label", 0).has_broadcast_parallel());
-      BalancedSplitter bs(class_num, parallel_num);
-      return std::make_shared<PartialFcSampleOpKernelState>(
-          ctx->device_ctx(), bs.At(ctx->parallel_ctx().parallel_id()).begin(),
-          bs.At(ctx->parallel_ctx().parallel_id()).end(), num_sample_per_rank);
-    } else {
-      return std::make_shared<PartialFcSampleOpKernelState>(ctx->device_ctx(), 0, class_num,
-                                                            num_sample_per_rank);
-    }
+    return std::make_shared<PartialFcSampleOpKernelState>(ctx->device_ctx());
   }
 
  private:
@@ -201,15 +180,14 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
 
     const int64_t batch_size = label->shape().At(0);
     const int64_t num_classes = ctx->Attr<int64_t>("num_classes");
+    const int64_t lower_bound = ctx->Attr<int64_t>("class_offset");
+    const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
     TmpBufferManager<K> buffer_manager(tmp_buffer->mut_dptr(), num_classes);
 
     auto* kernel_state = dynamic_cast<PartialFcSampleOpKernelState*>(state);
     CHECK_NOTNULL(kernel_state);
-    const int64_t upper_bound = kernel_state->upper();
-    const int64_t lower_bound = kernel_state->lower();
     OF_CURAND_CHECK(
         curandGenerate(kernel_state->gen(), buffer_manager.RandValuePtr(), num_classes));
-    const int64_t num_sample = kernel_state->num_sample_per_rank();
     InitBuffer<<<BlocksNum4ThreadsNum(num_classes), kCudaThreadsNumPerBlock, 0,
                  ctx->device_ctx()->cuda_stream()>>>(num_classes, buffer_manager.RandValuePtr(),
                                                      buffer_manager.LabelBufferPtr(),
@@ -227,7 +205,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
                                buffer_manager.SortedLabelBufferPtr(),
                                num_sample * GetSizeOfDataType(sampled_label->data_type()));
     // get LabelMap
-    const int64_t map_offset = ctx->parallel_ctx().parallel_id() * num_sample;
+    const int64_t map_offset = ctx->Attr<int64_t>("sample_offset");
     GetLabelMap<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,
                   ctx->device_ctx()->cuda_stream()>>>(num_sample, map_offset,
                                                       buffer_manager.SortedLabelBufferPtr(),
