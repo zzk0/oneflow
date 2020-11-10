@@ -220,19 +220,19 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
   bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
 };
 
-#define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(ltype_pair)                             \
+#define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(dtype)                                         \
   REGISTER_USER_KERNEL("partial_fc_sample")                                                       \
       .SetCreateFn<                                                                               \
-          PartialFcSampleGpuKernel<OF_PP_PAIR_FIRST(ltype_pair)>>()                               \
+          PartialFcSampleGpuKernel<dtype>>()                               \
       .SetIsMatchedHob((user_op::HobDeviceTag() == "gpu")                                         \
-                       & (user_op::HobDataType("label", 0) == OF_PP_PAIR_SECOND(ltype_pair)))     \
+                       & (user_op::HobDataType("label", 0) == GetDataType<dtype>::value))     \
       .SetInferTmpSizeFn([](oneflow::user_op::InferContext* ctx) {                                \
         const int64_t num_classes = ctx->Attr<int64_t>("num_classes");                            \
         TmpBufferManager<OF_PP_PAIR_FIRST(ltype_pair)> buffer_manager(nullptr, num_classes);      \
         return buffer_manager.GetTotalBufferSize();                                               \
       });
 
-OF_PP_SEQ_PRODUCT_FOR_EACH_TUPLE(REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL, INDEX_DATA_TYPE_SEQ)
+REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(int32_t)
 
 }  // namespace user_op
 }  // namespace oneflow
