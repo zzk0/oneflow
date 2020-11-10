@@ -30,10 +30,9 @@ from typing import Optional, Union
 
 @oneflow_export("partial_fc_sample")
 def partial_fc_sample(
-    weight: remote_blob_util.BlobDef,
     label: remote_blob_util.BlobDef,
     num_sample: int,
-    indexed_slice_update: False,
+    num_classes: int,
     name: Optional[str] = None,
 ) -> remote_blob_util.BlobDef:
 
@@ -42,13 +41,11 @@ def partial_fc_sample(
             name if name is not None else id_util.UniqueStr("PartialFcSample_")
         )
         .Op("partial_fc_sample")
-        .Input("weight", [weight])
         .Input("label", [label])
         .Attr("num_sample", num_sample)
-        .Attr("indexed_slice_update", indexed_slice_update)
+        .Attr("num_classes", num_classes)
         .Output("maped_label")
-        .Output("sampled_label")
-        .Output("sampled_weight")
+        .Output("sampled_index")
         .Build()
         .InferAndTryRun()
         .RemoteBlobList()

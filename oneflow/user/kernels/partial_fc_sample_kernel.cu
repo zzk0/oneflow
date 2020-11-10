@@ -175,11 +175,10 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
 
   std::shared_ptr<user_op::OpKernelState> CreateOpKernelState(
       user_op::KernelInitContext* ctx) const override {
-    const SbpParallel& in_sbp = ctx->SbpParallel4ArgNameAndIndex("weight", 0);
-    const TensorDesc* in_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("weight", 0);
-    const int64_t class_num = in_logical_desc->shape().At(0);
+    const int64_t class_num = ctx->Attr<int64_t>("num_classes");
     const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
     const int64_t parallel_num = ctx->parallel_ctx().parallel_num();
+    LOG(ERROR)<<"parallel_num"<<parallel_num;
     const int64_t num_sample_per_rank = RoundUp(num_sample, parallel_num) / parallel_num;
     if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == 0 && parallel_num > 1) {
       CHECK(ctx->SbpParallel4ArgNameAndIndex("label", 0).has_broadcast_parallel());
@@ -195,20 +194,17 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
 
  private:
   void Compute(user_op::KernelComputeContext* ctx, user_op::OpKernelState* state) const override {
-    const user_op::Tensor* weight = ctx->Tensor4ArgNameAndIndex("weight", 0);
     const user_op::Tensor* label = ctx->Tensor4ArgNameAndIndex("label", 0);
     user_op::Tensor* maped_label = ctx->Tensor4ArgNameAndIndex("maped_label", 0);
-    user_op::Tensor* sampled_label = ctx->Tensor4ArgNameAndIndex("sampled_label", 0);
-    user_op::Tensor* sampled_weight = ctx->Tensor4ArgNameAndIndex("sampled_weight", 0);
+    user_op::Tensor* sampled_label = ctx->Tensor4ArgNameAndIndex("sampled_idx", 0);
     user_op::Tensor* tmp_buffer = ctx->Tensor4ArgNameAndIndex("tmp_buffer", 0);
 
     const int64_t batch_size = label->shape().At(0);
-    const int64_t num_classes = weight->shape().At(0);
+    const int64_t num_classes = ctx->Attr<int64_t>("num_classes");
     TmpBufferManager<K> buffer_manager(tmp_buffer->mut_dptr(), num_classes);
 
     auto* kernel_state = dynamic_cast<PartialFcSampleOpKernelState*>(state);
     CHECK_NOTNULL(kernel_state);
-    CHECK_EQ(weight->shape().At(0), kernel_state->upper() - kernel_state->lower());
     const int64_t upper_bound = kernel_state->upper();
     const int64_t lower_bound = kernel_state->lower();
     OF_CURAND_CHECK(
@@ -227,22 +223,9 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
                     buffer_manager.SortedIndexBufferPtr(), buffer_manager.SortedLabelBufferPtr());
     // check num_sample > num_pos
     // get sampled_label
-    const bool indexed_slice_update = ctx->Attr<bool>("indexed_slice_update");
-    if (indexed_slice_update) {
-      GetSampleLabel<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,
-                       ctx->device_ctx()->cuda_stream()>>>(num_sample, lower_bound,
-                                                           buffer_manager.SortedLabelBufferPtr(),
-                                                           sampled_label->mut_dptr<K>());
-    } else {
-      Memcpy<DeviceType::kGPU>(ctx->device_ctx(), sampled_label->mut_dptr<void>(),
+    Memcpy<DeviceType::kGPU>(ctx->device_ctx(), sampled_label->mut_dptr<void>(),
                                buffer_manager.SortedLabelBufferPtr(),
                                num_sample * GetSizeOfDataType(sampled_label->data_type()));
-    }
-    // get sampled weight
-    GatherKernelUtilImpl<DeviceType::kGPU, T, K>::Forward(
-        ctx->device_ctx(), buffer_manager.SortedLabelBufferPtr(), num_sample, weight->dptr<T>(),
-        Shape({1, weight->shape().At(0), weight->shape().Count(1)}), sampled_weight->mut_dptr<T>(),
-        0);
     // get LabelMap
     const int64_t map_offset = ctx->parallel_ctx().parallel_id() * num_sample;
     GetLabelMap<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,
@@ -262,51 +245,16 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
 #define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(dtype_pair, ltype_pair)                             \
   REGISTER_USER_KERNEL("partial_fc_sample")                                                       \
       .SetCreateFn<                                                                               \
-          PartialFcSampleGpuKernel<OF_PP_PAIR_FIRST(dtype_pair), OF_PP_PAIR_FIRST(ltype_pair)>>() \
+          PartialFcSampleGpuKernel<OF_PP_PAIR_FIRST(ltype_pair)>>()                               \
       .SetIsMatchedHob((user_op::HobDeviceTag() == "gpu")                                         \
-                       & (user_op::HobDataType("label", 0) == OF_PP_PAIR_SECOND(ltype_pair))      \
-                       & (user_op::HobDataType("weight", 0) == OF_PP_PAIR_SECOND(dtype_pair)))    \
+                       & (user_op::HobDataType("label", 0) == OF_PP_PAIR_SECOND(ltype_pair)))     \
       .SetInferTmpSizeFn([](oneflow::user_op::InferContext* ctx) {                                \
-        const int64_t num_classes = ctx->TensorDesc4ArgNameAndIndex("weight", 0)->shape().At(0);  \
+        const int64_t num_classes = ctx->Attr<int64_t>("num_classes");                            \
         TmpBufferManager<OF_PP_PAIR_FIRST(ltype_pair)> buffer_manager(nullptr, num_classes);      \
         return buffer_manager.GetTotalBufferSize();                                               \
       });
 
 OF_PP_SEQ_PRODUCT_FOR_EACH_TUPLE(REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL, FLOATING_DATA_TYPE_SEQ,
-                                 INDEX_DATA_TYPE_SEQ)
-
-template<typename T, typename K>
-class PartialFcSampleGradGpuKernel final : public user_op::OpKernel {
- public:
-  PartialFcSampleGradGpuKernel() = default;
-  ~PartialFcSampleGradGpuKernel() = default;
-
- private:
-  void Compute(user_op::KernelComputeContext* ctx, user_op::OpKernelState* state) const override {
-    const user_op::Tensor* sampled_label = ctx->Tensor4ArgNameAndIndex("sampled_label", 0);
-    const user_op::Tensor* sampled_weight_diff =
-        ctx->Tensor4ArgNameAndIndex("sampled_weight_diff", 0);
-    user_op::Tensor* weight_diff = ctx->Tensor4ArgNameAndIndex("weight_diff", 0);
-    Memset<DeviceType::kGPU>(ctx->device_ctx(), weight_diff->mut_dptr(), 0,
-                             weight_diff->shape().elem_cnt() * sizeof(T));
-    UnsortedSegmentSumKernelUtil<DeviceType::kGPU, T, K>::UnsortedSegmentSum(
-        ctx->device_ctx(), sampled_label->dptr<K>(), sampled_weight_diff->dptr<T>(),
-        sampled_label->shape().elem_cnt(), weight_diff->shape().At(0), 1,
-        weight_diff->shape().Count(1), 0, weight_diff->mut_dptr<T>());
-  }
-  bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
-};
-
-#define REGISTER_PARTIAL_FC_SAMPLE_GRAD_GPU_KERNEL(dtype_pair, ltype_pair)              \
-  REGISTER_USER_KERNEL("partial_fc_sample_grad")                                        \
-      .SetCreateFn<PartialFcSampleGradGpuKernel<OF_PP_PAIR_FIRST(dtype_pair),           \
-                                                OF_PP_PAIR_FIRST(ltype_pair)>>()        \
-      .SetIsMatchedHob(                                                                 \
-          (user_op::HobDeviceTag() == "gpu")                                            \
-          & (user_op::HobDataType("sampled_label", 0) == OF_PP_PAIR_SECOND(ltype_pair)) \
-          & (user_op::HobDataType("sampled_weight_diff", 0) == OF_PP_PAIR_SECOND(dtype_pair)));
-
-OF_PP_SEQ_PRODUCT_FOR_EACH_TUPLE(REGISTER_PARTIAL_FC_SAMPLE_GRAD_GPU_KERNEL, FLOATING_DATA_TYPE_SEQ,
                                  INDEX_DATA_TYPE_SEQ)
 
 }  // namespace user_op
