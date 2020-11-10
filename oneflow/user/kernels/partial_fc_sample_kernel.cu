@@ -180,7 +180,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     const int64_t parallel_num = ctx->parallel_ctx().parallel_num();
     LOG(ERROR)<<"parallel_num"<<parallel_num;
     const int64_t num_sample_per_rank = RoundUp(num_sample, parallel_num) / parallel_num;
-    if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == 0 && parallel_num > 1) {
+    if (true) {
       CHECK(ctx->SbpParallel4ArgNameAndIndex("label", 0).has_broadcast_parallel());
       BalancedSplitter bs(class_num, parallel_num);
       return std::make_shared<PartialFcSampleOpKernelState>(
