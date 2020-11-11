@@ -184,7 +184,6 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     const int64_t lower_bound = ctx->Attr<int64_t>("class_offset");
     const int64_t num_sample = ctx->Attr<int64_t>("num_sample");
     const int64_t map_offset = ctx->Attr<int64_t>("sample_offset");
-    LOG(ERROR)<<"num_classes"<<num_classes<<" lower_bound "<<lower_bound<<" sample_offset "<<map_offset;
     TmpBufferManager<K> buffer_manager(tmp_buffer->mut_dptr(), num_classes);
     auto* kernel_state = dynamic_cast<PartialFcSampleOpKernelState*>(state);
     CHECK_NOTNULL(kernel_state);
@@ -194,7 +193,6 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
                  ctx->device_ctx()->cuda_stream()>>>(num_classes, buffer_manager.RandValuePtr(),
                                                      buffer_manager.LabelBufferPtr(),
                                                      buffer_manager.IndexBufferPtr());
-    LOG(ERROR)<<"batch_size"<<batch_size<<" lower_bound "<<lower_bound<<" num_classes "<<num_classes;
     IndexSetPos<<<BlocksNum4ThreadsNum(batch_size), kCudaThreadsNumPerBlock, 0,
                   ctx->device_ctx()->cuda_stream()>>>(
         batch_size, lower_bound, num_classes, label->dptr<K>(), buffer_manager.IndexBufferPtr());
