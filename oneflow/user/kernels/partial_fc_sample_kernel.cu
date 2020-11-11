@@ -138,7 +138,10 @@ __global__ void IndexSetPos(const int64_t n, const int64_t offset, const int64_t
                             const K* labels, K* index_buffer) {
   CUDA_1D_KERNEL_LOOP(i, n) {
     K label = labels[i] - offset;
-    if (label >= 0 && label < num_classes) { index_buffer[label] = -1; }
+    if (label >= 0 && label < num_classes) {
+      index_buffer[label] = -1;
+      printf("index_buffer[%d] = -1\n", label);
+    }
   }
 }
 
