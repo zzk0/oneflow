@@ -38,6 +38,7 @@ def compare_with_np(
         flow.config.gpu_device_num(4)
     func_config = flow.FunctionConfig()
     func_config.default_data_type(flow.float)
+    func_config.default_logical_view(flow.scope.mirrored_view())
 
     @flow.global_function(type="train", function_config=func_config)
     def PartialFcJob(
