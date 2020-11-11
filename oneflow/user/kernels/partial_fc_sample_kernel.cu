@@ -138,9 +138,6 @@ __global__ void IndexSetPos(const int64_t n, const int64_t offset, const int64_t
                             const K* labels, K* index_buffer) {
   CUDA_1D_KERNEL_LOOP(i, n) {
     K label = labels[i] - offset;
-    if(offset == 50) {
-      printf("index_buffer[%d] offset %d \n", labels[i], offset);
-    }
     if (label >= 0 && label < num_classes) {
       index_buffer[label] = -1;
     }
@@ -150,7 +147,6 @@ __global__ void IndexSetPos(const int64_t n, const int64_t offset, const int64_t
 template<typename K>
 __global__ void GetLabelMap(const int64_t n, const int64_t map_offset, const K* label,
                             K* label_map) {
-  printf("map_offset %d\n", map_offset);
   CUDA_1D_KERNEL_LOOP(i, n) {
     K cur_label = label[i];
     label_map[cur_label] = map_offset + i;
@@ -160,7 +156,6 @@ __global__ void GetLabelMap(const int64_t n, const int64_t map_offset, const K* 
 template<typename K>
 __global__ void GetSampleLabel(const int64_t n, const int64_t offset, const K* label,
                                K* sample_label) {
-  printf("offset %d", offset);
   CUDA_1D_KERNEL_LOOP(i, n) { sample_label[i] = label[i] + offset; }
 }
 
