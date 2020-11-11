@@ -22,7 +22,7 @@ flow.config.gpu_device_num(4)
 func_config = flow.FunctionConfig()
 func_config.default_data_type(flow.float)
 func_config.indexed_slices_optimizer_conf(
-    dict(include_op_names=dict(op_name=["fc7-weight"]))
+    dict(include_op_names=dict(op_name=["fc7-weight0", "fc7-weight1", "fc7-weight2", "fc7-weight3"]))
 )
 num_classes = 1000000
 emb_size = 128
@@ -82,6 +82,7 @@ def PartialFcJob(
                 mapped_label_list.append(mapped_label)
                 parallel_id += 1
     fc7_out = flow.advanced.distribute_concat(fc7_out_list, axis=1)
+    fc7_out = fc7_out.with_distribute(flow.distribute.split(1))
     mapped_label_out = flow.advanced.distribute_add(mapped_label_list)
     loss = flow.nn.sparse_softmax_cross_entropy_with_logits(
         mapped_label_out, fc7_out, name="softmax_loss"
