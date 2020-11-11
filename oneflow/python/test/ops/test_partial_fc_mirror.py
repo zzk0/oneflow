@@ -61,18 +61,20 @@ def compare_with_np(
                 with flow.scope.placement(
                         device_tag, str(machine_id) + ":" + str(device_id)
                 ):
+                    cur_num_classes = num_classes // parallel_desc_symbol.parallel_num
                     fc7_weight = flow.get_variable(
                         name="fc7-weight" + str(parallel_id),
-                        shape=(num_classes, 128),
+                        shape=(cur_num_classes, 128),
                         dtype=flow.float,
                         initializer=flow.random_normal_initializer(mean=0.0, stddev=0.01),
                         trainable=True,
                         distribute=flow.distribute.split(0),
                     )
+                    print("fc7_weight",fc7_weight.shape)
                     cur_num_sample = num_sample // parallel_desc_symbol.parallel_num
-                    cur_num_classes = num_classes // parallel_desc_symbol.parallel_num
                     cur_class_offset = parallel_id * cur_num_classes
                     cur_sample_offset = parallel_id * cur_num_sample
+                    print("id", parallel_id, cur_class_offset, cur_sample_offset)
                     (mapped_label, sample_idx) = flow.partial_fc_sample(
                         label=labels_list[parallel_id],
                         num_sample=cur_num_sample,
@@ -80,33 +82,36 @@ def compare_with_np(
                         class_offset=cur_class_offset,
                         sample_offset=cur_sample_offset,
                     )
+                    print(mapped_label.shape, sample_idx.shape)
                     sampled_weight = flow.gather(params=fc7_weight, indices=sample_idx)
                     sampled_weight_list.append(sampled_weight)
                     mapped_label_list.append(mapped_label)
                     sampled_label_list.append(sample_idx)
+                    parallel_id += 1
 
         sampled_weight_out = flow.advanced.distribute_concat(sampled_weight_list, axis=0)
         sampled_label_out = flow.advanced.distribute_concat(sampled_label_list, axis=0)
         mapped_label_out = flow.advanced.distribute_add(mapped_label_list)
 
-        with flow.scope.placement(device_type, "0:0"):
-            sampled_weight = flow.identity(sampled_weight_out)
-            loss = flow.math.square(sampled_weight)
-            flow.optimizer.SGD(
-                flow.optimizer.PiecewiseConstantScheduler([], [1e-4]), momentum=0
-            ).minimize(loss)
+        #with flow.scope.placement(device_type, "0:0"):
+        sampled_weight = flow.identity(sampled_weight_out)
+        loss = flow.math.square(sampled_weight)
+        flow.optimizer.SGD(
+            flow.optimizer.PiecewiseConstantScheduler([], [1e-4]), momentum=0
+        ).minimize(loss)
 
-            flow.watch(fc7_weight, test_global_storage.Setter("x"))
-            flow.watch_diff(fc7_weight, test_global_storage.Setter("x_diff"))
-            flow.watch_diff(
-                sampled_weight, test_global_storage.Setter("sampled_weight_diff")
-            )
+            #flow.watch(fc7_weight, test_global_storage.Setter("x"))
+            #flow.watch_diff(fc7_weight, test_global_storage.Setter("x_diff"))
+            #flow.watch_diff(
+            #    sampled_weight, test_global_storage.Setter("sampled_weight_diff")
+            #)
         return fc7_weight, mapped_label_out, sampled_label_out, sampled_weight
 
     # fake labels
     labels = np.random.randint(0, num_classes, size=(batch_size,)).astype(
         type_name_to_np_type[label_type]
     )
+    np.save("labels",labels)
     # OneFlow
     check_point = flow.train.CheckPoint()
     check_point.init()
@@ -148,6 +153,8 @@ def compare_with_np(
                 == True
             )
         assert len(local_sample_labels) == len(np.unique(local_sample_labels))
+        print("local label", local_label)
+        print("local label", global_sample_labels[0 : len(local_label)])
         assert (
             np.array_equal(local_label, global_sample_labels[0 : len(local_label)])
             == True
@@ -183,7 +190,7 @@ class TestPartialFc(flow.unittest.TestCase):
         arg_dict["num_classes"] = [85744]
         arg_dict["device_num_sample"] = [8600]
         arg_dict["batch_size"] = [512]
-        arg_dict["indexed_slice_update"] = [True, False]
+        arg_dict["indexed_slice_update"] = [False]
         for arg in GenArgList(arg_dict):
             compare_with_np(*arg)
 
