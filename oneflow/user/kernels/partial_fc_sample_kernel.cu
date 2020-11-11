@@ -148,6 +148,7 @@ __global__ void IndexSetPos(const int64_t n, const int64_t offset, const int64_t
 template<typename K>
 __global__ void GetLabelMap(const int64_t n, const int64_t map_offset, const K* label,
                             K* label_map) {
+  printf("map_offset %d\n", map_offset);
   CUDA_1D_KERNEL_LOOP(i, n) {
     K cur_label = label[i];
     label_map[cur_label] = map_offset + i;
