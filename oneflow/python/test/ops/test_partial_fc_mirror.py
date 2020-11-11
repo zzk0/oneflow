@@ -38,7 +38,7 @@ def compare_with_np(
         flow.config.gpu_device_num(4)
     func_config = flow.FunctionConfig()
     func_config.default_data_type(flow.float)
-    func_config.default_logical_view(flow.scope.mirrored_view())
+    #func_config.default_logical_view(flow.scope.mirrored_view())
 
     @flow.global_function(type="train", function_config=func_config)
     def PartialFcJob(
@@ -48,7 +48,7 @@ def compare_with_np(
     ):
         #labels = labels.with_distribute(flow.distribute.broadcast())
         labels = flow.parallel_cast(labels, distribute=flow.distribute.broadcast())
-        labels_list = flow.advanced.distribute_concat(labels)
+        #labels_list = flow.advanced.distribute_clone(labels)
         mapped_label_list = []
         sampled_weight_list = []
         sampled_label_list = []
@@ -78,7 +78,7 @@ def compare_with_np(
                     cur_sample_offset = parallel_id * cur_num_sample
                     print("id", parallel_id, cur_class_offset, cur_sample_offset)
                     (mapped_label, sample_idx) = flow.partial_fc_sample(
-                        label=labels_list[parallel_id],
+                        label=labels,
                         num_sample=cur_num_sample,
                         num_classes=cur_num_classes,
                         class_offset=cur_class_offset,
