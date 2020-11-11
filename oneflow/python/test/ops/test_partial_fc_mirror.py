@@ -48,7 +48,7 @@ def compare_with_np(
     ):
         #labels = labels.with_distribute(flow.distribute.broadcast())
         labels = flow.parallel_cast(labels, distribute=flow.distribute.broadcast())
-        labels_list = flow.advanced.distribute_clone(labels)
+        labels_list = flow.advanced.distribute_concat(labels)
         mapped_label_list = []
         sampled_weight_list = []
         sampled_label_list = []
