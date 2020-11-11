@@ -140,7 +140,7 @@ __global__ void IndexSetPos(const int64_t n, const int64_t offset, const int64_t
     K label = labels[i] - offset;
     if (label >= 0 && label < num_classes) {
       index_buffer[label] = -1;
-      printf("index_buffer[%d] = -1\n", label);
+      printf("index_buffer[%d] = -1 offset %d \n", labels[i], offset);
     }
   }
 }
