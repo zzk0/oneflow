@@ -187,9 +187,9 @@ class TestPartialFc(flow.unittest.TestCase):
         arg_dict = OrderedDict()
         arg_dict["device_type"] = ["gpu"]
         arg_dict["label_type"] = ["int32"]
-        arg_dict["num_classes"] = [85744]
-        arg_dict["device_num_sample"] = [8600]
-        arg_dict["batch_size"] = [512]
+        arg_dict["num_classes"] = [200]
+        arg_dict["device_num_sample"] = [50]
+        arg_dict["batch_size"] = [64]
         arg_dict["indexed_slice_update"] = [False]
         for arg in GenArgList(arg_dict):
             compare_with_np(*arg)
