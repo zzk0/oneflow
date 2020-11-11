@@ -39,7 +39,7 @@ def PartialFcJob(
 ):
 
     labels = labels.with_distribute(flow.distribute.broadcast())
-    data_list = flow.advanced.distribute_clone(data)
+    #data_list = flow.advanced.distribute_clone(data)
     fc7_out_list = []
     mapped_label_list = []
     parallel_desc_symbol = flow.current_scope().device_parallel_desc_symbol
@@ -75,7 +75,7 @@ def PartialFcJob(
                 )
                 sampled_weight = flow.gather(params=fc7_weight, indices=sample_idx)
                 fc7 = flow.matmul(
-                    a=data_list[parallel_id], b=sampled_weight, transpose_b=True
+                    a=data, b=sampled_weight, transpose_b=True
                 )
                 fc7_out_list.append(fc7)
                 mapped_label_list.append(mapped_label)

@@ -88,23 +88,39 @@ def compare_with_np(
                     sampled_weight_list.append(sampled_weight)
                     mapped_label_list.append(mapped_label)
                     sampled_label_list.append(sample_idx)
+                    if parallel_id == 0:
+                        fc7_0 = fc7_weight
+                    if parallel_id == 1:
+                        fc7_1 = fc7_weight
+                    if parallel_id == 2:
+                        fc7_2 = fc7_weight
+                    if parallel_id == 3:
+                        fc7_3 = fc7_weight
                     parallel_id += 1
-                    flow.watch(fc7_weight, test_global_storage.Setter("x"+str(parallel_id)))
-
-
+                    
+                    
         sampled_weight_out = flow.advanced.distribute_concat(sampled_weight_list, axis=0)
         sampled_label_out = flow.advanced.distribute_concat(sampled_label_list, axis=0)
         mapped_label_out = flow.advanced.distribute_add(mapped_label_list)
 
-        #with flow.scope.placement(device_type, "0:0"):
         sampled_weight = flow.identity(sampled_weight_out)
         loss = flow.math.square(sampled_weight)
         flow.optimizer.SGD(
             flow.optimizer.PiecewiseConstantScheduler([], [1e-4]), momentum=0
         ).minimize(loss)
 
-            #flow.watch(fc7_weight, test_global_storage.Setter("x"))
-            #flow.watch_diff(fc7_weight, test_global_storage.Setter("x_diff"))
+        with flow.scope.placement(device_type, "0:0"):
+            flow.watch(fc7_0, test_global_storage.Setter("x0"))
+            flow.watch_diff(fc7_0, test_global_storage.Setter("x0_diff"))
+        #with flow.scope.placement(device_type, "0:1"):
+            #flow.watch(fc7_1, test_global_storage.Setter("x1"))
+            #flow.watch_diff(fc7_1, test_global_storage.Setter("x1_diff"))
+        #with flow.scope.placement(device_type, "0:2"):
+        #    flow.watch(fc7_2, test_global_storage.Setter("x2"))
+        #    flow.watch_diff(fc7_2, test_global_storage.Setter("x2_diff"))
+        #with flow.scope.placement(device_type, "0:3"):
+        #    flow.watch(fc7_3, test_global_storage.Setter("x3"))
+        #    flow.watch_diff(fc7_3, test_global_storage.Setter("x3_diff"))
             #flow.watch_diff(
             #    sampled_weight, test_global_storage.Setter("sampled_weight_diff")
             #)
@@ -158,6 +174,7 @@ def compare_with_np(
         assert len(local_sample_labels) == len(np.unique(local_sample_labels))
         print("local label", local_label)
         print("local label", global_sample_labels[0 : len(local_label)])
+        print("test_global_storage.Get(x_diff)", test_global_storage.Get("x"+str(i)+"_diff"))
         assert (
             np.array_equal(local_label, global_sample_labels[0 : len(local_label)])
             == True
