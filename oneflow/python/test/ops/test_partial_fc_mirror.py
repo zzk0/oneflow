@@ -45,7 +45,8 @@ def compare_with_np(
             (batch_size,), dtype=type_name_to_flow_type[label_type]
         )
     ):
-        labels = labels.with_distribute(flow.distribute.broadcast())
+        #labels = labels.with_distribute(flow.distribute.broadcast())
+        labels = flow.parallel_cast(labels, distribute=flow.distribute.broadcast())
         labels_list = flow.advanced.distribute_clone(labels)
         mapped_label_list = []
         sampled_weight_list = []
