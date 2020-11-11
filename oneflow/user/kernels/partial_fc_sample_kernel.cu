@@ -157,6 +157,7 @@ __global__ void GetLabelMap(const int64_t n, const int64_t map_offset, const K* 
 template<typename K>
 __global__ void GetSampleLabel(const int64_t n, const int64_t offset, const K* label,
                                K* sample_label) {
+  printf("offset %d", offset);
   CUDA_1D_KERNEL_LOOP(i, n) { sample_label[i] = label[i] + offset; }
 }
 
