@@ -62,7 +62,7 @@ def compare_with_np(
                 with flow.scope.placement(
                         device_tag, str(machine_id) + ":" + str(device_id)
                 ):
-                    print("label.shape", labels_list[0].shape)
+                    print("label.shape", labels_list[0].shape, labels_list[1].shape, labels_list[2].shape, labels_list[3].shape)
                     cur_num_classes = num_classes // parallel_desc_symbol.parallel_num
                     fc7_weight = flow.get_variable(
                         name="fc7-weight" + str(parallel_id),
@@ -70,7 +70,6 @@ def compare_with_np(
                         dtype=flow.float,
                         initializer=flow.random_normal_initializer(mean=0.0, stddev=0.01),
                         trainable=True,
-                        distribute=flow.distribute.split(0),
                     )
                     print("fc7_weight",fc7_weight.shape)
                     cur_num_sample = num_sample // parallel_desc_symbol.parallel_num
