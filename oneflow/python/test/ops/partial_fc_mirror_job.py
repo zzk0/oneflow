@@ -39,7 +39,6 @@ def PartialFcJob(
 ):
 
     labels = labels.with_distribute(flow.distribute.broadcast())
-    labels_list = flow.advanced.distribute_clone(labels)
     data_list = flow.advanced.distribute_clone(data)
     fc7_out_list = []
     mapped_label_list = []
@@ -68,7 +67,7 @@ def PartialFcJob(
                 cur_class_offset = parallel_id * cur_num_classes
                 cur_sample_offset = parallel_id * cur_num_sample
                 (mapped_label, sample_idx) = flow.partial_fc_sample(
-                    label=labels_list[parallel_id],
+                    label=labels,
                     num_sample=cur_num_sample,
                     num_classes=cur_num_classes,
                     class_offset=cur_class_offset,
