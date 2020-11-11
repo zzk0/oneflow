@@ -199,7 +199,7 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
                  ctx->device_ctx()->cuda_stream()>>>(num_classes, buffer_manager.RandValuePtr(),
                                                      buffer_manager.LabelBufferPtr(),
                                                      buffer_manager.IndexBufferPtr());
-
+    LOG(ERROR)<<"batch_size"<<batch_size<<" lower_bound "<<lower_bound<<" num_classes "<<num_classes;
     IndexSetPos<<<BlocksNum4ThreadsNum(batch_size), kCudaThreadsNumPerBlock, 0,
                   ctx->device_ctx()->cuda_stream()>>>(
         batch_size, lower_bound, num_classes, label->dptr<K>(), buffer_manager.IndexBufferPtr());
