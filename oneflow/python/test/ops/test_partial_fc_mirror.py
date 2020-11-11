@@ -63,7 +63,7 @@ def compare_with_np(
                 ):
                     fc7_weight = flow.get_variable(
                         name="fc7-weight" + str(parallel_id),
-                        shape=(num_classes, emb_size),
+                        shape=(num_classes, 128),
                         dtype=flow.float,
                         initializer=flow.random_normal_initializer(mean=0.0, stddev=0.01),
                         trainable=True,
