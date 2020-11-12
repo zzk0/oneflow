@@ -115,10 +115,10 @@ class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBacke
 
   void DeviceWorkerLoop(int32_t device_id) {
     OF_CUDA_CHECK(cudaSetDevice(device_id));
-    auto& chan = device_thread_task_chan_.at(device_id);
+    auto* chan = device_thread_task_chan_.at(device_id).get();
     std::function<void()> task;
     while (true) {
-      auto status = chan.Receive(&task);
+      auto status = chan->Receive(&task);
       if (status == kChannelStatusErrorClosed) { break; }
       CHECK_EQ(status, kChannelStatusSuccess);
       task();
