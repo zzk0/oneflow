@@ -141,7 +141,7 @@ class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBacke
   std::mutex mutex_;
   std::shared_ptr<ThreadPool> callback_executor_pool_;
   std::vector<std::thread> device_thread_vec_;
-  std::vector<Channel<std::function<void()>>> device_thread_task_chan_;
+  std::vector<std::unique_ptr<Channel<std::function<void()>>>> device_thread_task_chan_;
 
   int64_t current_stream_id_ = 0;
 };
@@ -151,10 +151,12 @@ NcclCollectiveBoxingExecutorBackend::NcclCollectiveBoxingExecutorBackend()
       shutdown_(false) {
   OF_CUDA_CHECK(cudaGetDeviceCount(&num_devices_));
   callback_executor_pool_.reset(new ThreadPool(num_devices_));
-  for (int i = 0; i < num_devices_; ++i) { device_thread_task_chan_.emplace_back(); }
+  device_thread_task_chan_.resize(num_devices_);
+  device_thread_vec_.resize(num_devices_);
   for (int i = 0; i < num_devices_; ++i) {
-    device_thread_vec_.emplace_back(&NcclCollectiveBoxingExecutorBackend::DeviceWorkerLoop, this,
-                                    i);
+    device_thread_task_chan_.at(i).reset(new Channel<std::function<void()>>());
+    device_thread_vec_.at(i) =
+        std::thread(&NcclCollectiveBoxingExecutorBackend::DeviceWorkerLoop, this, i);
   }
   CHECK_GT(collective_boxing_conf_.nccl_num_streams(), 0);
   num_streams_ = collective_boxing_conf_.nccl_num_streams();
@@ -194,7 +196,7 @@ NcclCollectiveBoxingExecutorBackend::NcclCollectiveBoxingExecutorBackend()
 }
 
 NcclCollectiveBoxingExecutorBackend::~NcclCollectiveBoxingExecutorBackend() {
-  for (int i = 0; i < num_devices_; ++i) { device_thread_task_chan_.at(i).Close(); }
+  for (int i = 0; i < num_devices_; ++i) { device_thread_task_chan_.at(i)->Close(); }
   for (int i = 0; i < num_devices_; ++i) { device_thread_vec_.at(i).join(); }
   {
     std::unique_lock<std::mutex> lock(event_list_mutex_);
@@ -451,7 +453,7 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
       std::vector<std::function<void(Maybe<void>)>> callbacks =
           std::move(device_id2callbacks.at(device_id));
       cudaStream_t cuda_stream = device_id2device_ctx.at(device_id)->stream;
-      device_thread_task_chan_.at(device_id).Send(
+      device_thread_task_chan_.at(device_id)->Send(
           [op_func, cuda_stream, this, device_id, callbacks]() {
             OF_NCCL_CHECK(ncclGroupStart());
             for (const auto& fn : op_func) { fn(); }
