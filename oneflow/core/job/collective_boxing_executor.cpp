@@ -376,7 +376,6 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
         const RuntimeRequestInfo& request_info = rank7request_info.second;
         const DeviceDesc& device_desc = request_desc->device_set().device().Get(rank);
         const int64_t device_id = device_desc.device_id();
-        OF_CUDA_CHECK(cudaSetDevice(device_id));
         ncclComm_t comm = device_id2comm.at(device_id);
         auto& device_ctx = device_id2device_ctx.at(device_id);
         ncclDataType_t nccl_data_type = GetNcclDataType(op_desc.data_type());
