@@ -22,14 +22,17 @@ flow.config.gpu_device_num(4)
 func_config = flow.FunctionConfig()
 func_config.default_data_type(flow.float)
 func_config.indexed_slices_optimizer_conf(
-    dict(include_op_names=dict(op_name=["fc7-weight0", "fc7-weight1", "fc7-weight2", "fc7-weight3"]))
+    dict(
+        include_op_names=dict(
+            op_name=["fc7-weight0", "fc7-weight1", "fc7-weight2", "fc7-weight3"]
+        )
+    )
 )
 num_classes = 1000000
 emb_size = 128
 batch_size = 256
 num_sample = 100000
 partial_fc = True
-indexed_slice_update = True
 
 
 @flow.global_function(type="train", function_config=func_config)
@@ -38,12 +41,15 @@ def PartialFcJob(
     labels: oft.Numpy.Placeholder((batch_size,), dtype=flow.int32),
 ):
 
-    labels = labels.with_distribute(flow.distribute.broadcast())
-    #data_list = flow.advanced.distribute_clone(data)
+    # labels = labels.with_distribute(flow.distribute.broadcast())
+    labels_list = flow.advanced.distribute_clone(labels)
+    data_list = flow.advanced.distribute_clone(data)
     fc7_out_list = []
     mapped_label_list = []
     parallel_desc_symbol = flow.current_scope().device_parallel_desc_symbol
     device_tag = parallel_desc_symbol.device_tag
+    cur_num_sample = num_sample // parallel_desc_symbol.parallel_num
+    cur_num_classes = num_classes // parallel_desc_symbol.parallel_num
     parallel_id = 0
     for (
         machine_id,
@@ -53,6 +59,9 @@ def PartialFcJob(
             with flow.scope.placement(
                 device_tag, str(machine_id) + ":" + str(device_id)
             ):
+
+                cur_class_offset = parallel_id * cur_num_classes
+                cur_sample_offset = parallel_id * cur_num_sample
                 fc7_weight = flow.get_variable(
                     name="fc7-weight" + str(parallel_id),
                     shape=(num_classes, emb_size),
@@ -62,12 +71,9 @@ def PartialFcJob(
                     model_name="weight",
                     distribute=flow.distribute.split(0),
                 )
-                cur_num_sample = num_sample // parallel_desc_symbol.parallel_num
-                cur_num_classes = num_classes // parallel_desc_symbol.parallel_num
-                cur_class_offset = parallel_id * cur_num_classes
-                cur_sample_offset = parallel_id * cur_num_sample
+
                 (mapped_label, sample_idx) = flow.partial_fc_sample(
-                    label=labels,
+                    label=labels_list[parallel_id],
                     num_sample=cur_num_sample,
                     num_classes=cur_num_classes,
                     class_offset=cur_class_offset,
@@ -75,7 +81,7 @@ def PartialFcJob(
                 )
                 sampled_weight = flow.gather(params=fc7_weight, indices=sample_idx)
                 fc7 = flow.matmul(
-                    a=data, b=sampled_weight, transpose_b=True
+                    a=data_list[parallel_id], b=sampled_weight, transpose_b=True
                 )
                 fc7_out_list.append(fc7)
                 mapped_label_list.append(mapped_label)
@@ -99,8 +105,9 @@ data = np.random.rand(batch_size, emb_size).astype(np.float32)
 # OneFlow
 check_point = flow.train.CheckPoint()
 check_point.init()
-start_time = time.time()
-for i in range(200):
+for i in range(300):
+    if i == 100:
+        start_time = time.time()
     loss = PartialFcJob(data, labels).get()
 time = time.time() - start_time
 print("time", time)
