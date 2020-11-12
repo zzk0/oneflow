@@ -151,11 +151,10 @@ NcclCollectiveBoxingExecutorBackend::NcclCollectiveBoxingExecutorBackend()
       shutdown_(false) {
   OF_CUDA_CHECK(cudaGetDeviceCount(&num_devices_));
   callback_executor_pool_.reset(new ThreadPool(num_devices_));
-  device_thread_task_chan_.resize(num_devices_);
-  device_thread_vec_.resize(num_devices_);
+  for (int i = 0; i < num_devices_; ++i) { device_thread_task_chan_.emplace_back(); }
   for (int i = 0; i < num_devices_; ++i) {
-    device_thread_vec_.at(i) =
-        std::thread(&NcclCollectiveBoxingExecutorBackend::DeviceWorkerLoop, this, i);
+    device_thread_vec_.emplace_back(&NcclCollectiveBoxingExecutorBackend::DeviceWorkerLoop, this,
+                                    i);
   }
   CHECK_GT(collective_boxing_conf_.nccl_num_streams(), 0);
   num_streams_ = collective_boxing_conf_.nccl_num_streams();
