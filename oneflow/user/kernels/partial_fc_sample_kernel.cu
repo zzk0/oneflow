@@ -59,7 +59,7 @@ class TmpBufferManager final {
     label_buffer_offset_ = 0;
     index_buffer_offset_ = label_buffer_offset_ + label_buffer_bytes;
     sorted_label_buffer_offset_ = index_buffer_offset_ + index_buffer_bytes;
-    sorted_index_buffer_offset_ = sorted_label_buffer_offset_ + sorted_label_buffer_offset_;
+    sorted_index_buffer_offset_ = sorted_label_buffer_offset_ + sorted_label_buffer_bytes;
     rand_value_offset_ = sorted_index_buffer_offset_ + sorted_index_buffer_bytes;
     cub_tmp_storage_offset_ = rand_value_offset_ + rand_value_bytes;
     total_buffer_size_ = label_buffer_bytes + index_buffer_bytes + sorted_label_buffer_bytes
@@ -138,9 +138,7 @@ __global__ void IndexSetPos(const int64_t n, const int64_t offset, const int64_t
                             const K* labels, K* index_buffer) {
   CUDA_1D_KERNEL_LOOP(i, n) {
     K label = labels[i] - offset;
-    if (label >= 0 && label < num_classes) {
-      index_buffer[label] = -1;
-    }
+    if (label >= 0 && label < num_classes) { index_buffer[label] = -1; }
   }
 }
 
@@ -196,7 +194,6 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
     IndexSetPos<<<BlocksNum4ThreadsNum(batch_size), kCudaThreadsNumPerBlock, 0,
                   ctx->device_ctx()->cuda_stream()>>>(
         batch_size, lower_bound, num_classes, label->dptr<K>(), buffer_manager.IndexBufferPtr());
-
     SortPairs<K, K>(ctx->device_ctx()->cuda_stream(), num_classes,
                     buffer_manager.GetCubTmpStorageSize(), buffer_manager.IndexBufferPtr(),
                     buffer_manager.LabelBufferPtr(), buffer_manager.CubTmpStoragePtr(),
@@ -207,13 +204,13 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
                              buffer_manager.SortedLabelBufferPtr(),
                              num_sample * GetSizeOfDataType(sampled_label->data_type()));
     // get LabelMap
-
     GetLabelMap<<<BlocksNum4ThreadsNum(num_sample), kCudaThreadsNumPerBlock, 0,
                   ctx->device_ctx()->cuda_stream()>>>(num_sample, map_offset,
                                                       buffer_manager.SortedLabelBufferPtr(),
                                                       buffer_manager.LabelMapPtr());
     Memset<DeviceType::kGPU>(ctx->device_ctx(), maped_label->mut_dptr(), 0,
                              maped_label->shape().elem_cnt() * sizeof(K));
+
     GatherKernelUtilImpl<DeviceType::kGPU, K, K>::Forward(
         ctx->device_ctx(), label->dptr<K>(), batch_size, buffer_manager.LabelMapPtr(),
         Shape({1, num_classes, 1}), maped_label->mut_dptr<K>(), lower_bound);
@@ -221,16 +218,15 @@ class PartialFcSampleGpuKernel final : public user_op::OpKernel {
   bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
 };
 
-#define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(dtype)                                         \
-  REGISTER_USER_KERNEL("partial_fc_sample")                                                       \
-      .SetCreateFn<                                                                               \
-          PartialFcSampleGpuKernel<dtype>>()                               \
-      .SetIsMatchedHob((user_op::HobDeviceTag() == "gpu")                                         \
-                       & (user_op::HobDataType("label", 0) == GetDataType<dtype>::value))     \
-      .SetInferTmpSizeFn([](oneflow::user_op::InferContext* ctx) {                                \
-        const int64_t num_classes = ctx->Attr<int64_t>("num_classes");                            \
-        TmpBufferManager<dtype> buffer_manager(nullptr, num_classes);      \
-        return buffer_manager.GetTotalBufferSize();                                               \
+#define REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(dtype)                                      \
+  REGISTER_USER_KERNEL("partial_fc_sample")                                               \
+      .SetCreateFn<PartialFcSampleGpuKernel<dtype>>()                                     \
+      .SetIsMatchedHob((user_op::HobDeviceTag() == "gpu")                                 \
+                       & (user_op::HobDataType("label", 0) == GetDataType<dtype>::value)) \
+      .SetInferTmpSizeFn([](oneflow::user_op::InferContext* ctx) {                        \
+        const int64_t num_classes = ctx->Attr<int64_t>("num_classes");                    \
+        TmpBufferManager<dtype> buffer_manager(nullptr, num_classes);                     \
+        return buffer_manager.GetTotalBufferSize();                                       \
       });
 
 REGISTER_PARTIAL_FC_SAMPLE_GPU_KERNEL(int32_t)
