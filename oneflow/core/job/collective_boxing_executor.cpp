@@ -297,7 +297,7 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
     const std::vector<std::map<int64_t, RuntimeRequestInfo>>& ranks) {
   CHECK_EQ(group.size(), ranks.size());
   if (group.empty()) { return; }
-  std::map<int64_t, std::vector<std::function<void(Maybe<void>)>>> device_id2callbacks;
+  std::map<int64_t, std::list<std::function<void(Maybe<void>)>>> device_id2callbacks;
   const int64_t stream_id = current_stream_id_;
   current_stream_id_ = (current_stream_id_ + 1) % num_streams_;
   CudaCurrentDeviceGuard device_guard;
@@ -449,7 +449,7 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
     for (auto& device_id7op_func : device_id2op_func) {
       const int32_t device_id = device_id7op_func.first;
       std::list<std::function<void()>> op_func = std::move(device_id7op_func.second);
-      std::vector<std::function<void(Maybe<void>)>> callbacks =
+      std::list<std::function<void(Maybe<void>)>> callbacks =
           std::move(device_id2callbacks.at(device_id));
       cudaStream_t cuda_stream = device_id2device_ctx.at(device_id)->stream;
       device_thread_task_chan_.at(device_id)->Send(
