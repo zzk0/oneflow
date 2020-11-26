@@ -963,6 +963,7 @@ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
     JUST(DoPass("CudnnFusedNormalizationAddReluPass"));
     JUST(DoPass("PruneCastToStaticShapeOpsPass"));
     JUST(DoPass("FuseAddToOutputPass"));
+    JUST(DoPass("IndexedSlicesOptimizerMirroredUnsortedSegmentSumPromotionPass"));
     JUST(DoPass("IndexedSlicesOptimizerRewritePass"));
     JUST(DoPass("SplitSparseSoftmaxCrossEntropyOpPass"));
     JUST(DoPass("DoParallelCastBeforeWideningTypeCast"));
