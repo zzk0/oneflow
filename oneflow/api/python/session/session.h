@@ -13,6 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#ifndef ONEFLOW_API_PYTHON_SESSION_SESSION_H_
+#define ONEFLOW_API_PYTHON_SESSION_SESSION_H_
+
 #include "oneflow/api/python/session/session_helper.h"
 
 std::pair<bool, std::shared_ptr<oneflow::cfg::ErrorProto>> IsSessionInited() {
@@ -35,3 +38,5 @@ std::shared_ptr<oneflow::cfg::ErrorProto> StartLazyGlobalSession() {
 std::shared_ptr<oneflow::cfg::ErrorProto> StopLazyGlobalSession() {
   return oneflow::StopLazyGlobalSession().GetDataAndErrorProto();
 }
+
+#endif // ONEFLOW_API_PYTHON_SESSION_SESSION_H_

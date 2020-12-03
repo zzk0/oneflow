@@ -13,6 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#ifndef ONEFLOW_API_PYTHON_CALIBRATION_CALIBRATION_H_
+#define ONEFLOW_API_PYTHON_CALIBRATION_CALIBRATION_H_
+
 #include "oneflow/api/python/calibration/calibration_helper.h"
 
 std::shared_ptr<oneflow::cfg::ErrorProto> CacheInt8Calibration() {
@@ -22,3 +25,5 @@ std::shared_ptr<oneflow::cfg::ErrorProto> CacheInt8Calibration() {
 std::shared_ptr<oneflow::cfg::ErrorProto> WriteInt8Calibration(const std::string& path) {
   return oneflow::WriteInt8Calibration(path).GetDataAndErrorProto();
 }
+
+#endif //ONEFLOW_API_PYTHON_CALIBRATION_CALIBRATION_H_

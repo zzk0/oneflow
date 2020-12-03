@@ -13,6 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#ifndef ONEFLOW_API_PYTHON_OP_OP_MGR_H_
+#define ONEFLOW_API_PYTHON_OP_OP_MGR_H_
+
 #include "oneflow/api/python/op/op_mgr_helper.h"
 
 std::pair<bool, std::shared_ptr<oneflow::cfg::ErrorProto>> IsOpTypeCaseCpuSupportOnly(
@@ -55,3 +58,5 @@ std::pair<std::string, std::shared_ptr<oneflow::cfg::ErrorProto>> CheckAndComple
   return oneflow::CheckAndCompleteUserOpConf(serialized_op_conf)
       .GetDataAndErrorProto(std::string(""));
 }
+
+#endif // ONEFLOW_API_PYTHON_OP_OP_MGR_H_

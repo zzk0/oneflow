@@ -31,7 +31,6 @@ import oneflow.oneflow_internal as oneflow_internal
 from oneflow.core.framework.config_def_pb2 import ConfigDef
 from oneflow.core.job.inter_user_job_info_pb2 import InterUserJobInfo
 from oneflow.python.framework.job_build_and_infer_error import JobBuildAndInferError
-import oneflow
 from oneflow.python.framework.job_build_and_infer_cfg_error import (
     JobBuildAndInferCfgError,
 )
@@ -42,11 +41,16 @@ import oneflow_api.oneflow.core.job.placement as placement_cfg
 oneflow_api = oneflow.oneflow_api
 
 
+def RegisterForeignCallbackOnlyOnce(callback):
+    error = oneflow_api.RegisterForeignCallbackOnlyOnce(callback)
+    if error.has_error_type():
+        raise JobBuildAndInferCfgError(error)
+
+
 def RegisterWatcherOnlyOnce(watcher):
-    error_str = oneflow_internal.RegisterWatcherOnlyOnce(watcher)
-    error = text_format.Parse(error_str, error_util.ErrorProto())
-    if error.HasField("error_type"):
-        raise JobBuildAndInferError(error)
+    error = oneflow_api.RegisterWatcherOnlyOnce(watcher)
+    if error.has_error_type():
+        raise JobBuildAndInferCfgError(error)
 
 
 def IsOpTypeCaseCpuSupportOnly(op_type_case):
@@ -149,10 +153,9 @@ def GetInterUserJobInfo():
 
 
 def LaunchJob(job_instance):
-    error_str = oneflow_internal.LaunchJob(job_instance)
-    error = text_format.Parse(error_str, error_util.ErrorProto())
-    if error.HasField("error_type"):
-        raise JobBuildAndInferError(error)
+    error = oneflow_api.LaunchJob(job_instance)
+    if error.has_error_type():
+        raise JobBuildAndInferCfgError(error)
 
 
 def JobBuildAndInferCtx_Open(job_name):

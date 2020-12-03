@@ -13,6 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#ifndef ONEFLOW_API_PYTHON_ENV_EVN_H_
+#define ONEFLOW_API_PYTHON_ENV_EVN_H_
+
 #include "oneflow/api/python/env/env_helper.h"
 
 std::pair<std::string, std::shared_ptr<oneflow::cfg::ErrorProto>> CurrentResource() {
@@ -42,3 +45,5 @@ std::shared_ptr<oneflow::cfg::ErrorProto> DestroyEnv() {
 std::pair<long long, std::shared_ptr<oneflow::cfg::ErrorProto>> CurrentMachineId() {
   return oneflow::CurrentMachineId().GetDataAndErrorProto(0LL);
 }
+
+#endif // ONEFLOW_API_PYTHON_ENV_EVN_H_

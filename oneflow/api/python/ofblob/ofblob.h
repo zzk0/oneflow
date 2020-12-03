@@ -13,6 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#ifndef ONEFLOW_API_PYTHON_OFBLOB_OFBLOB_H_
+#define ONEFLOW_API_PYTHON_OFBLOB_OFBLOB_H_
+
 #include "oneflow/core/common/type_traits.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -148,3 +151,5 @@ void OfBlob_CurMutTensorCopyShapeFrom(uint64_t of_blob_ptr, py::array_t<int64_t>
   auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
   return of_blob->CurMutTensorCopyShapeFrom(buf_ptr, size);
 }
+
+#endif // ONEFLOW_API_PYTHON_OFBLOB_OFBLOB_H_
