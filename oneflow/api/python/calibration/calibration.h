@@ -26,4 +26,4 @@ std::shared_ptr<oneflow::cfg::ErrorProto> WriteInt8Calibration(const std::string
   return oneflow::WriteInt8Calibration(path).GetDataAndErrorProto();
 }
 
-#endif //ONEFLOW_API_PYTHON_CALIBRATION_CALIBRATION_H_
+#endif  // ONEFLOW_API_PYTHON_CALIBRATION_CALIBRATION_H_

@@ -16,5 +16,3 @@ limitations under the License.
 #include <stdint.h>
 #include "oneflow/python/oneflow_internal_helper.h"
 #include "oneflow/core/job/resource_desc.h"
-
-

@@ -50,6 +50,4 @@ limitations under the License.
 #include "oneflow/core/eager/eager_oneflow.h"
 #include "oneflow/core/eager/eager_symbol_storage.h"
 
-namespace oneflow {
-
-}  // namespace oneflow
+namespace oneflow {}  // namespace oneflow

@@ -59,4 +59,4 @@ std::pair<std::string, std::shared_ptr<oneflow::cfg::ErrorProto>> CheckAndComple
       .GetDataAndErrorProto(std::string(""));
 }
 
-#endif // ONEFLOW_API_PYTHON_OP_OP_MGR_H_
+#endif  // ONEFLOW_API_PYTHON_OP_OP_MGR_H_

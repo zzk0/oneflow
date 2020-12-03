@@ -152,4 +152,4 @@ void OfBlob_CurMutTensorCopyShapeFrom(uint64_t of_blob_ptr, py::array_t<int64_t>
   return of_blob->CurMutTensorCopyShapeFrom(buf_ptr, size);
 }
 
-#endif // ONEFLOW_API_PYTHON_OFBLOB_OFBLOB_H_
+#endif  // ONEFLOW_API_PYTHON_OFBLOB_OFBLOB_H_

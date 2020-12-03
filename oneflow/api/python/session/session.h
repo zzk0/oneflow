@@ -39,4 +39,4 @@ std::shared_ptr<oneflow::cfg::ErrorProto> StopLazyGlobalSession() {
   return oneflow::StopLazyGlobalSession().GetDataAndErrorProto();
 }
 
-#endif // ONEFLOW_API_PYTHON_SESSION_SESSION_H_
+#endif  // ONEFLOW_API_PYTHON_SESSION_SESSION_H_

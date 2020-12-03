@@ -46,4 +46,4 @@ std::pair<long long, std::shared_ptr<oneflow::cfg::ErrorProto>> CurrentMachineId
   return oneflow::CurrentMachineId().GetDataAndErrorProto(0LL);
 }
 
-#endif // ONEFLOW_API_PYTHON_ENV_EVN_H_
+#endif  // ONEFLOW_API_PYTHON_ENV_EVN_H_
