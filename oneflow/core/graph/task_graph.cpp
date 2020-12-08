@@ -36,6 +36,9 @@ limitations under the License.
 #include "oneflow/core/graph/boxing/to_interface_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
 #include "oneflow/core/graph/boxing_identity_compute_task_node.h"
+#include "oneflow/core/job/scope.h"
+#include "oneflow/core/job_rewriter/calculation_pass.h"
+#include "oneflow/core/vm/symbol_storage.h"
 
 namespace oneflow {
 
@@ -83,7 +86,17 @@ bool CanBeMergedInChain(const TaskNode* node) {
   if (fw_comp_node->device_type() != DeviceType::kGPU) { return false; }
   const Operator* op = fw_comp_node->logical_node()->SoleOp().get();
   if (IsSpecialOpNotConsiderMergeInChain(op)) { return false; }
-  return true;
+
+  // only merge in fw/bw pass
+  int64_t scope_symbol_id = op->op_conf().scope_symbol_id();
+  if (!Global<vm::SymbolStorage<Scope>>::Get()->Has(scope_symbol_id)) { return false; }
+  const auto& scope = Global<vm::SymbolStorage<Scope>>::Get()->Get(scope_symbol_id);
+  const auto& pass_name = scope.scope_proto().calculation_pass_name();
+  if (pass_name == kForwardPass || pass_name == kBackwardPass) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 void TraverseConnectedSubGraphMergeInThisChain(TaskNode* this_node, const int64_t this_chain_id) {
@@ -368,18 +381,26 @@ void TaskGraph::SetOrderInGraphForEachNode() {
 
 void TaskGraph::MergeChain() {
   int64_t chain_id = 0;
+  HashMap<int64_t, int64_t> global_area2chain_id;
   for (auto* this_node : ordered_task_nodes_) {
     // skip if this node has been set in a chain.
     if (this_node->chain_id() != -1) { continue; }
 
     CHECK_EQ(this_node->chain_id(), -1);
     if (CanBeMergedInChain(this_node)) {
-      TraverseConnectedSubGraphMergeInThisChain(this_node, chain_id);
+      int64_t key = this_node->GlobalWorkStreamId() + this_node->area_id();
+      if (global_area2chain_id.find(key) == global_area2chain_id.end()) {
+        global_area2chain_id.emplace(key, chain_id);
+        ++chain_id;
+      }
+      this_node->set_chain_id(global_area2chain_id.at(key));
+
+      // TraverseConnectedSubGraphMergeInThisChain(this_node, chain_id);
     } else {
       this_node->set_chain_id(chain_id);
+      ++chain_id;
     }
-
-    ++chain_id;
+    // ++chain_id;
   }
   for (auto* node : ordered_task_nodes_) { CHECK_NE(node->chain_id(), -1); }
 }
