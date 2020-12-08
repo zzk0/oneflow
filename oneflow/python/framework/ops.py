@@ -25,6 +25,8 @@ import oneflow.python.framework.remote_blob as remote_blob_util
 import oneflow.python.framework.hob as hob
 import oneflow.python.lib.core.enable_if as enable_if
 from oneflow.python.oneflow_export import oneflow_export
+import oneflow.python.framework.c_api_util as c_api_util
+import oneflow.python.experimental.name_scope as name_scope
 import oneflow
 from typing import Union, Optional
 
@@ -143,15 +145,14 @@ def api_parallel_cast(
 @enable_if.condition(hob.in_global_mode & ~hob.eager_execution_enabled)
 def parallel_cast(input, name=None, distribute=None, gradient_distribute=None):
     assert not oneflow.eager_execution_enabled()
+    if name is None:
+        name = id_util.UniqueStr("ParallelCast_")
+    job_name = c_api_util.JobBuildAndInferCtx_GetCurrentJobName()
+    name = name_scope.GetJobNameScopePrefix(job_name) + name
     op_conf = op_conf_util.OperatorConf()
-    setattr(
-        op_conf,
-        "name",
-        name if name is not None else id_util.UniqueStr("ParallelCast_"),
-    )
-    op_conf.parallel_cast_conf.out = "out"
+    setattr(op_conf, "name", name)
     setattr(op_conf.parallel_cast_conf, "in", input.unique_name)
-
+    setattr(op_conf.parallel_cast_conf, "out", "out")
     def to_split_axis(dist):
         split_axis = data_type_util.OptInt64()
         if type(dist) is distribute_util.SplitDistribute:
@@ -161,7 +162,6 @@ def parallel_cast(input, name=None, distribute=None, gradient_distribute=None):
         else:
             raise NotImplementedError
         return split_axis
-
     if distribute is not None:
         op_conf.parallel_cast_conf.split_axis.CopyFrom(to_split_axis(distribute))
     if gradient_distribute is not None:
