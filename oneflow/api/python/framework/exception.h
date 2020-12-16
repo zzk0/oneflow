@@ -17,9 +17,17 @@ limitations under the License.
 #ifndef ONEFLOW_API_PYTHON_FRAMEWORK_EXCEPTION_H_
 #define ONEFLOW_API_PYTHON_FRAMEWORK_EXCEPTION_H_
 
+#include <string>
+#include "oneflow/core/common/maybe.h"
 #include "oneflow/core/common/exception.h"
 
-void TestErrorException() {
+using namespace oneflow;
+
+Maybe<void> ToDoError() { TODO_THEN_RETURN(); }
+
+Maybe<void> UnImplError() { UNIMPLEMENTED_THEN_RETURN(); }
+
+void TestErrorException(std::string error_type) {
   using namespace oneflow;
   cfg::ErrorProto error_;
 
@@ -27,9 +35,17 @@ void TestErrorException() {
   error_.set_msg("TestErrorException");
   error_.mutable_check_failed_error();
 
-  if (error_.has_error_type()) {
-    ErrorException exp(error_);
-    throw exp;
+  if (error_type == "todo") {
+    auto maybe_obj = ToDoError();
+    throw TodoException(*maybe_obj.GetDataAndErrorProto());
+  } else if (error_type == "unimpl") {
+    auto maybe_obj = UnImplError();
+    throw UnimplementedException(*maybe_obj.GetDataAndErrorProto());
+  } else if (error_type == "error") {
+    if (error_.has_error_type()) {
+      ErrorException exp(error_);
+      throw exp;
+    }
   }
 }
 

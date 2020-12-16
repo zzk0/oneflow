@@ -24,8 +24,8 @@ limitations under the License.
 #include <stdlib.h>
 #include <limits.h>
 #include "oneflow/core/common/error.cfg.h"
-#include "oneflow/core/job/global_for.h"
-#include "oneflow/core/job/resource_desc.h"
+// #include "oneflow/core/job/global_for.h"
+// #include "oneflow/core/job/resource_desc.h"
 
 namespace oneflow {
 
@@ -34,6 +34,7 @@ std::string debug_info(const char* file_name);
 class OneflowException : public std::exception {
  public:
   virtual const char* what() const throw() { return "Oneflow exception happened"; }
+  // virtual std::string ExceptionType() const { return "OneflowException"; }
 };
 
 class BaseException : public OneflowException {
@@ -73,12 +74,9 @@ class ErrorException : public OneflowException {
   std::string msg_;
 };
 
-class UnimplementedException : public OneflowException {
+class TodoException : public OneflowException {
  public:
-  explicit UnimplementedException(const std::string& debug_info)
-      : info_("\nOneflow exception: UNIMPLEMENTED") {
-    info_ = info_ = info_ + debug_info;
-  }
+  explicit TodoException(const cfg::ErrorProto& error_proto) : info_(error_proto.DebugString()) {}
 
   const char* what() const noexcept override { return info_.data(); }
 
@@ -86,11 +84,10 @@ class UnimplementedException : public OneflowException {
   std::string info_;
 };
 
-class TodoException : public OneflowException {
+class UnimplementedException : public OneflowException {
  public:
-  explicit TodoException(const std::string& debug_info) : info_("\nOneflow exception: TODO") {
-    info_ = info_ + debug_info;
-  }
+  explicit UnimplementedException(const cfg::ErrorProto& error_proto)
+      : info_(error_proto.DebugString()) {}
 
   const char* what() const noexcept override { return info_.data(); }
 

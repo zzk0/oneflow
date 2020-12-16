@@ -20,6 +20,12 @@ limitations under the License.
 namespace py = pybind11;
 
 ONEFLOW_API_PYBIND11_MODULE("", m) {
-  py::register_exception<oneflow::OneflowException>(m, "OneflowException");
+  py::module exception = m.def_submodule("exception");
+
+  py::register_exception<oneflow::OneflowException>(exception, "OneflowException");
+  py::register_exception<oneflow::ErrorException>(exception, "ErrorException");
+  py::register_exception<oneflow::TodoException>(exception, "TodoException");
+  py::register_exception<oneflow::UnimplementedException>(exception, "UnimplementedException");
+
   m.def("TestErrorException", &TestErrorException);
 }

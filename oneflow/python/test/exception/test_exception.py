@@ -13,18 +13,40 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+import argparse
 import oneflow as flow
 import oneflow_api
-from oneflow_api import OneflowException
+from oneflow_api.exception import (
+    ErrorException,
+    TodoException,
+    UnimplementedException,
+    OneflowException,
+)
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-t", "--type", type=str, default="todo", choices=["todo", "unimpl", "error"]
+)
+parser.add_argument("-r", "--raise_exp", type=str, default="n")
+args = parser.parse_args()
 
 
 def TestOneflowError():
     try:
-        oneflow_api.TestErrorException()
-    except OneflowException:
-        print("Receive OneflowException!")
+        oneflow_api.TestErrorException(args.type)
+    except TodoException:
+        print("Receive TodoException!")
+        if args.raise_exp == "y":
+            raise
+    except UnimplementedException:
+        print("Receive UnimplementedException!")
+        if args.raise_exp == "y":
+            raise
+    except ErrorException:
+        print("Receive ErrorException!")
+        if args.raise_exp == "y":
+            raise
 
 
 if __name__ == "__main__":
-    # flow.env.init()
     TestOneflowError()
