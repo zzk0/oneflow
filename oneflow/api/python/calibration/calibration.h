@@ -16,14 +16,33 @@ limitations under the License.
 #ifndef ONEFLOW_API_PYTHON_CALIBRATION_CALIBRATION_H_
 #define ONEFLOW_API_PYTHON_CALIBRATION_CALIBRATION_H_
 
-#include "oneflow/api/python/calibration/calibration_helper.h"
+#include "oneflow/core/common/maybe.h"
 
-std::shared_ptr<oneflow::cfg::ErrorProto> CacheInt8Calibration() {
-  return oneflow::CacheInt8Calibration().GetDataAndErrorProto();
+#ifdef WITH_TENSORRT
+#include "oneflow/xrt/api.h"
+#endif  // WITH_TENSORRT
+
+namespace oneflow {
+
+inline Maybe<void> CacheInt8Calibration() {
+#ifdef WITH_TENSORRT
+  xrt::tensorrt::CacheInt8Calibration();
+#else
+  CHECK_OR_RETURN(0) << "Please recompile with TensorRT.";
+#endif  // WITH_TENSORRT
+  return Maybe<void>::Ok();
 }
 
-std::shared_ptr<oneflow::cfg::ErrorProto> WriteInt8Calibration(const std::string& path) {
-  return oneflow::WriteInt8Calibration(path).GetDataAndErrorProto();
+inline Maybe<void> WriteInt8Calibration(const std::string& path) {
+#ifdef WITH_TENSORRT
+  xrt::tensorrt::CacheInt8Calibration();
+  xrt::tensorrt::WriteInt8Calibration(path);
+#else
+  CHECK_OR_RETURN(0) << "Please recompile with TensorRT.";
+#endif  // WITH_TENSORRT
+  return Maybe<void>::Ok();
 }
+
+}  // namespace oneflow
 
 #endif  // ONEFLOW_API_PYTHON_CALIBRATION_CALIBRATION_H_
