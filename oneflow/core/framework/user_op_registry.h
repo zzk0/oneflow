@@ -31,12 +31,16 @@ class UserOpDefWrapper;
 class UserOpConfWrapper;
 class InferContext;
 class SbpContext;
+class InferSbpSignatureFnContext;
 class BatchAxisContext;
+class InferOutputBlobTimeShapeFnContext;
+class ComputeComplexityFnContext;
 
 using CheckAttrFn = std::function<Maybe<void>(const UserOpDefWrapper&, const UserOpConfWrapper&)>;
 using TensorDescInferFn = std::function<Maybe<void>(InferContext*)>;
 using BatchAxisInferFn = std::function<Maybe<void>(BatchAxisContext*)>;
 using GetSbpFn = std::function<Maybe<void>(SbpContext*)>;
+using InferSbpSignatureFn = std::function<Maybe<void>(InferSbpSignatureFnContext*)>;
 using InputArgModifier = InputBlobModifier;
 using GetInputArgModifier =
     std::function<InputArgModifier*(const std::string& in_arg_name, int32_t in_arg_index)>;
@@ -45,6 +49,8 @@ using OutputArgModifier = OutputBlobModifier;
 using GetOutputArgModifier =
     std::function<OutputArgModifier*(const std::string& out_arg_name, int32_t out_arg_index)>;
 using OutputArgModifyFn = std::function<void(GetOutputArgModifier, const UserOpConfWrapper&)>;
+using InferOutputBlobTimeShapeFn = std::function<Maybe<void>(InferOutputBlobTimeShapeFnContext*)>;
+using ComputeComplexityFn = std::function<Maybe<double>(ComputeComplexityFnContext*)>;
 
 struct OpRegistryResult {
   OpRegistryResult() : cpu_only_supported(false), same_output_regst_num(-1) {}
@@ -58,10 +64,13 @@ struct OpRegistryResult {
   TensorDescInferFn tensor_desc_infer_fn;
   BatchAxisInferFn batch_axis_infer_fn;
   GetSbpFn get_sbp_fn;
+  InferSbpSignatureFn infer_sbp_signature_fn;
   // TODO(niuchong): move input_arg_modify_fn out of OpRegistryResult since it is more about
   // performance other than op definition
   InputArgModifyFn input_arg_modify_fn;
   OutputArgModifyFn output_arg_modify_fn;
+  InferOutputBlobTimeShapeFn infer_output_blob_time_shape_fn;
+  ComputeComplexityFn compute_complexity_fn;
 };
 
 class OpRegistry final {
@@ -85,16 +94,24 @@ class OpRegistry final {
   OpRegistry& SupportCpuOnly();
   OpRegistry& SetOutputBufferNum(int32_t num);
 
-  OpRegistry& Attr(const std::string& name, UserOpAttrType type);
+  __attribute__((deprecated)) OpRegistry& Attr(const std::string& name, AttrType type);
   template<typename T>
-  OpRegistry& Attr(const std::string& name, UserOpAttrType type, T&& default_val);
+  __attribute__((deprecated)) OpRegistry& Attr(const std::string& name, AttrType type,
+                                               const T& default_val);
+  template<typename T>
+  OpRegistry& Attr(const std::string& name, const T& default_val);
+  template<typename T>
+  OpRegistry& Attr(const std::string& name);
 
   OpRegistry& SetTensorDescInferFn(TensorDescInferFn fn);
   OpRegistry& SetBatchAxisInferFn(BatchAxisInferFn fn);
   OpRegistry& SetGetSbpFn(GetSbpFn fn);
+  OpRegistry& SetInferSbpSignatureFn(InferSbpSignatureFn fn);
   OpRegistry& SetInputArgModifyFn(InputArgModifyFn fn);
   OpRegistry& SetOutputArgModifyFn(OutputArgModifyFn fn);
+  OpRegistry& SetInferOutputBlobTimeShapeFn(InferOutputBlobTimeShapeFn fn);
   OpRegistry& SetCheckAttrFn(CheckAttrFn fn);
+  OpRegistry& SetComputeComplexityFn(ComputeComplexityFn fn);
 
   OpRegistry& Finish();
   OpRegistryResult GetResult() { return result_; }
@@ -102,6 +119,8 @@ class OpRegistry final {
  private:
   OpRegistry& ArgImpl(bool is_input, const std::string& name, bool is_optional, int32_t num,
                       bool num_as_min);
+  OpRegistry& DefaultedAttr(const std::string& name, AttrType type,
+                            const std::function<void(UserOpDef::AttrDef*)>& SetDefault);
 
  private:
   HashSet<std::string> unique_names_;

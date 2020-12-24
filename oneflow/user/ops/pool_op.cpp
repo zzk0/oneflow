@@ -15,6 +15,7 @@ limitations under the License.
 */
 #include "oneflow/core/framework/framework.h"
 #include "oneflow/user/utils/pool_util.h"
+#include <numeric>
 
 namespace oneflow {
 
@@ -62,6 +63,21 @@ Maybe<void> FwBatchAxisInferFn(user_op::BatchAxisContext* ctx) {
 Maybe<void> BwBatchAxisInferFn(user_op::BatchAxisContext* ctx) {
   *ctx->BatchAxis4ArgNameAndIndex("dx", 0) = *ctx->BatchAxis4ArgNameAndIndex("x", 0);
   return Maybe<void>::Ok();
+}
+
+// Logically computation cost of pool op is the product of output data amount and pool kernal data
+// amount. After adding sbp, we just divide it by parallel number if output data is splited because
+// splitting input and using partial sum for output is not a valid sbp for this op for now.
+Maybe<double> GetComputationCostFn(user_op::ComputeComplexityFnContext* ctx) {
+  const std::vector<int32_t> pool_size = ctx->Attr<std::vector<int32_t>>("pool_size");
+  double logical_computation_cost =
+      std::accumulate(pool_size.begin(), pool_size.end(),
+                      ctx->Shape4ArgNameAndIndex("y", 0)->elem_cnt(), std::multiplies<double>());
+  const auto& sbp_parallel = ctx->SbpParallel4ArgNameAndIndex("y", 0);
+  if (sbp_parallel.has_split_parallel()) {
+    return logical_computation_cost / ctx->parallel_desc().parallel_num();
+  }
+  return logical_computation_cost;
 }
 
 Maybe<void> FwGetSbpFn(user_op::SbpContext* ctx) {
@@ -114,192 +130,204 @@ GenBackwardOpConfFn MakeGenBackwardOpConfFn(const std::string& mode, const int32
 REGISTER_USER_OP("avg_pool_1d")
     .Input("x")
     .Output("y")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(MakeFwTensorDescInferFn(1))
     .SetBatchAxisInferFn(FwBatchAxisInferFn)
-    .SetGetSbpFn(FwGetSbpFn);
+    .SetGetSbpFn(FwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP("avg_pool_1d_grad")
     .Input("x")
     .Input("y")
     .Input("dy")
     .Output("dx")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(BwTensorDescInferFn)
     .SetBatchAxisInferFn(BwBatchAxisInferFn)
-    .SetGetSbpFn(BwGetSbpFn);
+    .SetGetSbpFn(BwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP_GRAD("avg_pool_1d").SetGenBackwardOpConfFn(MakeGenBackwardOpConfFn("avg", 1));
 
 REGISTER_USER_OP("avg_pool_2d")
     .Input("x")
     .Output("y")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(MakeFwTensorDescInferFn(2))
     .SetBatchAxisInferFn(FwBatchAxisInferFn)
-    .SetGetSbpFn(FwGetSbpFn);
+    .SetGetSbpFn(FwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP("avg_pool_2d_grad")
     .Input("x")
     .Input("y")
     .Input("dy")
     .Output("dx")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(BwTensorDescInferFn)
     .SetBatchAxisInferFn(BwBatchAxisInferFn)
-    .SetGetSbpFn(BwGetSbpFn);
+    .SetGetSbpFn(BwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP_GRAD("avg_pool_2d").SetGenBackwardOpConfFn(MakeGenBackwardOpConfFn("avg", 2));
 
 REGISTER_USER_OP("avg_pool_3d")
     .Input("x")
     .Output("y")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(MakeFwTensorDescInferFn(3))
     .SetBatchAxisInferFn(FwBatchAxisInferFn)
-    .SetGetSbpFn(FwGetSbpFn);
+    .SetGetSbpFn(FwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP("avg_pool_3d_grad")
     .Input("x")
     .Input("y")
     .Input("dy")
     .Output("dx")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(BwTensorDescInferFn)
     .SetBatchAxisInferFn(BwBatchAxisInferFn)
-    .SetGetSbpFn(BwGetSbpFn);
+    .SetGetSbpFn(BwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP_GRAD("avg_pool_3d").SetGenBackwardOpConfFn(MakeGenBackwardOpConfFn("avg", 3));
 
 REGISTER_USER_OP("max_pool_1d")
     .Input("x")
     .Output("y")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(MakeFwTensorDescInferFn(1))
     .SetBatchAxisInferFn(FwBatchAxisInferFn)
-    .SetGetSbpFn(FwGetSbpFn);
+    .SetGetSbpFn(FwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP("max_pool_1d_grad")
     .Input("x")
     .Input("y")
     .Input("dy")
     .Output("dx")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(BwTensorDescInferFn)
     .SetBatchAxisInferFn(BwBatchAxisInferFn)
-    .SetGetSbpFn(BwGetSbpFn);
+    .SetGetSbpFn(BwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP_GRAD("max_pool_1d").SetGenBackwardOpConfFn(MakeGenBackwardOpConfFn("max", 1));
 
 REGISTER_USER_OP("max_pool_2d")
     .Input("x")
     .Output("y")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(MakeFwTensorDescInferFn(2))
     .SetBatchAxisInferFn(FwBatchAxisInferFn)
-    .SetGetSbpFn(FwGetSbpFn);
+    .SetGetSbpFn(FwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP("max_pool_2d_grad")
     .Input("x")
     .Input("y")
     .Input("dy")
     .Output("dx")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(BwTensorDescInferFn)
     .SetBatchAxisInferFn(BwBatchAxisInferFn)
-    .SetGetSbpFn(BwGetSbpFn);
+    .SetGetSbpFn(BwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP_GRAD("max_pool_2d").SetGenBackwardOpConfFn(MakeGenBackwardOpConfFn("max", 2));
 
 REGISTER_USER_OP("max_pool_3d")
     .Input("x")
     .Output("y")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(MakeFwTensorDescInferFn(3))
     .SetBatchAxisInferFn(FwBatchAxisInferFn)
-    .SetGetSbpFn(FwGetSbpFn);
+    .SetGetSbpFn(FwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP("max_pool_3d_grad")
     .Input("x")
     .Input("y")
     .Input("dy")
     .Output("dx")
-    .Attr("padding", UserOpAttrType::kAtString)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("padding_after", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("pool_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("ceil_mode", UserOpAttrType::kAtBool)
+    .Attr<std::string>("padding")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::vector<int32_t>>("padding_after")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("pool_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<bool>("ceil_mode")
     .SetTensorDescInferFn(BwTensorDescInferFn)
     .SetBatchAxisInferFn(BwBatchAxisInferFn)
-    .SetGetSbpFn(BwGetSbpFn);
+    .SetGetSbpFn(BwGetSbpFn)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP_GRAD("max_pool_3d").SetGenBackwardOpConfFn(MakeGenBackwardOpConfFn("max", 3));
 

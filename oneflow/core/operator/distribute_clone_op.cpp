@@ -30,8 +30,6 @@ class DistributeCloneOp final : public Operator {
 
   void InitFromOpConf() override;
 
-  const PbMessage& GetCustomizedConf() const override;
-
   LogicalNode* NewProperLogicalNode() const override { return new DistributeSplitLogicalNode; }
 
  private:
@@ -48,8 +46,8 @@ class DistributeCloneOp final : public Operator {
                              const ParallelContext*) const override;
   Maybe<void> InferOutParallelDesc(
       std::function<ParallelDesc*(const std::string&)> ParallelDesc4Obn,
-      std::function<const BlobDesc*(const std::string&)> LogicalBlobDesc4Ibn, const ParallelDesc&,
-      const SbpSignature*) const override;
+      std::function<const BlobDesc*(const std::string&)> LogicalBlobDesc4Ibn,
+      const ParallelDesc&) const override;
 };
 
 void DistributeCloneOp::InitFromOpConf() {
@@ -59,10 +57,6 @@ void DistributeCloneOp::InitFromOpConf() {
   EnrollRepeatedOutputBnWithSetter("out", [&](OutputBlobModifier* ob_modifier) {
     ob_modifier->set_is_mutable(op_conf().distribute_clone_conf().is_variable_ref());
   });
-}
-
-const PbMessage& DistributeCloneOp::GetCustomizedConf() const {
-  return op_conf().distribute_clone_conf();
 }
 
 Maybe<void> DistributeCloneOp::InferBlobDescs(
@@ -85,7 +79,7 @@ Maybe<void> DistributeCloneOp::InferBlobDescs(
 Maybe<void> DistributeCloneOp::InferOutParallelDesc(
     std::function<ParallelDesc*(const std::string&)> ParallelDesc4Obn,
     std::function<const BlobDesc*(const std::string&)> LogicalBlobDesc4Ibn,
-    const ParallelDesc& op_parallel_desc, const SbpSignature*) const {
+    const ParallelDesc& op_parallel_desc) const {
   FOR_RANGE(int, i, 0, output_bns().size()) {
     const auto& obn = output_bns().Get(i);
     if (op_parallel_desc.parallel_num() > 1) {

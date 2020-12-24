@@ -30,8 +30,6 @@ class DistributeSplitOp final : public Operator {
 
   void InitFromOpConf() override;
 
-  const PbMessage& GetCustomizedConf() const override;
-
   LogicalNode* NewProperLogicalNode() const override { return new DistributeSplitLogicalNode; }
 
  private:
@@ -48,8 +46,8 @@ class DistributeSplitOp final : public Operator {
                              const ParallelContext*) const override;
   Maybe<void> InferOutParallelDesc(
       std::function<ParallelDesc*(const std::string&)> ParallelDesc4Obn,
-      std::function<const BlobDesc*(const std::string&)> LogicalBlobDesc4Ibn, const ParallelDesc&,
-      const SbpSignature*) const override;
+      std::function<const BlobDesc*(const std::string&)> LogicalBlobDesc4Ibn,
+      const ParallelDesc&) const override;
 
   Maybe<void> GetSbpSignatures(
       const std::function<Maybe<const BlobDesc&>(const std::string&)>& LogicalBlobDesc4Ibn,
@@ -65,10 +63,6 @@ void DistributeSplitOp::InitFromOpConf() {
     ob_modifier->set_header_infered_before_compute(false);
     ob_modifier->set_is_mutable(op_conf().distribute_split_conf().is_variable_ref());
   });
-}
-
-const PbMessage& DistributeSplitOp::GetCustomizedConf() const {
-  return op_conf().distribute_split_conf();
 }
 
 Maybe<void> DistributeSplitOp::InferBlobDescs(
@@ -99,7 +93,7 @@ Maybe<void> DistributeSplitOp::InferBlobDescs(
 Maybe<void> DistributeSplitOp::InferOutParallelDesc(
     std::function<ParallelDesc*(const std::string&)> ParallelDesc4Obn,
     std::function<const BlobDesc*(const std::string&)> LogicalBlobDesc4Ibn,
-    const ParallelDesc& op_parallel_desc, const SbpSignature*) const {
+    const ParallelDesc& op_parallel_desc) const {
   FOR_RANGE(int, i, 0, output_bns().size()) {
     const auto& obn = output_bns().Get(i);
     if (op_parallel_desc.parallel_num() > 1) {

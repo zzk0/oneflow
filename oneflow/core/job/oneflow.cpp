@@ -40,6 +40,9 @@ limitations under the License.
 #include "oneflow/core/vm/oneflow_vm.h"
 #include "oneflow/core/graph/plan_task_graph.h"
 #include "oneflow/core/graph/boxing/collective_boxing_util.h"
+#include "oneflow/core/job_rewriter/job_completer.h"
+#include "oneflow/core/graph/op_graph.h"
+#include "oneflow/core/auto_parallel/sbp_constructor.h"
 
 namespace std {
 
@@ -62,6 +65,18 @@ bool operator==(const ParallelBlobConf& lhs, const ParallelBlobConf& rhs) {
 }
 
 namespace {
+
+void DoJobComplete(Job* job) {
+  JobCompleter().Complete(job);
+  // auto-parallel
+  // TODO: recode this
+  if (job->job_conf().job_name() == "TrainNet")
+    job->mutable_job_parallel_view_conf()->clear_op_name2sbp_signature_conf();
+  OpGraph op_graph(*job);
+  SbpConstructor sbp_constructor;
+  sbp_constructor.constructSbpGraph(op_graph, *job);
+  JobCompleter().InsertIdentity(job);
+}
 
 std::string cluster_thrd_ids_key(const std::string& plan_name) {
   return plan_name + "_cluster_thrd_ids";
@@ -222,8 +237,17 @@ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
     auto ForEachNodeOnOutEdge = [&](const PlanTaskNode* node,
                                     const std::function<void(const PlanTaskNode*)>& Handler) {
       if (!IsCollectiveBoxingNode(node)) {
-        node->ForEachNodeOnOutEdge(
-            [&](const PlanTaskNode* node_on_out_edge) { Handler(node_on_out_edge); });
+        node->ForEachNodeOnOutEdge([&](const PlanTaskNode* node_on_out_edge) {
+          bool has_unvisited_collective_boxing_node_on_in_edges = false;
+          node_on_out_edge->ForEachNodeOnInEdge([&](const PlanTaskNode* node_on_in_edge) {
+            if (!has_unvisited_collective_boxing_node_on_in_edges
+                && IsCollectiveBoxingNode(node_on_in_edge)
+                && all_visited.count(node_on_in_edge) == 0) {
+              has_unvisited_collective_boxing_node_on_in_edges = true;
+            }
+          });
+          if (!has_unvisited_collective_boxing_node_on_in_edges) { Handler(node_on_out_edge); }
+        });
       }
     };
     HashSet<const PlanTaskNode*> visited;
@@ -306,7 +330,7 @@ Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_c
     } else {
       PullPlan("complete_plan", &complete_plan);
     }
-    OF_BARRIER();
+    OF_SESSION_BARRIER();
     // Experiment Runtime
     { Runtime experiment_run(complete_plan, job_desc.piece_num_of_experiment_phase(), true); }
     // Improve
@@ -316,7 +340,7 @@ Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_c
       *improved_plan = *JUST(Improver().Improve(
           *Global<AvailableMemDesc>::Get(), naive_plan,
           JoinPath(FLAGS_log_dir, ActEventLogger::experiment_act_event_bin_filename())));
-      OF_BARRIER();
+      OF_SESSION_BARRIER();
       TeePersistentLogStream::Create("improved_plan")->Write(*improved_plan);
     }
   } else {
@@ -888,6 +912,13 @@ REGISTER_FUNCTION_CONFIG_DEF().Bool("__is_user_function__", true, "is user defin
 Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan) {
   std::vector<std::shared_ptr<Job>> jobs(conf_jobs.size());
   FOR_RANGE(int, i, 0, jobs.size()) { jobs.at(i).reset(new Job(conf_jobs.Get(i))); }
+  int job_complete_idx = 0;
+  while (job_complete_idx < jobs.size()) {
+    auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(job_complete_idx)->job_conf(),
+                                                      job_complete_idx);
+    DoJobComplete(jobs.at(job_complete_idx).get());
+    job_complete_idx++;
+  }
   if (jobs.size() > 1) { CheckNonDistributeOptimizerAvailable(jobs); }
   if (Global<MachineCtx>::Get()->IsThisMachineMaster()) {
     HashMap<std::string, ParallelBlobConf> var_op_name2parallel_blob_conf;
@@ -902,6 +933,12 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       MakeModelIoV2Jobs(jobs, var_op_name2parallel_blob_conf, AppendJob);
     } else {
       MakeModelIoJobs(jobs, var_op_name2parallel_blob_conf, AppendJob);
+    }
+    while (job_complete_idx < jobs.size()) {
+      auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(job_complete_idx)->job_conf(),
+                                                        job_complete_idx);
+      DoJobComplete(jobs.at(job_complete_idx).get());
+      job_complete_idx++;
     }
   }
   std::vector<std::shared_ptr<Job>> function_jobs;
@@ -929,6 +966,12 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
                   pull_job.get());
       jobs.emplace_back(pull_job);
     }
+    while (job_complete_idx < jobs.size()) {
+      auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(job_complete_idx)->job_conf(),
+                                                        job_complete_idx);
+      DoJobComplete(jobs.at(job_complete_idx).get());
+      job_complete_idx++;
+    }
   }
   std::vector<Plan> sub_plans(jobs.size());
   FOR_RANGE(int64_t, i, 0, jobs.size()) {
@@ -940,6 +983,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
     MergeSubPlanWithoutGenNetTopo(plan, sub_plans);
     InterJobMemSharingUtil::MergeMemReusedChunkBetweenUserJobs(function_jobs, plan);
     InterJobMemSharingUtil::MergeMemSharedInterfaceMemBlockBetweenJobs(jobs, plan);
+    PlanUtil::SetForceInplaceMemBlock(plan);
     FinishGlobalCriticalSectionDesc(*plan, jobs.size());
     Plan main_plan;
     std::vector<std::string> identity_tick_op_names;
@@ -963,7 +1007,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       TeePersistentLogStream::Create("merged_plan")->Write(*plan);
     }
   }
-  OF_BARRIER();
+  OF_SESSION_BARRIER();
   return Maybe<void>::Ok();
 }
 

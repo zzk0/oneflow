@@ -43,11 +43,9 @@ void VariableOp::InitFromOpConf() {
   EnrollOutputBn("out", is_trainable)->set_is_mutable(true);
 }
 
-const PbMessage& VariableOp::GetCustomizedConf() const { return op_conf().variable_conf(); }
-
 Maybe<void> VariableOp::InferBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx) const {
+    const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature) const {
   const VariableOpConf& variable_conf = op_conf().variable_conf();
   CHECK_OR_RETURN(job_desc().job_conf().has_default_initializer_conf()
                   || job_desc().job_conf().has_default_initialize_with_snapshot_path()
@@ -57,13 +55,24 @@ Maybe<void> VariableOp::InferBlobDescs(
   out_blob_desc->mut_shape() = Shape(variable_conf.shape());
   out_blob_desc->set_data_type(variable_conf.has_data_type() ? variable_conf.data_type()
                                                              : job_desc().DefaultDataType());
-  const auto& opt_split_axis = JUST(GetSplitAxis(variable_conf));
-  if (opt_split_axis->has_value()) {
-    int32_t model_split_axis = opt_split_axis->value();
+  const SplitParallel opt_split_axis =
+      sbp_signature->bn_in_op2sbp_parallel().at("out").split_parallel();
+  if (opt_split_axis.has_axis()) {
+    int32_t model_split_axis = opt_split_axis.axis();
     int64_t split_dim_num = out_blob_desc->shape().At(model_split_axis);
     BalancedSplitter bs(split_dim_num, parallel_ctx->parallel_num());
     out_blob_desc->mut_shape().Set(model_split_axis, bs.At(parallel_ctx->parallel_id()).size());
   }
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> VariableOp::UpdateOpconf() {
+  const SbpSignature* sbp_sig_conf = JUST(sbp_signature());
+  OptInt64* split_axis = mut_op_conf()->mutable_variable_conf()->mutable_split_axis();
+  if (sbp_sig_conf->bn_in_op2sbp_parallel().at("out").has_split_parallel())
+    split_axis->set_value(sbp_sig_conf->bn_in_op2sbp_parallel().at("out").split_parallel().axis());
+  else
+    split_axis->clear_value();
   return Maybe<void>::Ok();
 }
 
@@ -73,26 +82,31 @@ Maybe<void> VariableOp::InferBatchAxis(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> VariableOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
-  const auto& opt_split_axis = JUST(GetSplitAxis(op_conf().variable_conf()));
-  SbpSignatureBuilder sbp_sig_builder;
-  if (opt_split_axis->has_value()) {
-    sbp_sig_builder.Split(output_bns(), opt_split_axis->value());
-  } else {
-    sbp_sig_builder.Broadcast(output_bns());
-  }
-  sbp_sig_builder.Broadcast(input_bns()).Build(sbp_sig_list->mutable_sbp_signature()->Add());
-  return Maybe<void>::Ok();
+Maybe<double> VariableOp::GetComputeComplexity(
+    SbpSignature* sbp_signature,
+    std::function<const BlobDesc&(const std::string& bn)> logical_blob_desc4bn,
+    const ParallelDesc& parallel_desc) const {
+  double CostRatio;
+  std::ifstream ifs("/root/work/codes/OneFlow-Benchmark/Classification/cnns/VarCostRatioFile.txt");
+  if (ifs.is_open()) {
+    ifs >> CostRatio;
+  } else
+    CostRatio = 1;
+  std::cout << "variable Cost Ratio: " << CostRatio << std::endl;
+  return CostRatio
+         * JUST(Operator::GetComputeComplexity(sbp_signature, logical_blob_desc4bn, parallel_desc));
 }
 
-Maybe<void> VariableOp::InferSbpSignature(
-    SbpSignature* sbp_signature, const SbpSignature& sbp_sig_conf,
-    const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
-    std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
-    const ParallelDesc& parallel_desc) const {
-  SbpSignatureList sbp_sig_list;
-  GetSbpSignatures(&sbp_sig_list);
-  *sbp_signature = sbp_sig_list.sbp_signature().Get(0);
+Maybe<void> VariableOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
+  // TODO: re-code this
+  // NOTE: It can build all split axis, and delete impossible case in `GetComputeComplexity`
+  // build all avaible sbp signature
+  for (int32_t i = 0; i < 5; i++) {
+    SbpSignatureBuilder sbp_sig_builder;
+    sbp_sig_builder.Split(output_bns(), i)
+        .Broadcast(input_bns())
+        .Build(sbp_sig_list->mutable_sbp_signature()->Add());
+  }
   return Maybe<void>::Ok();
 }
 

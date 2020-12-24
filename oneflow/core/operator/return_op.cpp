@@ -32,8 +32,6 @@ Maybe<void> ReturnOp::InferBlobDescs(
   return Maybe<void>::Ok();
 }
 
-const PbMessage& ReturnOp::GetCustomizedConf() const { return op_conf().return_conf(); }
-
 Maybe<void> ReturnOp::InferBatchAxis(
     std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {
   *BatchAxis4BnInOp("out") = *BatchAxis4BnInOp("in");
@@ -55,6 +53,21 @@ Maybe<void> ReturnOp::InferSbpSignature(
     (*bn2sbp)["in"] = in_sbp_infer_hint.sbp_parallel();
     (*bn2sbp)["out"] = in_sbp_infer_hint.sbp_parallel();
   }
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> ReturnOp::GetSbpSignatures(
+    const std::function<Maybe<const BlobDesc&>(const std::string&)>& LogicalBlobDesc4Ibn,
+    const ParallelDesc& parallel_desc, SbpSignatureList* sbp_sig_list) const {
+  const BlobDesc& blob = JUST(LogicalBlobDesc4Ibn("in"));
+  for (int32_t i = 0; i < blob.shape().NumAxes(); i++) {
+    SbpSignatureBuilder sbp_sig_builder;
+    sbp_sig_builder.Split(input_bns(), i)
+        .Split(output_bns(), i)
+        .Build(sbp_sig_list->mutable_sbp_signature()->Add());
+  }
+  // In a System-Pull-Return_* job. A blob named "tick" will replace the blob "in" and the
+  // SbpParallel will be set as "broadcast" for "tick" automatically.
   return Maybe<void>::Ok();
 }
 

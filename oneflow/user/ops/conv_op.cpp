@@ -119,6 +119,33 @@ Maybe<void> GetSbpSignatures4Conv(user_op::SbpContext* ctx) {
   return Maybe<void>::Ok();
 }
 
+/*
+Example for conv2d:
+
+ComputationCost
+= ((k*k + k*k-1)*c + c-1 + bias?1:0) * out_channel * out_width * out_height * batch_size
+= (2*k*k*c - 1 + bias?1:0) * out_channel * out_width * out_height * batch_size
+≈ 2*k*k*c * out_channel * out_width * out_height * batch_size
+*/
+Maybe<double> GetComputationCostFn(user_op::ComputeComplexityFnContext* ctx) {
+  const std::vector<int32_t> kernel_size = ctx->Attr<std::vector<int32_t>>("kernel_size");
+  const std::string data_format = ctx->Attr<std::string>("data_format");
+  const user_op::TensorDesc* in = ctx->TensorDesc4ArgNameAndIndex("in", 0);
+  const size_t c_dim = data_format == "channels_first" ? 1 : in->shape().NumAxes() - 1;
+  const int32_t c = in->shape().At(c_dim);
+  const user_op::TensorDesc* out = ctx->TensorDesc4ArgNameAndIndex("out", 0);
+  double cost =
+      std::accumulate(kernel_size.begin(), kernel_size.end(), 1.0, std::multiplies<double>());
+  cost = cost * 2 * c;
+  cost *= std::accumulate(out->shape().dim_vec().begin(), out->shape().dim_vec().end(), 1.0,
+                          std::multiplies<double>());
+
+  if (ctx->SbpParallel4ArgNameAndIndex("out", 0).has_split_parallel()) {
+    return cost / ctx->parallel_desc().parallel_num();
+  }
+  return cost;
+}
+
 template<size_t NDims>
 Maybe<void> CheckAttr(const user_op::UserOpDefWrapper& def,
                       const user_op::UserOpConfWrapper& conf) {
@@ -240,17 +267,18 @@ REGISTER_USER_OP("conv1d")
     .OptionalInput("bias")
     .OptionalInput("bias_multiplier")  // cudnn conv doesn't need this
     .Output("out")
-    .Attr("filters", UserOpAttrType::kAtInt32)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("kernel_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("dilation_rate", UserOpAttrType::kAtListInt32)
-    .Attr<int32_t>("groups", UserOpAttrType::kAtInt32, 1)
+    .Attr<int32_t>("filters")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("kernel_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<std::vector<int32_t>>("dilation_rate")
+    .Attr<int32_t>("groups", 1)
     .SetCheckAttrFn(CheckAttr<1>)
     .SetTensorDescInferFn(InferTensorDesc4Conv<1>)
     .SetBatchAxisInferFn(InferBatchAxis4Conv)
-    .SetGetSbpFn(GetSbpSignatures4Conv);
+    .SetGetSbpFn(GetSbpSignatures4Conv)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP("conv2d")
     .Input("in")
@@ -258,17 +286,18 @@ REGISTER_USER_OP("conv2d")
     .OptionalInput("bias")
     .OptionalInput("bias_multiplier")  // cudnn conv doesn't need this
     .Output("out")
-    .Attr("filters", UserOpAttrType::kAtInt32)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("kernel_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("dilation_rate", UserOpAttrType::kAtListInt32)
-    .Attr<int32_t>("groups", UserOpAttrType::kAtInt32, 1)
+    .Attr<int32_t>("filters")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("kernel_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<std::vector<int32_t>>("dilation_rate")
+    .Attr<int32_t>("groups", 1)
     .SetCheckAttrFn(CheckAttr<2>)
     .SetTensorDescInferFn(InferTensorDesc4Conv<2>)
     .SetBatchAxisInferFn(InferBatchAxis4Conv)
-    .SetGetSbpFn(GetSbpSignatures4Conv);
+    .SetGetSbpFn(GetSbpSignatures4Conv)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP("conv3d")
     .Input("in")
@@ -276,17 +305,18 @@ REGISTER_USER_OP("conv3d")
     .OptionalInput("bias")
     .OptionalInput("bias_multiplier")  // cudnn conv doesn't need this
     .Output("out")
-    .Attr("filters", UserOpAttrType::kAtInt32)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("kernel_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("dilation_rate", UserOpAttrType::kAtListInt32)
-    .Attr<int32_t>("groups", UserOpAttrType::kAtInt32, 1)
+    .Attr<int32_t>("filters")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("kernel_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<std::vector<int32_t>>("dilation_rate")
+    .Attr<int32_t>("groups", 1)
     .SetCheckAttrFn(CheckAttr<3>)
     .SetTensorDescInferFn(InferTensorDesc4Conv<3>)
     .SetBatchAxisInferFn(InferBatchAxis4Conv)
-    .SetGetSbpFn(GetSbpSignatures4Conv);
+    .SetGetSbpFn(GetSbpSignatures4Conv)
+    .SetComputeComplexityFn(GetComputationCostFn);
 
 REGISTER_USER_OP_GRAD("conv1d").SetGenBackwardOpConfFn(GenerateBackwardOpConf4Conv);
 REGISTER_USER_OP_GRAD("conv2d").SetGenBackwardOpConfFn(GenerateBackwardOpConf4Conv);
@@ -296,14 +326,15 @@ REGISTER_USER_OP("conv_data_grad")
     .Input("dy")
     .Input("filter")
     .Input("x_like")
+    .OptionalInput("_add_to_output")
     .Output("dx")
-    .Attr("num_spatial_dims", UserOpAttrType::kAtInt32)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("kernel_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("dilation_rate", UserOpAttrType::kAtListInt32)
-    .Attr("groups", UserOpAttrType::kAtInt32)
+    .Attr<int32_t>("num_spatial_dims")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("kernel_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<std::vector<int32_t>>("dilation_rate")
+    .Attr<int32_t>("groups")
     .SetCheckAttrFn(CheckAttr<0>)
     .SetInputArgModifyFn([](user_op::GetInputArgModifier GetInputArgModifierFn,
                             const user_op::UserOpConfWrapper&) {
@@ -320,7 +351,12 @@ REGISTER_USER_OP("conv_data_grad")
       CHECK_EQ_OR_RETURN(dy->shape().NumAxes(), num_spatial_dims + 2);
       CHECK_EQ_OR_RETURN(x_like->shape().NumAxes(), num_spatial_dims + 2);
       CHECK_EQ_OR_RETURN(x_like->data_type(), dy->data_type());
-
+      if (ctx->user_op_conf().has_input("_add_to_output", 0)) {
+        const user_op::TensorDesc* add_to_output =
+            ctx->TensorDesc4ArgNameAndIndex("_add_to_output", 0);
+        CHECK_EQ_OR_RETURN(add_to_output->data_type(), x_like->data_type());
+        CHECK_EQ_OR_RETURN(add_to_output->shape(), x_like->shape());
+      }
       user_op::TensorDesc* dx = ctx->TensorDesc4ArgNameAndIndex("dx", 0);
       *dx = *x_like;
       return Maybe<void>::Ok();
@@ -335,26 +371,41 @@ REGISTER_USER_OP("conv_data_grad")
       return Maybe<void>::Ok();
     })
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
-      ctx->NewBuilder()
-          .Split(user_op::OpArg("dy", 0), 0)
-          .Broadcast(user_op::OpArg("filter", 0))
-          .Split(user_op::OpArg("x_like", 0), 0)
-          .Split(user_op::OpArg("dx", 0), 0)
-          .Build();
+      std::vector<user_op::OpArg> split_args;
+      split_args.emplace_back("dy", 0);
+      split_args.emplace_back("x_like", 0);
+      split_args.emplace_back("dx", 0);
+      if (ctx->user_op_conf().has_input("_add_to_output", 0)) {
+        split_args.emplace_back("_add_to_output", 0);
+      }
+      ctx->NewBuilder().Split(split_args, 0).Broadcast(user_op::OpArg("filter", 0)).Build();
       return Maybe<void>::Ok();
+    })
+    .SetComputeComplexityFn([](user_op::ComputeComplexityFnContext* ctx) -> Maybe<double> {
+      const user_op::TensorDesc* filter = ctx->TensorDesc4ArgNameAndIndex("filter", 0);
+      const user_op::TensorDesc* dy = ctx->TensorDesc4ArgNameAndIndex("dy", 0);
+
+      double cost = std::accumulate(filter->shape().dim_vec().begin(),
+                                    filter->shape().dim_vec().end(), 2.0, std::multiplies<double>())
+                    * std::accumulate(dy->shape().dim_vec().begin(), dy->shape().dim_vec().end(),
+                                      1.0, std::multiplies<double>());
+      if (ctx->SbpParallel4ArgNameAndIndex("dy", 0).has_split_parallel()) {
+        return cost / ctx->parallel_desc().parallel_num();
+      }
+      return cost;
     });
 
 REGISTER_USER_OP("conv_filter_grad")
     .Input("dy")
     .Input("x")
     .Output("filter_diff")
-    .Attr("num_spatial_dims", UserOpAttrType::kAtInt32)
-    .Attr("padding_before", UserOpAttrType::kAtListInt32)
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("kernel_size", UserOpAttrType::kAtListInt32)
-    .Attr("strides", UserOpAttrType::kAtListInt32)
-    .Attr("dilation_rate", UserOpAttrType::kAtListInt32)
-    .Attr("groups", UserOpAttrType::kAtInt32)
+    .Attr<int32_t>("num_spatial_dims")
+    .Attr<std::vector<int32_t>>("padding_before")
+    .Attr<std::string>("data_format")
+    .Attr<std::vector<int32_t>>("kernel_size")
+    .Attr<std::vector<int32_t>>("strides")
+    .Attr<std::vector<int32_t>>("dilation_rate")
+    .Attr<int32_t>("groups")
     .SetCheckAttrFn(CheckAttr<0>)
     .SetTensorDescInferFn([](user_op::InferContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc* dy = ctx->TensorDesc4ArgNameAndIndex("dy", 0);
@@ -394,6 +445,7 @@ REGISTER_USER_OP("conv_filter_grad")
       user_op::TensorDesc* filter_diff = ctx->TensorDesc4ArgNameAndIndex("filter_diff", 0);
       *filter_diff->mut_shape() = Shape(filter_diff_dim_vec);
       *filter_diff->mut_data_type() = x->data_type();
+      filter_diff->set_is_dynamic(false);
 
       return Maybe<void>::Ok();
     })
@@ -412,13 +464,27 @@ REGISTER_USER_OP("conv_filter_grad")
           .PartialSum(user_op::OpArg("filter_diff", 0))
           .Build();
       return Maybe<void>::Ok();
+    })
+    .SetComputeComplexityFn([](user_op::ComputeComplexityFnContext* ctx) -> Maybe<double> {
+      const user_op::TensorDesc* filter_diff = ctx->TensorDesc4ArgNameAndIndex("filter_diff", 0);
+      const user_op::TensorDesc* dy = ctx->TensorDesc4ArgNameAndIndex("dy", 0);
+
+      double cost =
+          std::accumulate(filter_diff->shape().dim_vec().begin(),
+                          filter_diff->shape().dim_vec().end(), 2.0, std::multiplies<double>())
+          * std::accumulate(dy->shape().dim_vec().begin(), dy->shape().dim_vec().end(), 1.0,
+                            std::multiplies<double>());
+      if (ctx->SbpParallel4ArgNameAndIndex("dy", 0).has_split_parallel()) {
+        return cost / ctx->parallel_desc().parallel_num();
+      }
+      return cost;
     });
 
 REGISTER_USER_OP("conv_bias_grad")
     .Input("dy")
     .Output("bias_diff")
-    .Attr("data_format", UserOpAttrType::kAtString)
-    .Attr("num_spatial_dims", UserOpAttrType::kAtInt32)
+    .Attr<std::string>("data_format")
+    .Attr<int32_t>("num_spatial_dims")
     .SetCheckAttrFn([](const user_op::UserOpDefWrapper& def,
                        const user_op::UserOpConfWrapper& conf) -> Maybe<void> {
       std::string data_format = conf.attr<std::string>("data_format");
@@ -459,6 +525,22 @@ REGISTER_USER_OP("conv_bias_grad")
           .PartialSum(user_op::OpArg("bias_diff", 0))
           .Build();
       return Maybe<void>::Ok();
+    })
+    .SetComputeComplexityFn([](user_op::ComputeComplexityFnContext* ctx) -> Maybe<double> {
+      const user_op::TensorDesc* dy = ctx->TensorDesc4ArgNameAndIndex("dy", 0);
+      const std::string data_format = ctx->Attr<std::string>("data_format");
+      int32_t c;
+      if (data_format == "channels_first") {
+        c = dy->shape().At(1);
+      } else {
+        c = dy->shape().At(dy->shape().NumAxes() - 1);
+      }
+      double cost = std::accumulate(dy->shape().dim_vec().begin(), dy->shape().dim_vec().end(),
+                                    2.0 * c, std::multiplies<double>());
+      if (ctx->SbpParallel4ArgNameAndIndex("dy", 0).has_split_parallel()) {
+        return cost / ctx->parallel_desc().parallel_num();
+      }
+      return cost;
     });
 
 }  // namespace oneflow
