@@ -90,4 +90,13 @@ void BinarySet::AddEntrys(std::vector<int32_t> &in) {
   for (int32_t i = 0; i < in.size(); i++) { AddEntry(i); }
 }
 
+// If two binary sets are equal to each other
+bool BinarySet::operator==(const BinarySet& rhs)const {
+  if(SizeOfSet!=rhs.SizeOfSet) return false;
+  for(int32_t i=0; i<BinarySetValues.size(); i++){
+    if(BinarySetValues[i]!=rhs.BinarySetValues[i]) return false;
+  }
+  return true;
+}
+
 }  // namespace Algorithm

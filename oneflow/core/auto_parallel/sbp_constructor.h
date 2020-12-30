@@ -121,6 +121,8 @@ class SbpConstructor {
 
   // Time ratio for unit computation cost vs unit copy cost
   double CostRatio;
+  // Maps operator name to the successive proxy of sbp node
+  HashMap<std::string, Algorithm::SbpNode<SbpSignature>*> op_name2sbp_proxy;
 };
 
 }  // namespace oneflow

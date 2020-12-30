@@ -49,6 +49,21 @@ class BinarySet {
   void OutPut(std::vector<int32_t> &out);
   // Add elements of input into this subset
   void AddEntrys(std::vector<int32_t> &in);
+  // If two binary sets are equal to each other
+  bool operator==(const BinarySet& rhs)const;
+};
+
+struct BinarySetHasher{
+  std::size_t operator()(const BinarySet& bs)const{
+    using std::size_t;
+    using std::hash;
+
+    size_t h = 0;
+    for(int i=0; i<bs.BinarySetValues.size(); i++){
+      h ^= (hash<BinarySetEntryType>()(bs.BinarySetValues[i]) << i);
+    }
+    return h;
+  };
 };
 
 }  // namespace Algorithm

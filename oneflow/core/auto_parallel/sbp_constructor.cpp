@@ -226,6 +226,23 @@ double ComputCopyCostBetweenTwoSbpParallel(const SbpParallel& producer_sbp_paral
   return 2 * logical_blob_size * parallel_desc.parallel_num();
 }
 
+// Find sbp edge between two given sbp nodes
+SbpEdge<SbpSignature>* FindEdgeBetweenNodes(SbpNode<SbpSignature>* sbp_node_producer,
+                                            SbpNode<SbpSignature>* sbp_node_consumer) {
+  // Look through Edges for SbpEdge(sbp_node_producer->sbp_node_consumer)
+  // Might need to use HashMap for sbp_edge
+  if (sbp_node_producer->EdgesOut.size() > sbp_node_consumer->EdgesIn.size()) {
+    for (auto* sbp_edge : sbp_node_consumer->EdgesIn) {
+      if (sbp_edge->StartNode == sbp_node_producer) { return sbp_edge; }
+    }
+  } else {
+    for (auto* sbp_edge : sbp_node_producer->EdgesOut) {
+      if (sbp_edge->EndNode == sbp_node_consumer) { return sbp_edge; }
+    }
+  }
+  return NULL;
+}
+
 }  // namespace
 
 // Should customize a function to compute computation cost for each kind of op
@@ -299,24 +316,8 @@ void SbpConstructor::InitializeCopyCost(
               input_blob_modifier_.has_is_mutable() && input_blob_modifier_.is_mutable();
           // TODO: recode this
           // if (op_node->op().op_name().find("Return") != std::string::npos) is_same_sbp = true;
-          // Look through Edges for SbpEdge(sbp_node_producer->sbp_node_consumer)
-          // Might need to use HashMap for sbp_edge
-          SbpEdge<SbpSignature>* edge_found = NULL;
-          if (sbp_node_producer->EdgesOut.size() > sbp_node_consumer->EdgesIn.size()) {
-            for (auto* sbp_edge : sbp_node_consumer->EdgesIn) {
-              if (sbp_edge->StartNode == sbp_node_producer) {
-                edge_found = sbp_edge;
-                break;
-              }
-            }
-          } else {
-            for (auto* sbp_edge : sbp_node_producer->EdgesOut) {
-              if (sbp_edge->EndNode == sbp_node_consumer) {
-                edge_found = sbp_edge;
-                break;
-              }
-            }
-          }
+          SbpEdge<SbpSignature>* edge_found =
+              FindEdgeBetweenNodes(sbp_node_producer, sbp_node_consumer);
           // should use assert or CHECK process here, skip for speeding up for now
           // TODO: print to error log
           if (edge_found == NULL) std::cout << "SbpEdge not found!" << std::endl;
@@ -688,6 +689,7 @@ Maybe<void> SbpConstructor::InferSbpSignature(
   }
 
   // TODO: delete this
+  /*
   if (op_.op_name().find("Return") != std::string::npos) {
     std::cout << "op filter: " << op_.op_name() << std::endl;
     std::cout << sbp_sig_conf.DebugString() << std::endl;
@@ -695,6 +697,7 @@ Maybe<void> SbpConstructor::InferSbpSignature(
     std::cout << sbp_sig_list.DebugString() << std::endl;
     std::cout << "================\n";
   }
+  */
 
   // filter out those sbp signatures who contain sbp signature configure from sbp signature list
   SbpSignatureList filtered_sbp_sigs_by_conf;
