@@ -72,7 +72,8 @@ class SbpCollector {
   vector<BinarySet> ProxySbpCandidate(
       const OpGraph& op_graph,
       HashMap<std::string, Algorithm::SbpNode<SbpSignature>*>& op_name2sbp_node,
-      HashMap<std::string, Algorithm::SbpNode<SbpSignature>*> op_name2sbp_proxy,
+      HashMap<std::string, HashMap<LogicalBlobId, Algorithm::SbpNode<SbpSignature>*>>&
+          op_name2lbi2sbp_proxy,
       SbpGraph<SbpSignature>& sbp_graph) {
     // mapping from a logical blob id to a group of consumers and corresponding input blob names.
     // mapping from consumers and input blob names to an unordered_set of SBP Parallel.
@@ -115,13 +116,15 @@ class SbpCollector {
       // store all the binary sets of SBP Parallel into an unordered_set.
       std::unordered_set<BinarySet, BinarySetHasher> ParallelCandidates;
       DFS_SBPset(it_begin, consumer_bn2sbp_set, op_name2sbp_node, ParallelCandidates);
+      SbpNode<SbpSignature> *sbp_proxy = sbp_graph.GenerateNode()
+      op_name2lbi2sbp_proxy[producer.op().op_name()][lbi] = sbp_proxy;
+      
       // Todo: coding
-      op_name2sbp_proxy[producer.op().op_name()] = sbp_graph.GenerateNode();
     }
   }
 
  private:
-  // Depth first search
+  // Depth first search to collect Sbp Parallel information for different lbis
   void DFS_SBPset(
       HashMap<std::pair<const OpNode*, std::string>, std::unordered_set<int32_t>>::iterator it,
       HashMap<std::pair<const OpNode*, std::string>, std::unordered_set<int32_t>>&

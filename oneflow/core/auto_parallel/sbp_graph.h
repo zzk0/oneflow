@@ -95,6 +95,12 @@ class SbpGraph {
   // Set Threshold for SbpNode Merging
   void SetThreshold(int32_t thrhld) { Threshold = thrhld; }
 
+  // Clip an edge, remove it from graph
+  // Clipping an edge will also delete the nodes and edges contained in this edge. Though not
+  // sufferring from any compiling and runtime bugs, clipping an edge on a shrunk graph is not
+  // recommanded. We should carefully think about it before any clipping.
+  void ClipEdge(SbpEdge<SbpSignature> *this_edge);
+
 #ifdef PRINT_GRAPH_
   void PrintGraph();
   void PrintSbpSigs();
@@ -455,6 +461,14 @@ int32_t SbpGraph<SbpSignature>::PickAndMerge() {
     return NodeMerging(NodeList[MinNodePair[0]], NodeList[MinNodePair[1]]);
   else
     return 0;
+}
+
+// Clip an edge, remove it from graph
+template<class SbpSignature>
+void SbpGraph<SbpSignature>::ClipEdge(SbpEdge<SbpSignature> *this_edge) {
+  CheckAndRemoveFrom<SbpEdge<SbpSignature> *>(this_edge->EndNode->EdgesIn, this_edge);
+  CheckAndRemoveFrom<SbpEdge<SbpSignature> *>(this_edge->StartNode->EdgesOut, this_edge);
+  delete this_edge;
 }
 
 #ifdef RANDOM_GENERATOR_

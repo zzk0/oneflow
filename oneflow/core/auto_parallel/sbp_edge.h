@@ -20,6 +20,12 @@ limitations under the License.
 #include "sbp_node.h"
 #include <assert.h>
 
+#ifdef SBP_CONSTRUCTOR_
+#include <unordered_set>
+#include "oneflow/core/job/sbp_parallel.pb.h"
+#include "oneflow/core/graph/op_graph.h"
+#endif  // SBP_CONSTRUCTOR_
+
 namespace Algorithm {
 
 template<class SbpSignature>
@@ -82,6 +88,19 @@ class SbpEdge {
     if (MidNode) { delete MidNode; }
     for (auto &this_edge : EdgeList) { delete this_edge; }
   }
+
+#ifdef SBP_CONSTRUCTOR_
+  // a set of ids of logical blobs carried/transferred on this sbp edge
+  std::unordered_set<LogicalBlobId> CarryLbis;
+
+  // load a logical blob
+  void LoadLbi(LogicalBlobId lbi) { CarryLbis.insert(lbi); }
+
+  // unload a logical blob
+  void UnloadLbi(LogicalBlobId lbi) {
+    if (CarryLbis.erase(lbi) == 0) std::cout << "Unload an empty lbi!" << std::endl;
+  }
+#endif  // SBP_CONSTRUCTOR_
 };
 }  // namespace Algorithm
 // function in cpp. Should be put in one file due to use of template

@@ -96,6 +96,11 @@ class SbpConstructor {
                           HashMap<std::string, Algorithm::SbpNode<SbpSignature>*>& op_name2sbp_node,
                           HashMap<std::string, bool>& op_name2is_fixed);
 
+  // Load logical blob ids onto sbp edges
+  void LoadLbi2SbpEdge(OpGraph& op_graph,
+                       HashMap<std::string, Algorithm::SbpNode<SbpSignature>*>& op_name2sbp_node,
+                       HashMap<std::string, bool>& op_name2is_fixed);
+
   // Compute computation cost for all sbp nodes
   void InitializeComputationCost(
       OpGraph& op_graph, HashMap<std::string, Algorithm::SbpNode<SbpSignature>*>& op_name2sbp_node,

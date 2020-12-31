@@ -293,35 +293,42 @@ void SbpConstructor::InitializeCopyCost(
       if (op_name2is_fixed[producer->op().op_name()]) continue;
       // producer sbp node
       const auto* sbp_node_producer = op_name2sbp_node[producer->op().op_name()];
+      // TODO: recode this
+      // if (op_node->op().op_name().find("Return") != std::string::npos) is_same_sbp = true;
+      SbpEdge<SbpSignature>* edge_found =
+          FindEdgeBetweenNodes(sbp_node_producer, sbp_node_consumer);
+      // should use assert or CHECK process here, skip for speeding up for now
+      // TODO: print to error log
+      // TODO: move copy cost to proxy
+      if (edge_found == NULL)
+        std::cout << "SbpEdge not found while computing copy cost!" << std::endl;
+
+      // Add copy cost for each blob
+      const LogicalBlobId& lbi = op_node->op().BnInOp2Lbi(ibn);
+      // Need to be careful, the logical blob description should be independent to current
+      // SbpParallel. Use producer or op_node?
+      const BlobDesc& logical_blob_desc = producer->LogicalBlobDesc4Lbi(lbi);
+      const std::string& obn = *CHECK_JUST(producer->op().obn4lbi(lbi));
+      const auto input_blob_modifier_ = op_node->op().InputBlobModifier4Ibn(ibn);
+      bool is_same_sbp = input_blob_modifier_.has_is_mutable() && input_blob_modifier_.is_mutable();
       int32_t consumer_sbp_size = sbp_node_consumer->SbpSignatureList.size();
+
       // look through sbp signature in producer
       for (int32_t sbp_id_producer = 0;
            sbp_id_producer < sbp_node_producer->SbpSignatureList.size(); sbp_id_producer++) {
+        // get sbp parallel for a logical blob in producer
         const auto producer_sbp_bn_in_op2sbp_parallel =
             sbp_node_producer->SbpSignatureList[sbp_id_producer]->bn_in_op2sbp_parallel();
+        const SbpParallel& sbp_producer = producer_sbp_bn_in_op2sbp_parallel.at(obn);
+
         // look through sbp signature in consumer
         for (int32_t sbp_id_consumer = 0; sbp_id_consumer < consumer_sbp_size; sbp_id_consumer++) {
+          // get sbp parallel for a logical blob in consumer
           const auto consumer_sbp_bn_in_op2sbp_parallel =
               sbp_node_consumer->SbpSignatureList[sbp_id_consumer]->bn_in_op2sbp_parallel();
-          // Add copy cost for each blob
-          const LogicalBlobId& lbi = op_node->op().BnInOp2Lbi(ibn);
-          // Need to be careful, the logical blob description should be independent to current
-          // SbpParallel. Use producer or op_node?
-          const BlobDesc& logical_blob_desc = producer->LogicalBlobDesc4Lbi(lbi);
-          const std::string& obn = *CHECK_JUST(producer->op().obn4lbi(lbi));
-          const SbpParallel& sbp_producer = producer_sbp_bn_in_op2sbp_parallel.at(obn);
           const SbpParallel& sbp_consumer = consumer_sbp_bn_in_op2sbp_parallel.at(ibn);
-          const auto input_blob_modifier_ = op_node->op().InputBlobModifier4Ibn(ibn);
-          bool is_same_sbp =
-              input_blob_modifier_.has_is_mutable() && input_blob_modifier_.is_mutable();
-          // TODO: recode this
-          // if (op_node->op().op_name().find("Return") != std::string::npos) is_same_sbp = true;
-          SbpEdge<SbpSignature>* edge_found =
-              FindEdgeBetweenNodes(sbp_node_producer, sbp_node_consumer);
-          // should use assert or CHECK process here, skip for speeding up for now
-          // TODO: print to error log
-          if (edge_found == NULL) std::cout << "SbpEdge not found!" << std::endl;
 
+          // compute copy cost for a specific logical blob
           edge_found->Cost[sbp_id_producer][sbp_id_consumer] += ComputCopyCostBetweenTwoSbpParallel(
               sbp_producer, sbp_consumer, logical_blob_desc, parallel_desc, is_same_sbp);
 
@@ -333,6 +340,42 @@ void SbpConstructor::InitializeCopyCost(
 #endif
         }
       }
+    }
+  });
+}
+
+// Load logical blob ids onto sbp edges
+void SbpConstructor::LoadLbi2SbpEdge(
+    OpGraph& op_graph, HashMap<std::string, Algorithm::SbpNode<SbpSignature>*>& op_name2sbp_node,
+    HashMap<std::string, bool>& op_name2is_fixed) {
+  // Load logical blobs onto sbp edges
+  op_graph.ForEachNode([&](OpNode* op_node) {
+    // skip it if fixed
+    if (op_name2is_fixed[op_node->op().op_name()]) return;
+    // get corresponding sbp node consumer
+    Algorithm::SbpNode<SbpSignature>* sbp_node_consumer = op_name2sbp_node[op_node->op().op_name()];
+
+    // Loading logical blobs between two nodes
+    // look through input blobs
+    for (const std::string& ibn : op_node->op().input_bns()) {
+      // Each input blob has one source op node.
+      OpNode* producer = op_node->MutSrcNode4Ibn(ibn);
+      // Skip this node because it is not in SbpGraph. However, our final goal is adding every node
+      // into SbpGraph.
+      if (op_name2is_fixed[producer->op().op_name()]) continue;
+      // producer sbp node
+      const auto* sbp_node_producer = op_name2sbp_node[producer->op().op_name()];
+      // TODO: recode this
+      SbpEdge<SbpSignature>* edge_found =
+          FindEdgeBetweenNodes(sbp_node_producer, sbp_node_consumer);
+      // should use assert or CHECK process here, skip for speeding up for now
+      // TODO: print to error log
+      // TODO: move copy cost to proxy
+      CHECK(edge_found == NULL) << "SbpEdge not found while loading!" << std::endl;
+
+      // Add copy cost for each blob
+      const LogicalBlobId& lbi = op_node->op().BnInOp2Lbi(ibn);
+      edge_found->LoadLbi(lbi);
     }
   });
 }
