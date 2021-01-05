@@ -21,6 +21,14 @@ limitations under the License.
 #include <iostream>
 #include <vector>
 
+#ifdef SBP_COLLECTOR_
+#include "binary_set.h"
+#endif  // SBP_COLLECTOR_
+
+#ifdef SBP_CONSTRUCTOR_
+#include "oneflow/core/graph/op_graph.h"
+#endif  // SBP_CONSTRUCTOR_
+
 namespace Algorithm {
 
 template<class SbpSignature>
@@ -71,6 +79,14 @@ class SbpNode {
 
   // Cost[sbp] is Computation Cost when using SbpSignatureList[sbp]
   std::vector<double> Cost;
+
+#ifdef SBP_COLLECTOR_
+  std::vector<BinarySet> ParallelCandidates;
+#endif  // SBP_COLLECTOR_
+
+#ifdef SBP_CONSTRUCTOR_
+  OpNode *op_node;
+#endif  // SBP_CONSTRUCTOR_
 
 #ifdef DEBUG_ALGORITHM_
 

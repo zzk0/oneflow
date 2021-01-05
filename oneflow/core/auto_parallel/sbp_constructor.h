@@ -33,7 +33,7 @@ class SbpConstructor {
     if (ifs.is_open()) {
       ifs >> CostRatio;
     } else {
-      CostRatio = 1e-8;
+      CostRatio = 0.1;
       std::cout << "CostRatioFile.txt does not exist." << std::endl;
     }
     ifs.close();

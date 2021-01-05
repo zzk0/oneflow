@@ -162,7 +162,10 @@ void SbpConstructor::InitializeSbpGraph(
     // if this op node is mirrored, skip it.
     // generate sbp node in cost model and link it with corresponding op node
     if (!op_name2is_fixed[op_node->op().op_name()]) {
-      op_name2sbp_node[op_node->op().op_name()] = sbp_graph.GenerateNode();
+      Algorithm::SbpNode<SbpSignature>* sbp_node = sbp_graph.GenerateNode();
+      // mapping from sbp_node to op_node
+      sbp_node->op_node = op_node;
+      op_name2sbp_node[op_node->op().op_name()] = sbp_node;
     }
   });
   // Initialize sbp edges
@@ -297,14 +300,16 @@ void SbpConstructor::InitializeCopyCost(
       // if (op_node->op().op_name().find("Return") != std::string::npos) is_same_sbp = true;
       SbpEdge<SbpSignature>* edge_found =
           FindEdgeBetweenNodes(sbp_node_producer, sbp_node_consumer);
-      // should use assert or CHECK process here, skip for speeding up for now
-      // TODO: print to error log
-      // TODO: move copy cost to proxy
-      if (edge_found == NULL)
+      // Edge is clipped. Skip it.
+      if (edge_found == NULL){
         std::cout << "SbpEdge not found while computing copy cost!" << std::endl;
+        continue;
+      }
 
       // Add copy cost for each blob
       const LogicalBlobId& lbi = op_node->op().BnInOp2Lbi(ibn);
+      // Check whether lbi is transferred by this edge
+      if(!edge_found->SearchLbi(lbi)) continue;
       // Need to be careful, the logical blob description should be independent to current
       // SbpParallel. Use producer or op_node?
       const BlobDesc& logical_blob_desc = producer->LogicalBlobDesc4Lbi(lbi);

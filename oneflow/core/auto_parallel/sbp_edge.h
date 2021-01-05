@@ -96,10 +96,16 @@ class SbpEdge {
   // load a logical blob
   void LoadLbi(LogicalBlobId lbi) { CarryLbis.insert(lbi); }
 
+  // check existancy of a logical blob
+  bool SearchLbi(LogicalBlobId lbi) const { return CarryLbis.find(lbi) != CarryLbis.end(); }
+
   // unload a logical blob
   void UnloadLbi(LogicalBlobId lbi) {
     if (CarryLbis.erase(lbi) == 0) std::cout << "Unload an empty lbi!" << std::endl;
   }
+
+  // Not carrying any blob
+  bool EmptyLbi() const { return CarryLbis.empty(); }
 #endif  // SBP_CONSTRUCTOR_
 };
 }  // namespace Algorithm
