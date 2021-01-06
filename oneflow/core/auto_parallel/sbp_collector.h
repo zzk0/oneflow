@@ -20,6 +20,7 @@ limitations under the License.
 #include <vector>
 #include <unordered_set>
 #include <utility>
+#include <type_traits>
 #include "sbp_constructor.h"
 #define DEBUG_COLLECTOR_
 using namespace Algorithm;
@@ -88,7 +89,7 @@ class SbpCollector {
     SbpEdge<SbpSignature>* sbp_edge = sbp_proxy->EdgesIn[0];
     SbpNode<SbpSignature>* sbp_node_producer = sbp_edge->StartNode;
     sbp_edge->Cost.resize(sbp_node_producer->SbpSignatureList.size());
-    int32_t consumer_sbp_size = sbp_proxy->Cost.size();
+    int32_t consumer_sbp_size = sbp_proxy->ParallelCandidates.size();
     // look through sbp signature in producer
     for (int32_t sbp_id_producer = 0; sbp_id_producer < sbp_node_producer->SbpSignatureList.size();
          sbp_id_producer++) {
@@ -128,6 +129,55 @@ class SbpCollector {
           // compute copy cost for a specific logical blob
           sbp_edge->Cost[sbp_id_producer][sbp_id_consumer] += ComputCopyCostBetweenTwoSbpParallel(
               sbp_producer, sbp_consumer, logical_blob_desc, parallel_desc, false);
+        }
+      }
+    }
+  }
+
+  // Initialize copy cost from proxy of producer to consumers
+  void InitializeCopyCostFromProxy2Consumer(
+      SbpNode<SbpSignature>* sbp_proxy,
+      HashMap<std::pair<std::string, std::string>, std::unordered_set<int32_t>>&
+          consumer_bn2sbp_set,
+      HashMap<std::string, Algorithm::SbpNode<SbpSignature>*>& op_name2sbp_node) {
+    // Connect sbp proxy and consumers
+    for (const auto& consumer_bn_group : consumer_bn2sbp_set) {
+      // consumer in cost model
+      Algorithm::SbpNode<SbpSignature>* sbp_node_consumer =
+          op_name2sbp_node[consumer_bn_group.first.first];
+      // input blob name of logical blob in consumer
+      const std::string& ibn = consumer_bn_group.first.second;
+
+      // check is_mutable in consumer
+      OpNode* consumer = sbp_node_consumer->op_node;
+      const auto input_blob_modifier_ = consumer->op().InputBlobModifier4Ibn(ibn);
+      bool is_same_sbp = input_blob_modifier_.has_is_mutable() && input_blob_modifier_.is_mutable();
+      CHECK(!is_same_sbp) << " Create a proxy for an unmutable consumer!\n";
+
+      // Connect sbp proxy and consumer
+      sbp_proxy->PointTo(sbp_node_consumer);
+      // the sbp edge connecting proxy and consumer
+      SbpEdge<SbpSignature>* sbp_edge = FindEdgeBetweenNodes(sbp_proxy, sbp_node_consumer);
+      sbp_edge->Cost.resize(sbp_proxy->ParallelCandidates.size());
+      int32_t consumer_sbp_size = sbp_node_consumer->SbpSignatureList.size();
+
+      // look through sbp parallel set in proxy
+      for (int32_t sbp_id_producer = 0; sbp_id_producer < sbp_proxy->ParallelCandidates.size();
+           sbp_id_producer++) {
+        // initialization for copy cost
+        sbp_edge->Cost[sbp_id_producer].resize(consumer_sbp_size, 0);
+        // get sbp parallel set for a logical blob in proxy
+        Algorithm::BinarySet& parallel_candidate = sbp_proxy->ParallelCandidates[sbp_id_producer];
+
+        // look through sbp signatures in consumers
+        for (int32_t sbp_id_consumer = 0; sbp_id_consumer < consumer_sbp_size; sbp_id_consumer++) {
+          // get sbp parallel for a logical blob in consumer
+          const auto consumer_sbp_bn_in_op2sbp_parallel =
+              sbp_node_consumer->SbpSignatureList[sbp_id_consumer]->bn_in_op2sbp_parallel();
+          const SbpParallel& sbp_consumer = consumer_sbp_bn_in_op2sbp_parallel.at(ibn);
+
+          if (!parallel_candidate.CheckExistency(SbpParallelUniverse[sbp_consumer]))
+            sbp_edge->Cost[sbp_id_producer][sbp_id_consumer] = GetMaxVal<float>();
         }
       }
     }
@@ -179,9 +229,6 @@ class SbpCollector {
     one_broadcast.AddEntry(0);
     OneBroadcast.insert(std::move(one_broadcast));
 
-    // A buffer to store the sbp parallel id
-    // std::vector<int32_t> sbp_parallel_ids;
-
     // Decide if we should insert a proxy for each logical blob
     for (const auto& lbi7groups : producer_lbi2consumer_bn2sbp_set) {
       // Only insert proxy for those blobs with multiple downstream consumers.
@@ -194,8 +241,6 @@ class SbpCollector {
           consumer_bn2sbp_set = lbi7groups.second;
       HashMap<std::pair<std::string, std::string>, std::unordered_set<int32_t>>::iterator it_begin =
           consumer_bn2sbp_set.begin();
-      // some problem here. How do we find producer?
-      // const OpNode& producer = it_begin->first.first->ProducerOpNode4Lbi(lbi);
       // store all the binary sets of SBP Parallel into an unordered_set.
       std::unordered_set<BinarySet, BinarySetHasher> ParallelCandidates(
           ParallelCandidatesInitializer);
@@ -207,18 +252,11 @@ class SbpCollector {
       // Transfer a logical blob from producer to a sbp proxy of this blob
       sbp_node_producer->PointTo(sbp_proxy);
 
+      // Compute copy cost between producer and proxy
       InitializeCopyCostFromNode2Proxy(sbp_proxy);
 
-      // Should also build connection between proxy and consumers
-      // TODO
-
-      // TODO
-      // check is_mutable in consumer
-      // OpNode* consumer = sbp_node_consumer->op_node;
-      // const auto input_blob_modifier_ = consumer->op().InputBlobModifier4Ibn(ibn);
-      // bool is_same_sbp = input_blob_modifier_.has_is_mutable() &&
-      // input_blob_modifier_.is_mutable(); CHECK(!is_same_sbp) << " Create a proxy for an unmutable
-      // consumer!\n";
+      // Build connection and compute copy cost between proxy and consumers
+      InitializeCopyCostFromProxy2Consumer(sbp_proxy, consumer_bn2sbp_set, op_name2sbp_node);
 
       // Unloading and maybe clipping
       for (const auto& consumer_bn_group : consumer_bn2sbp_set) {
