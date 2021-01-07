@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-#include "oneflow/core/job/collective_boxing_executor.h"
+#include "oneflow/core/job/collective_boxing/executor.h"
 #include "oneflow/core/device/nccl_util.h"
 #include "oneflow/core/graph/boxing/collective_boxing_util.h"
 #include "oneflow/core/job/resource_desc.h"
@@ -25,6 +25,8 @@ limitations under the License.
 #include "oneflow/core/thread/thread_pool.h"
 #ifdef WITH_CUDA
 #include <nccl.h>
+
+#include <utility>
 #endif
 
 namespace oneflow {
@@ -657,7 +659,111 @@ bool CollectiveBoxingExecutor::GroupState::IsReady() const {
   return ready_request_ids.size() == request_ids.size();
 }
 
-}  // namespace collective
+/*
+class RequestStore {
+
+  bool PushRuntimeRequest(int32_t request_id, int32_t local_rank, RuntimeRequestInfo request_info);
+  const RuntimeRequestInfo& GetRuntimeRequest(int32_t request_id, int32_t local_rank) const;
+  void ResetRuntimeRequest(int32_t request_id);
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+};*/
+
+struct RequestStore::Impl {
+  struct RequestInfo {
+    RequestInfo(int64_t job_id, const RequestDesc& desc) : job_id(job_id), desc(desc) {
+      std::set<int64_t> node_ids;
+      for (const DeviceDesc& device : desc.device_set().device()) {
+        if (IsDeviceOnThisMachine(device)) { local_device_vec.push_back(device); }
+        node_ids.emplace(device.machine_id());
+      }
+      local_rank_count = local_device_vec.size();
+      node_count = node_ids.size();
+      runtime_request_info_vec.resize(local_rank_count);
+      runtime_request_info_count = 0;
+    }
+
+    int64_t job_id;
+    RequestDesc desc;
+    int32_t local_rank_count;
+    int32_t node_count;
+    std::vector<std::shared_ptr<const RuntimeRequestInfo>> runtime_request_info_vec;
+    int32_t runtime_request_info_count;
+    std::vector<DeviceDesc> local_device_vec;
+    std::mutex mutex_;
+  };
+
+  std::vector<RequestInfo> request_info_vec;
+  int32_t max_multi_node_request_id = 0;
+  std::vector<std::mutex> mutex_vec;
+};
+
+RequestStore::RequestStore(const CollectiveBoxingPlan& collective_boxing_plan) {
+  impl_.reset(new Impl());
+  for (const auto& job_id7request_set : collective_boxing_plan.job_id2request_set()) {
+    const int64_t job_id = job_id7request_set.first;
+    const RequestSet& request_set = job_id7request_set.second;
+    for (const RequestDesc& desc : request_set.request()) {
+      impl_->request_info_vec.emplace_back(job_id, desc);
+    }
+  }
+  std::sort(impl_->request_info_vec.begin(), impl_->request_info_vec.end(),
+            [](const Impl::RequestInfo& a, const Impl::RequestInfo& b) {
+              return a.node_count > b.node_count;
+            });
+  impl_->mutex_vec.resize(impl_->request_info_vec.size());
+  impl_->max_multi_node_request_id = std::count_if(
+      impl_->request_info_vec.cbegin(), impl_->request_info_vec.cend(),
+      [](const Impl::RequestInfo& a, const Impl::RequestInfo& b) { return a.node_count > 1; });
+}
+
+int32_t RequestStore::RequestCount() const { return impl_->request_info_vec.size(); }
+
+int32_t RequestStore::MaxMultiNodeRequestId() const { return impl_->max_multi_node_request_id; }
+
+const RequestDesc& RequestStore::GetRequestDesc(int32_t request_id) const {
+  return impl_->request_info_vec.at(request_id).desc;
+}
+
+int32_t RequestStore::GetLocalRankCount(int32_t request_id) const {
+  return impl_->request_info_vec.at(request_id).local_rank_count;
+}
+
+bool RequestStore::SetRuntimeRequest(
+    int32_t request_id, int32_t local_rank,
+    std::shared_ptr<const RuntimeRequestInfo> runtime_request_info) {
+  auto& mutex = impl_->mutex_vec.at(request_id);
+  auto& request_info = impl_->request_info_vec.at(request_id);
+  CHECK_LT(local_rank, request_info.local_rank_count);
+  std::lock_guard<std::mutex> lock(mutex);
+  CHECK(!request_info.runtime_request_info_vec.at(local_rank));
+  request_info.runtime_request_info_vec.at(local_rank) = std::move(runtime_request_info);
+  request_info.runtime_request_info_count += 1;
+  return request_info.runtime_request_info_count == request_info.local_rank_count;
+}
+
+const std::shared_ptr<const RuntimeRequestInfo>& RequestStore::GetRuntimeRequest(
+    int32_t request_id, int32_t local_rank) const {
+  auto& mutex = impl_->mutex_vec.at(request_id);
+  auto& request_info = impl_->request_info_vec.at(request_id);
+  CHECK_LT(local_rank, request_info.local_rank_count);
+  std::lock_guard<std::mutex> lock(mutex);
+  return request_info.runtime_request_info_vec.at(local_rank);
+}
+
+void RequestStore::ResetRuntimeRequest(int32_t request_id) {
+  auto& mutex = impl_->mutex_vec.at(request_id);
+  auto& request_info = impl_->request_info_vec.at(request_id);
+  std::lock_guard<std::mutex> lock(mutex);
+  for (auto& runtime_request_info : request_info.runtime_request_info_vec) {
+    runtime_request_info.reset();
+  }
+  request_info.runtime_request_info_count = 0;
+}
+
+};  // namespace collective
 
 }  // namespace boxing
 

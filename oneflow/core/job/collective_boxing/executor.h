@@ -33,6 +33,27 @@ struct RuntimeRequestInfo {
   std::shared_ptr<const std::function<void(const Maybe<void>&)>> callback;
 };
 
+class RequestStore {
+  OF_DISALLOW_COPY_AND_MOVE(RequestStore);
+  explicit RequestStore(const CollectiveBoxingPlan& collective_boxing_plan);
+  ~RequestStore() = default;
+
+  int32_t RequestCount() const;
+  int32_t MaxMultiNodeRequestId() const;
+  const RequestDesc& GetRequestDesc(int32_t request_id) const;
+  int32_t GetLocalRankCount(int32_t request_id) const;
+
+  bool SetRuntimeRequest(int32_t request_id, int32_t local_rank,
+                         std::shared_ptr<const RuntimeRequestInfo> runtime_request_info);
+  const std::shared_ptr<const RuntimeRequestInfo>& GetRuntimeRequest(int32_t request_id,
+                                                                     int32_t local_rank) const;
+  void ResetRuntimeRequest(int32_t request_id);
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+};
+
 class CollectiveBoxingExecutorBackend {
  public:
   OF_DISALLOW_COPY_AND_MOVE(CollectiveBoxingExecutorBackend);
