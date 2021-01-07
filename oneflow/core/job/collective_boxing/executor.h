@@ -44,6 +44,9 @@ class RequestStore {
   const RequestDesc& GetRequestDesc(int32_t request_id) const;
   int32_t GetLocalRankCount(int32_t request_id) const;
   int32_t GetRequestIdByName(const std::string& name) const;
+  int64_t GetJobId(int32_t request_id) const;
+  int64_t GetGlobalRank(int32_t request_id, int32_t local_rank) const;
+  bool HasRankOnThisNode(int32_t request_id) const;
 
   bool SetRuntimeRequest(int32_t request_id, int32_t local_rank,
                          std::shared_ptr<const RuntimeRequestInfo> runtime_request_info);
@@ -64,10 +67,9 @@ class CollectiveBoxingExecutorBackend {
 
   virtual void Init(const CollectiveBoxingPlan& collective_boxing_plan,
                     std::shared_ptr<RequestStore> request_store){};
-  virtual void GroupRequests(const std::vector<const RequestDesc*>& requests,
-                             std::vector<std::vector<const RequestDesc*>>* groups);
-  virtual void ExecuteGroup(const std::vector<const RequestDesc*>& group,
-                            const std::vector<std::map<int64_t, RuntimeRequestInfo>>& ranks) = 0;
+  virtual void GroupRequests(const std::vector<int32_t>& request_ids,
+                             std::vector<std::vector<int32_t>>* groups);
+  virtual void ExecuteGroup(const std::vector<int32_t>& request_ids) = 0;
 };
 
 class CollectiveBoxingExecutor final {
@@ -103,18 +105,13 @@ class CollectiveBoxingExecutor final {
   };
 
   struct GroupState {
-    GroupState(CollectiveBoxingExecutorBackend* p_backend, std::set<int64_t> p_request_ids,
-               std::vector<const RequestDesc*> p_requests)
-        : backend(p_backend),
-          request_ids(std::move(p_request_ids)),
-          requests(std::move(p_requests)),
-          ready_request_ids() {}
+    GroupState(CollectiveBoxingExecutorBackend* backend, std::set<int32_t> request_ids)
+        : backend(backend), request_ids(std::move(request_ids)), ready_request_ids() {}
     CollectiveBoxingExecutorBackend* const backend;
-    const std::set<int64_t> request_ids;
-    const std::vector<const RequestDesc*> requests;
-    std::set<int64_t> ready_request_ids;
+    const std::set<int32_t> request_ids;
+    std::set<int32_t> ready_request_ids;
 
-    void AddReadyRequest(int64_t request_id);
+    void AddReadyRequest(int32_t request_id);
     bool IsReady() const;
   };
 

@@ -52,6 +52,12 @@ void SortRequestsByOrder(std::vector<const RequestDesc*>* requests) {
             [](const RequestDesc* a, const RequestDesc* b) { return a->order() < b->order(); });
 }
 
+void SortRequestIdsByOrder(const RequestStore* request_store, std::vector<int32_t>* requests) {
+  std::sort(requests->begin(), requests->end(), [request_store](int32_t a, int32_t b) {
+    return request_store->GetRequestDesc(a).order() < request_store->GetRequestDesc(b).order();
+  });
+}
+
 bool IsDeviceOnThisMachine(const DeviceDesc& device_desc) {
   return device_desc.machine_id() == Global<MachineCtx>::Get()->this_machine_id();
 }
@@ -66,12 +72,12 @@ std::string GetNcclUniqueIdRpcKey(const std::string& name, int64_t stream_id) {
   return "CollectiveBoxingExecutorNcclUniqueIdRpcKey-" + name + "-" + std::to_string(stream_id);
 }
 
-int64_t GetRequestSize(const RequestDesc* request) {
-  return Shape(request->op_desc().shape()).elem_cnt()
-         * GetSizeOfDataType(request->op_desc().data_type());
+int64_t GetRequestSize(const RequestDesc& request) {
+  return Shape(request.op_desc().shape()).elem_cnt()
+         * GetSizeOfDataType(request.op_desc().data_type());
 }
 
-int64_t GetAlignedRequestSize(const RequestDesc* request) {
+int64_t GetAlignedRequestSize(const RequestDesc& request) {
   return GetCudaAlignedSize(GetRequestSize(request));
 }
 
@@ -79,11 +85,10 @@ int64_t GetAlignedRequestSize(const RequestDesc* request) {
 
 #ifdef WITH_CUDA
 
-void CollectiveBoxingExecutorBackend::GroupRequests(
-    const std::vector<const RequestDesc*>& requests,
-    std::vector<std::vector<const RequestDesc*>>* groups) {
-  for (const RequestDesc* request : requests) {
-    groups->emplace_back(std::vector<const RequestDesc*>({request}));
+void CollectiveBoxingExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
+                                                    std::vector<std::vector<int32_t>>* groups) {
+  for (const int32_t request_id : request_ids) {
+    groups->emplace_back(std::vector<int32_t>({request_id}));
   }
 }
 
@@ -96,10 +101,9 @@ class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBacke
  private:
   void Init(const CollectiveBoxingPlan& collective_boxing_plan,
             std::shared_ptr<RequestStore> request_store) override;
-  void GroupRequests(const std::vector<const RequestDesc*>& requests,
-                     std::vector<std::vector<const RequestDesc*>>* groups) override;
-  void ExecuteGroup(const std::vector<const RequestDesc*>& group,
-                    const std::vector<std::map<int64_t, RuntimeRequestInfo>>& ranks) override;
+  void GroupRequests(const std::vector<int32_t>& request_ids,
+                     std::vector<std::vector<int32_t>>* groups) override;
+  void ExecuteGroup(const std::vector<int32_t>& request_ids) override;
 
   struct Event {
     int64_t device_id;
@@ -204,13 +208,12 @@ NcclCollectiveBoxingExecutorBackend::~NcclCollectiveBoxingExecutorBackend() {
   }
 }
 
-void NcclCollectiveBoxingExecutorBackend::GroupRequests(
-    const std::vector<const RequestDesc*>& requests,
-    std::vector<std::vector<const RequestDesc*>>* groups) {
-  std::vector<const RequestDesc*> group;
+void NcclCollectiveBoxingExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
+                                                        std::vector<std::vector<int32_t>>* groups) {
+  std::vector<int32_t> group;
   int64_t group_size = 0;
-  auto IsOpFusionEnabled = [&](const RequestDesc* request) -> bool {
-    const OpType op_type = request->op_desc().op_type();
+  auto IsOpFusionEnabled = [&](const RequestDesc& request) -> bool {
+    const OpType op_type = request.op_desc().op_type();
     if (op_type == OpType::kOpTypeAllReduce) {
       return collective_boxing_conf_.nccl_fusion_all_reduce();
     } else if (op_type == OpType::kOpTypeAllGather) {
@@ -228,21 +231,21 @@ void NcclCollectiveBoxingExecutorBackend::GroupRequests(
       return false;
     }
   };
-  auto CanFuse = [&](const RequestDesc* lhs, const RequestDesc* rhs) -> bool {
+  auto CanFuse = [&](const RequestDesc& lhs, const RequestDesc& rhs) -> bool {
     const bool enable_mixed_fusion = (!collective_boxing_conf_.nccl_fusion_all_reduce_use_buffer())
                                      && collective_boxing_conf_.nccl_enable_mixed_fusion();
-    if (lhs->device_set() != rhs->device_set()) { return false; }
+    if (lhs.device_set() != rhs.device_set()) { return false; }
     if (!IsOpFusionEnabled(lhs) || !IsOpFusionEnabled(rhs)) { return false; }
-    if (lhs->op_desc().op_type() != rhs->op_desc().op_type() && (!enable_mixed_fusion)) {
+    if (lhs.op_desc().op_type() != rhs.op_desc().op_type() && (!enable_mixed_fusion)) {
       return false;
     }
-    const OpType op_type = lhs->op_desc().op_type();
+    const OpType op_type = lhs.op_desc().op_type();
     if (op_type == OpType::kOpTypeAllReduce) {
       if (collective_boxing_conf_.nccl_fusion_all_reduce_use_buffer()) {
-        CHECK(lhs->op_desc().has_reduce_method());
-        CHECK(rhs->op_desc().has_reduce_method());
-        return lhs->op_desc().reduce_method() == rhs->op_desc().reduce_method()
-               && lhs->op_desc().data_type() == rhs->op_desc().data_type();
+        CHECK(lhs.op_desc().has_reduce_method());
+        CHECK(rhs.op_desc().has_reduce_method());
+        return lhs.op_desc().reduce_method() == rhs.op_desc().reduce_method()
+               && lhs.op_desc().data_type() == rhs.op_desc().data_type();
       } else {
         return true;
       }
@@ -257,9 +260,11 @@ void NcclCollectiveBoxingExecutorBackend::GroupRequests(
     }
   };
 
-  for (const RequestDesc* request : requests) {
+  for (const int32_t request_id : request_ids) {
+    const auto& request = request_store_->GetRequestDesc(request_id);
     const int64_t size = GetAlignedRequestSize(request);
-    if (group.empty() || !CanFuse(group.back(), request) || group_size + size > fusion_threshold_
+    if (group.empty() || !CanFuse(request_store_->GetRequestDesc(group.back()), request)
+        || group_size + size > fusion_threshold_
         || group.size() >= collective_boxing_conf_.nccl_fusion_max_ops()) {
       if (!group.empty()) {
         groups->emplace_back();
@@ -267,7 +272,7 @@ void NcclCollectiveBoxingExecutorBackend::GroupRequests(
         group_size = 0;
       }
     }
-    group.push_back(request);
+    group.push_back(request_id);
     group_size += size;
   }
   if (!group.empty()) {
@@ -276,9 +281,19 @@ void NcclCollectiveBoxingExecutorBackend::GroupRequests(
   }
 }
 
-void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
-    const std::vector<const RequestDesc*>& group,
-    const std::vector<std::map<int64_t, RuntimeRequestInfo>>& ranks) {
+void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(const std::vector<int32_t>& request_ids) {
+  std::vector<const RequestDesc*> group;
+  std::vector<std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>> ranks;
+  group.reserve(request_ids.size());
+  for (const int32_t request_id : request_ids) {
+    group.push_back(&request_store_->GetRequestDesc(request_id));
+    ranks.emplace_back();
+    for (int32_t local_rank = 0; local_rank < request_store_->GetLocalRankCount(request_id);
+         ++local_rank) {
+      ranks.back()[request_store_->GetGlobalRank(request_id, local_rank)] =
+          request_store_->GetRuntimeRequest(request_id, local_rank);
+    }
+  }
   CHECK_EQ(group.size(), ranks.size());
   if (group.empty()) { return; }
   const int64_t group_size = group.size();
@@ -303,13 +318,14 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
         CHECK_EQ(request_desc->op_desc().reduce_method(), group.front()->op_desc().reduce_method());
         CHECK_EQ(request_desc->op_desc().data_type(), group.front()->op_desc().data_type());
       }
-      const std::map<int64_t, RuntimeRequestInfo>& rank2request_info = ranks.at(i);
-      const int64_t size = GetRequestSize(request_desc);
+      const std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>& rank2request_info =
+          ranks.at(i);
+      const int64_t size = GetRequestSize(*request_desc);
       CHECK_LE(offset + size, fusion_threshold_);
       const int64_t aligned_size = GetCudaAlignedSize(size);
       for (const auto& rank7request_info : rank2request_info) {
         const int64_t rank = rank7request_info.first;
-        const RuntimeRequestInfo& request_info = rank7request_info.second;
+        const RuntimeRequestInfo& request_info = *rank7request_info.second;
         const DeviceDesc& device_desc = request_desc->device_set().device().Get(rank);
         const int64_t device_id = device_desc.device_id();
         auto& device_ctx = device_id2device_ctx.at(device_id);
@@ -358,10 +374,11 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
     for (int64_t i = 0; i < group.size(); ++i) {
       const RequestDesc* request_desc = group.at(i);
       const OpDesc& op_desc = request_desc->op_desc();
-      const std::map<int64_t, RuntimeRequestInfo>& rank2request_info = ranks.at(i);
+      const std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>& rank2request_info =
+          ranks.at(i);
       for (const auto& rank7request_info : rank2request_info) {
         const int64_t rank = rank7request_info.first;
-        const RuntimeRequestInfo& request_info = rank7request_info.second;
+        const RuntimeRequestInfo& request_info = *rank7request_info.second;
         const DeviceDesc& device_desc = request_desc->device_set().device().Get(rank);
         const int64_t device_id = device_desc.device_id();
         OF_CUDA_CHECK(cudaSetDevice(device_id));
@@ -528,56 +545,54 @@ CollectiveBoxingExecutor::CollectiveBoxingExecutor(const Plan& plan)
 }
 
 void CollectiveBoxingExecutor::Init() {
-  for (const auto& job_id7request_set : collective_boxing_plan_.job_id2request_set()) {
-    const CollectiveBoxingConf collective_boxing_conf =
-        Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf();
-    const int64_t job_id = job_id7request_set.first;
-    const RequestSet& request_set = job_id7request_set.second;
-    std::vector<const RequestDesc*> requests;
-    requests.reserve(request_set.request_size());
-    for (const auto& request : request_set.request()) {
-      if (HasDeviceOnThisMachine(request.device_set())) { requests.push_back(&request); }
+  const CollectiveBoxingConf collective_boxing_conf =
+      Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf();
+  HashMap<int64_t, std::vector<int32_t>> job_id2request_ids;
+  const int32_t request_count = request_store_->RequestCount();
+  for (int32_t request_id = 0; request_id < request_count; ++request_id) {
+    if (request_store_->HasRankOnThisNode(request_id)) {
+      job_id2request_ids.emplace(request_store_->GetJobId(request_id), request_id);
     }
-    SortRequestsByOrder(&requests);
-    CHECK(std::adjacent_find(requests.begin(), requests.end(),
-                             [](const RequestDesc* a, const RequestDesc* b) {
-                               return a->dependency_depth() > b->dependency_depth();
+  }
+  const auto GetRequestDesc = [&](int32_t request_id) -> const RequestDesc& {
+    return request_store_->GetRequestDesc(request_id);
+  };
+  for (auto& job_id7request_ids : job_id2request_ids) {
+    const int64_t job_id = job_id7request_ids.first;
+    auto& request_ids = job_id7request_ids.second;
+    SortRequestIdsByOrder(request_store_.get(), &request_ids);
+    CHECK(std::adjacent_find(request_ids.begin(), request_ids.end(),
+                             [&](int32_t a, int32_t b) {
+                               return GetRequestDesc(a).dependency_depth()
+                                      > GetRequestDesc(b).dependency_depth();
                              })
-          == requests.end());
-    std::vector<std::vector<const RequestDesc*>> rough_groups;
-    for (const auto* request : requests) {
-      if ((!collective_boxing_conf.enable_fusion()) || rough_groups.empty()
-          || request->dependency_depth() != rough_groups.back().front()->dependency_depth()
-          || request->op_desc().backend() != rough_groups.back().front()->op_desc().backend()
-          || request->device_set() != rough_groups.back().front()->device_set()) {
-        rough_groups.emplace_back(std::vector<const RequestDesc*>({request}));
+          == request_ids.end());
+    std::vector<std::vector<int32_t>> rough_request_id_groups;
+    for (const int32_t request_id : request_ids) {
+      bool new_group = (!collective_boxing_conf.enable_fusion()) || rough_request_id_groups.empty();
+      if (!new_group) {
+        const auto& cur_desc = GetRequestDesc(request_id);
+        const auto& group_desc = GetRequestDesc(rough_request_id_groups.back().front());
+        if (cur_desc.dependency_depth() != group_desc.dependency_depth()
+            || cur_desc.op_desc().backend() != group_desc.op_desc().backend()
+            || cur_desc.device_set() != group_desc.device_set()) {
+          new_group = true;
+        }
+      }
+      if (new_group) {
+        rough_request_id_groups.emplace_back(std::vector<int32_t>({request_id}));
       } else {
-        rough_groups.back().push_back(request);
+        rough_request_id_groups.back().push_back(request_id);
       }
     }
-    for (const auto& rough_group : rough_groups) {
-      auto it = backends_.find(rough_group.front()->op_desc().backend());
-      CHECK(it != backends_.end());
-      auto* backend = it->second.get();
-      std::vector<std::vector<const RequestDesc*>> groups;
+    for (const auto& rough_group : rough_request_id_groups) {
+      auto* backend = backends_.at(GetRequestDesc(rough_group.front()).op_desc().backend()).get();
+      std::vector<std::vector<int32_t>> groups;
       backend->GroupRequests(rough_group, &groups);
       for (const auto& group : groups) {
-        std::set<int64_t> request_ids;
         const int64_t group_id = group_id2group_state_.size();
-        for (const auto* request : group) {
-          std::set<int64_t> local_ranks;
-          for (int64_t rank = 0; rank < request->device_set().device_size(); ++rank) {
-            if (IsDeviceOnThisMachine(request->device_set().device(rank))) {
-              local_ranks.emplace(rank);
-            }
-          }
-          const int64_t request_id = name2request_id_.size();
-          CHECK(name2request_id_.emplace(request->op_desc().name(), request_id).second);
-          request_id2request_state_.emplace_back(
-              RequestState(request, job_id, group_id, local_ranks));
-          request_ids.emplace(request_id);
-        }
-        group_id2group_state_.emplace_back(backend, request_ids, group);
+        group_id2group_state_.emplace_back(backend,
+                                           std::set<int32_t>({group.cbegin(), group.cend()}));
         job_id2group_ids_[job_id].push_back(group_id);
       }
     }
@@ -589,8 +604,8 @@ void CollectiveBoxingExecutor::DumpSummary() const {
   auto group_ls = TeePersistentLogStream::Create("boxing/collective/group");
   for (int64_t group_id = 0; group_id < group_id2group_state_.size(); ++group_id) {
     group_ls << "group id: " << std::to_string(group_id) << "\n";
-    for (const auto& request : group_id2group_state_.at(group_id).requests) {
-      group_ls->Write(*request);
+    for (const int32_t request_id : group_id2group_state_.at(group_id).request_ids) {
+      group_ls->Write(request_store_->GetRequestDesc(request_id));
     }
   }
 }
@@ -629,7 +644,8 @@ void CollectiveBoxingExecutor::Enqueue(const RankDesc& rank_desc,
         ranks.emplace_back(std::move(rank));
         rank.clear();
       }
-      group_state.backend->ExecuteGroup(group_state.requests, ranks);
+      group_state.backend->ExecuteGroup(
+          std::vector<int32_t>({group_state.request_ids.cbegin(), group_state.request_ids.cend()}));
       group_state.ready_request_ids.clear();
       current_group_idx_in_job_ = (current_group_idx_in_job_ + 1) % group_ids.size();
       num_launched_groups += 1;
@@ -654,7 +670,7 @@ bool CollectiveBoxingExecutor::RequestState::IsReady() const {
   return ready_ranks.size() == local_ranks.size();
 }
 
-void CollectiveBoxingExecutor::GroupState::AddReadyRequest(int64_t request_id) {
+void CollectiveBoxingExecutor::GroupState::AddReadyRequest(int32_t request_id) {
   CHECK(request_ids.find(request_id) != request_ids.end());
   CHECK(ready_request_ids.emplace(request_id).second);
 }
@@ -667,8 +683,13 @@ struct RequestStore::Impl {
   struct RequestInfo {
     RequestInfo(int64_t job_id, const RequestDesc& desc) : job_id(job_id), desc(desc) {
       std::set<int64_t> node_ids;
-      for (const DeviceDesc& device : desc.device_set().device()) {
-        if (IsDeviceOnThisMachine(device)) { local_device_vec.push_back(device); }
+      for (int64_t global_rank = 0; global_rank < desc.device_set().device().size();
+           ++global_rank) {
+        const DeviceDesc& device = desc.device_set().device(global_rank);
+        if (IsDeviceOnThisMachine(device)) {
+          local_device_vec.push_back(device);
+          global_rank_vec.push_back(global_rank);
+        }
         node_ids.emplace(device.machine_id());
       }
       local_rank_count = local_device_vec.size();
@@ -684,6 +705,7 @@ struct RequestStore::Impl {
     std::vector<std::shared_ptr<const RuntimeRequestInfo>> runtime_request_info_vec;
     int32_t runtime_request_info_count;
     std::vector<DeviceDesc> local_device_vec;
+    std::vector<int64_t> global_rank_vec;
   };
 
   std::vector<RequestInfo> request_info_vec;
@@ -729,7 +751,21 @@ int32_t RequestStore::GetLocalRankCount(int32_t request_id) const {
   return impl_->request_info_vec.at(request_id).local_rank_count;
 }
 
-int32_t RequestStore::GetRequestIdByName(const std::string& name) const {}
+int32_t RequestStore::GetRequestIdByName(const std::string& name) const {
+  return impl_->name2request_id.at(name);
+}
+
+int64_t RequestStore::GetJobId(int32_t request_id) const {
+  return impl_->request_info_vec.at(request_id).job_id;
+}
+
+int64_t RequestStore::GetGlobalRank(int32_t request_id, int32_t local_rank) const {
+  return impl_->request_info_vec.at(request_id).global_rank_vec.at(local_rank);
+}
+
+bool RequestStore::HasRankOnThisNode(int32_t request_id) const {
+  return impl_->request_info_vec.at(request_id).local_rank_count > 0;
+}
 
 bool RequestStore::SetRuntimeRequest(
     int32_t request_id, int32_t local_rank,
