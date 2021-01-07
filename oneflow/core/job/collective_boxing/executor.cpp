@@ -692,7 +692,6 @@ struct RequestStore::Impl {
     std::vector<std::shared_ptr<const RuntimeRequestInfo>> runtime_request_info_vec;
     int32_t runtime_request_info_count;
     std::vector<DeviceDesc> local_device_vec;
-    std::mutex mutex_;
   };
 
   std::vector<RequestInfo> request_info_vec;
