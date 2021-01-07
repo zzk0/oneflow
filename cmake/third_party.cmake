@@ -100,11 +100,6 @@ else()
 endif()
 message(STATUS "Found Blas Lib: " ${BLAS_LIBRARIES})
 
-if (WITH_MPI)
-  find_package(MPI REQUIRED)
-  add_definitions(-DWITH_MPI)
-endif()
-
 set(oneflow_third_party_libs
     ${GLOG_STATIC_LIBRARIES}
     ${GFLAGS_STATIC_LIBRARIES}
@@ -243,6 +238,13 @@ endif()
 
 if(WITH_TENSORRT)
   list(APPEND oneflow_third_party_libs ${TENSORRT_LIBRARIES})
+endif()
+
+if (WITH_MPI)
+  find_package(MPI REQUIRED)
+  add_definitions(-DWITH_MPI)
+  list(APPEND ONEFLOW_INCLUDE_SRC_DIRS ${MPI_INCLUDE_PATH})
+  list(APPEND oneflow_third_party_libs ${MPI_LIBRARIES})
 endif()
 
 message(STATUS "oneflow_third_party_libs: " ${oneflow_third_party_libs})
