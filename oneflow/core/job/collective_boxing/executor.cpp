@@ -712,10 +712,10 @@ RequestStore::RequestStore(const CollectiveBoxingPlan& collective_boxing_plan) {
             [](const Impl::RequestInfo& a, const Impl::RequestInfo& b) {
               return a.node_count > b.node_count;
             });
-  impl_->mutex_vec.resize(impl_->request_info_vec.size());
-  impl_->max_multi_node_request_id = std::count_if(
-      impl_->request_info_vec.cbegin(), impl_->request_info_vec.cend(),
-      [](const Impl::RequestInfo& a, const Impl::RequestInfo& b) { return a.node_count > 1; });
+  impl_->mutex_vec = std::vector<std::mutex>(impl_->request_info_vec.size());
+  impl_->max_multi_node_request_id =
+      std::count_if(impl_->request_info_vec.cbegin(), impl_->request_info_vec.cend(),
+                    [](const Impl::RequestInfo& info) { return info.node_count > 1; });
 }
 
 int32_t RequestStore::RequestCount() const { return impl_->request_info_vec.size(); }
