@@ -91,16 +91,16 @@ class SbpEdge {
 
 #ifdef SBP_CONSTRUCTOR_
   // a set of ids of logical blobs carried/transferred on this sbp edge
-  std::unordered_set<LogicalBlobId> CarryLbis;
+  std::unordered_set<oneflow::LogicalBlobId> CarryLbis;
 
   // load a logical blob
-  void LoadLbi(LogicalBlobId lbi) { CarryLbis.insert(lbi); }
+  void LoadLbi(oneflow::LogicalBlobId lbi) { CarryLbis.insert(lbi); }
 
   // check existancy of a logical blob
-  bool SearchLbi(LogicalBlobId lbi) const { return CarryLbis.find(lbi) != CarryLbis.end(); }
+  bool SearchLbi(oneflow::LogicalBlobId lbi) const { return CarryLbis.find(lbi) != CarryLbis.end(); }
 
   // unload a logical blob
-  void UnloadLbi(LogicalBlobId lbi) {
+  void UnloadLbi(oneflow::LogicalBlobId lbi) {
     if (CarryLbis.erase(lbi) == 0) std::cout << "Unload an empty lbi!" << std::endl;
   }
 

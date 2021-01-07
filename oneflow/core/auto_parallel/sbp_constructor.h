@@ -23,6 +23,7 @@ limitations under the License.
 #include "oneflow/core/job/job_builder.h"
 #include "oneflow/core/operator/normal_model_update_op.h"
 #include <fstream>
+#include "sbp_collector.h"
 
 namespace oneflow {
 
