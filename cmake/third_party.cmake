@@ -100,6 +100,11 @@ else()
 endif()
 message(STATUS "Found Blas Lib: " ${BLAS_LIBRARIES})
 
+if (WITH_MPI)
+  find_package(MPI REQUIRED)
+  add_definitions(-DWITH_MPI)
+endif()
+
 set(oneflow_third_party_libs
     ${GLOG_STATIC_LIBRARIES}
     ${GFLAGS_STATIC_LIBRARIES}
