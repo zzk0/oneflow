@@ -659,18 +659,6 @@ bool CollectiveBoxingExecutor::GroupState::IsReady() const {
   return ready_request_ids.size() == request_ids.size();
 }
 
-/*
-class RequestStore {
-
-  bool PushRuntimeRequest(int32_t request_id, int32_t local_rank, RuntimeRequestInfo request_info);
-  const RuntimeRequestInfo& GetRuntimeRequest(int32_t request_id, int32_t local_rank) const;
-  void ResetRuntimeRequest(int32_t request_id);
-
- private:
-  struct Impl;
-  std::unique_ptr<Impl> impl_;
-};*/
-
 struct RequestStore::Impl {
   struct RequestInfo {
     RequestInfo(int64_t job_id, const RequestDesc& desc) : job_id(job_id), desc(desc) {
