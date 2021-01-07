@@ -34,6 +34,7 @@ struct RuntimeRequestInfo {
 };
 
 class RequestStore {
+ public:
   OF_DISALLOW_COPY_AND_MOVE(RequestStore);
   explicit RequestStore(const CollectiveBoxingPlan& collective_boxing_plan);
   ~RequestStore() = default;
@@ -42,6 +43,7 @@ class RequestStore {
   int32_t MaxMultiNodeRequestId() const;
   const RequestDesc& GetRequestDesc(int32_t request_id) const;
   int32_t GetLocalRankCount(int32_t request_id) const;
+  int32_t GetRequestIdByName(const std::string& name) const;
 
   bool SetRuntimeRequest(int32_t request_id, int32_t local_rank,
                          std::shared_ptr<const RuntimeRequestInfo> runtime_request_info);
@@ -60,7 +62,8 @@ class CollectiveBoxingExecutorBackend {
   CollectiveBoxingExecutorBackend() = default;
   virtual ~CollectiveBoxingExecutorBackend() = default;
 
-  virtual void Init(const CollectiveBoxingPlan& collective_boxing_plan){};
+  virtual void Init(const CollectiveBoxingPlan& collective_boxing_plan,
+                    std::shared_ptr<RequestStore> request_store){};
   virtual void GroupRequests(const std::vector<const RequestDesc*>& requests,
                              std::vector<std::vector<const RequestDesc*>>* groups);
   virtual void ExecuteGroup(const std::vector<const RequestDesc*>& group,
@@ -126,6 +129,8 @@ class CollectiveBoxingExecutor final {
 
   int64_t current_job_id_ = -1;
   int64_t current_group_idx_in_job_ = -1;
+
+  std::shared_ptr<RequestStore> request_store_;
 };
 
 }  // namespace collective

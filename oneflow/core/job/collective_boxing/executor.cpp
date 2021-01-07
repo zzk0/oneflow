@@ -94,13 +94,13 @@ class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBacke
   ~NcclCollectiveBoxingExecutorBackend() override;
 
  private:
-  void Init(const CollectiveBoxingPlan& collective_boxing_plan) override;
+  void Init(const CollectiveBoxingPlan& collective_boxing_plan,
+            std::shared_ptr<RequestStore> request_store) override;
   void GroupRequests(const std::vector<const RequestDesc*>& requests,
                      std::vector<std::vector<const RequestDesc*>>* groups) override;
   void ExecuteGroup(const std::vector<const RequestDesc*>& group,
                     const std::vector<std::map<int64_t, RuntimeRequestInfo>>& ranks) override;
 
- private:
   struct Event {
     int64_t device_id;
     cudaEvent_t cuda_event;
@@ -132,6 +132,7 @@ class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBacke
   std::shared_ptr<ThreadPool> callback_executor_pool_;
 
   int64_t current_stream_id_ = 0;
+  std::shared_ptr<RequestStore> request_store_;
 };
 
 NcclCollectiveBoxingExecutorBackend::NcclCollectiveBoxingExecutorBackend()
@@ -436,7 +437,9 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(
   }
 }
 
-void NcclCollectiveBoxingExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_plan) {
+void NcclCollectiveBoxingExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_plan,
+                                               std::shared_ptr<RequestStore> request_store) {
+  request_store_ = request_store;
   CudaCurrentDeviceGuard guard;
   std::set<int64_t> local_device_ids;
   for (const auto& job_id7request_set : collective_boxing_plan.job_id2request_set()) {
@@ -512,12 +515,13 @@ void NcclCollectiveBoxingExecutorBackend::Init(const CollectiveBoxingPlan& colle
 
 CollectiveBoxingExecutor::CollectiveBoxingExecutor(const Plan& plan)
     : collective_boxing_plan_(plan.collective_boxing_plan()) {
+  request_store_.reset(new RequestStore(collective_boxing_plan_));
 #ifdef WITH_CUDA
   auto it =
       backends_
           .emplace(Backend::kBackendNCCL, std::make_unique<NcclCollectiveBoxingExecutorBackend>())
           .first;
-  it->second->Init(collective_boxing_plan_);
+  it->second->Init(collective_boxing_plan_, request_store_);
 #endif
   Init();
   DumpSummary();
@@ -685,6 +689,7 @@ struct RequestStore::Impl {
   std::vector<RequestInfo> request_info_vec;
   int32_t max_multi_node_request_id = 0;
   std::vector<std::mutex> mutex_vec;
+  HashMap<std::string, int32_t> name2request_id;
 };
 
 RequestStore::RequestStore(const CollectiveBoxingPlan& collective_boxing_plan) {
@@ -698,8 +703,14 @@ RequestStore::RequestStore(const CollectiveBoxingPlan& collective_boxing_plan) {
   }
   std::sort(impl_->request_info_vec.begin(), impl_->request_info_vec.end(),
             [](const Impl::RequestInfo& a, const Impl::RequestInfo& b) {
-              return a.node_count > b.node_count;
+              return a.node_count == b.node_count
+                         ? a.desc.op_desc().name() < b.desc.op_desc().name()
+                         : a.node_count > b.node_count;
             });
+  for (int32_t i = 0; i < impl_->request_info_vec.size(); ++i) {
+    CHECK(impl_->name2request_id.emplace(impl_->request_info_vec.at(i).desc.op_desc().name(), i)
+              .second);
+  }
   impl_->mutex_vec = std::vector<std::mutex>(impl_->request_info_vec.size());
   impl_->max_multi_node_request_id =
       std::count_if(impl_->request_info_vec.cbegin(), impl_->request_info_vec.cend(),
@@ -717,6 +728,8 @@ const RequestDesc& RequestStore::GetRequestDesc(int32_t request_id) const {
 int32_t RequestStore::GetLocalRankCount(int32_t request_id) const {
   return impl_->request_info_vec.at(request_id).local_rank_count;
 }
+
+int32_t RequestStore::GetRequestIdByName(const std::string& name) const {}
 
 bool RequestStore::SetRuntimeRequest(
     int32_t request_id, int32_t local_rank,
