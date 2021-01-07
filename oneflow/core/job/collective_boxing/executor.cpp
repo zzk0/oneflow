@@ -551,7 +551,7 @@ void CollectiveBoxingExecutor::Init() {
   const int32_t request_count = request_store_->RequestCount();
   for (int32_t request_id = 0; request_id < request_count; ++request_id) {
     if (request_store_->HasRankOnThisNode(request_id)) {
-      job_id2request_ids.emplace(request_store_->GetJobId(request_id), request_id);
+      job_id2request_ids[request_store_->GetJobId(request_id)].push_back(request_id);
     }
   }
   const auto GetRequestDesc = [&](int32_t request_id) -> const RequestDesc& {
