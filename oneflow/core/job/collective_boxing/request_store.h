@@ -70,9 +70,9 @@ class RequestStore {
   RequestEntry* MutRequestEntry(int32_t request_id) {
     return request_entry_vec_.at(request_id).get();
   }
-  int32_t RequestCount() const;
-  int32_t MaxMultiNodeRequestId() const;
-  int32_t GetRequestIdByName(const std::string& name) const;
+  int32_t RequestCount() const { return request_entry_vec_.size(); }
+  int32_t MaxMultiNodeRequestId() const { return max_multi_node_request_id_; }
+  int32_t GetRequestIdByName(const std::string& name) const { return name2request_id_.at(name); }
 
  private:
   std::vector<std::unique_ptr<RequestEntry>> request_entry_vec_;
