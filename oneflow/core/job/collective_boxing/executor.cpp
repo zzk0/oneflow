@@ -612,12 +612,36 @@ void Scheduler::DumpSummary() const {
   }
 }
 
-void Scheduler::Schedule(const RankDesc& rank_desc,
+class RequestHandle final {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(RequestHandle)
+  RequestHandle(int32_t request_id, int64_t local_rank)
+      : request_id_(request_id), local_rank_(local_rank) {}
+  ~RequestHandle() = default;
+
+  int32_t request_id() const { return request_id_; }
+
+  int64_t local_rank() const { return local_rank_; }
+
+ private:
+  int32_t request_id_;
+  int64_t local_rank_;
+};
+
+std::shared_ptr<RequestHandle> Scheduler::CreateRequestHandle(const RankDesc& rank_desc) {
+  const int32_t request_id = request_store_->GetRequestIdByName(rank_desc.op_desc().name());
+  const RequestDesc& request_desc = request_store_->GetRequestDesc(request_id);
+  CHECK(rank_desc.op_desc() == request_desc.op_desc());
+  const int64_t local_rank = request_store_->GetLocalRank(request_id, rank_desc.rank());
+  return std::make_shared<RequestHandle>(request_id, local_rank);
+}
+
+void Scheduler::Schedule(const std::shared_ptr<RequestHandle>& handle,
                          std::shared_ptr<const RuntimeRequestInfo> request_info) {
   std::unique_lock<std::mutex> lock(mutex_);
   {
-    const int64_t request_id = request_store_->GetRequestIdByName(rank_desc.op_desc().name());
-    const int64_t local_rank = request_store_->GetLocalRank(request_id, rank_desc.rank());
+    const int64_t request_id = handle->request_id();
+    const int64_t local_rank = handle->local_rank();
     const bool ready =
         request_store_->SetRuntimeRequest(request_id, local_rank, std::move(request_info));
     const int64_t job_id = request_store_->GetJobId(request_id);

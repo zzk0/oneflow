@@ -73,12 +73,26 @@ class CollectiveBoxingExecutorBackend {
   virtual void ExecuteGroup(const std::vector<int32_t>& request_ids) = 0;
 };
 
+class Coordinator {
+ public:
+  Coordinator() = default;
+  virtual ~Coordinator() = default;
+
+  virtual void Init(const CollectiveBoxingPlan& collective_boxing_plan,
+                    std::shared_ptr<RequestStore> request_store) = 0;
+  virtual void AddRequest(int32_t request_id) = 0;
+};
+
+class RequestHandle;
+
 class Scheduler final {
  public:
   OF_DISALLOW_COPY_AND_MOVE(Scheduler);
   ~Scheduler() = default;
 
-  void Schedule(const RankDesc& rank_desc, std::shared_ptr<const RuntimeRequestInfo> request_info);
+  std::shared_ptr<RequestHandle> CreateRequestHandle(const RankDesc& rank_desc);
+  void Schedule(const std::shared_ptr<RequestHandle>& handle,
+                std::shared_ptr<const RuntimeRequestInfo> request_info);
 
  private:
   friend class Global<Scheduler>;

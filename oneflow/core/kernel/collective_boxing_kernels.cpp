@@ -31,10 +31,19 @@ class CollectiveBoxingGenericKernel final : public KernelIf<device_type> {
   ~CollectiveBoxingGenericKernel() override = default;
 
  private:
+  void VirtualKernelInit() override;
   bool IsKernelLaunchSynchronized() const override { return false; }
   void ForwardDataContent(const KernelCtx& ctx,
                           std::function<Blob*(const std::string&)> BnInOp2Blob) const override;
+
+  std::shared_ptr<RequestHandle> request_handle_;
 };
+
+template<DeviceType device_type>
+void CollectiveBoxingGenericKernel<device_type>::VirtualKernelInit() {
+  const RankDesc& rank_desc = this->op_conf().collective_boxing_generic_conf().rank_desc();
+  request_handle_ = Global<Scheduler>::Get()->CreateRequestHandle(rank_desc);
+}
 
 template<DeviceType device_type>
 void CollectiveBoxingGenericKernel<device_type>::ForwardDataContent(
