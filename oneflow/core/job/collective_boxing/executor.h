@@ -70,7 +70,19 @@ class CollectiveBoxingExecutorBackend {
                     std::shared_ptr<RequestStore> request_store){};
   virtual void GroupRequests(const std::vector<int32_t>& request_ids,
                              std::vector<std::vector<int32_t>>* groups);
-  virtual void ExecuteGroup(const std::vector<int32_t>& request_ids) = 0;
+  virtual void ExecuteRequests(const std::vector<int32_t>& request_ids) = 0;
+};
+
+class Executor {
+ public:
+  Executor() = default;
+  virtual ~Executor() = default;
+
+  virtual void Init(const CollectiveBoxingPlan& collective_boxing_plan,
+                    std::shared_ptr<RequestStore> request_store) = 0;
+  virtual void GroupRequests(const std::vector<int32_t>& request_ids,
+                             std::vector<std::vector<int32_t>>* groups) = 0;
+  virtual void ExecuteRequests(const std::vector<int32_t>& request_ids) = 0;
 };
 
 class Coordinator {
@@ -79,7 +91,8 @@ class Coordinator {
   virtual ~Coordinator() = default;
 
   virtual void Init(const CollectiveBoxingPlan& collective_boxing_plan,
-                    std::shared_ptr<RequestStore> request_store) = 0;
+                    std::shared_ptr<RequestStore> request_store,
+                    std::shared_ptr<Executor> executor) = 0;
   virtual void AddRequest(int32_t request_id) = 0;
 };
 
@@ -102,9 +115,8 @@ class Scheduler final {
   void DumpSummary() const;
 
   struct GroupState {
-    GroupState(CollectiveBoxingExecutorBackend* backend, std::set<int32_t> request_ids)
-        : backend(backend), request_ids(std::move(request_ids)), ready_request_ids() {}
-    CollectiveBoxingExecutorBackend* const backend;
+    explicit GroupState(std::set<int32_t> request_ids)
+        : request_ids(std::move(request_ids)), ready_request_ids() {}
     const std::set<int32_t> request_ids;
     std::set<int32_t> ready_request_ids;
 
@@ -115,7 +127,6 @@ class Scheduler final {
   std::mutex mutex_;
 
   const CollectiveBoxingPlan collective_boxing_plan_;
-  std::map<Backend, std::unique_ptr<CollectiveBoxingExecutorBackend>> backends_;
   std::map<int64_t, std::vector<int64_t>> job_id2group_ids_;
   std::vector<GroupState> group_id2group_state_;
   std::vector<int64_t> request_id2group_id_;
@@ -123,6 +134,8 @@ class Scheduler final {
   int64_t current_group_idx_in_job_ = -1;
 
   std::shared_ptr<RequestStore> request_store_;
+  std::shared_ptr<Coordinator> coordinator_;
+  std::shared_ptr<Executor> executor_;
 };
 
 }  // namespace collective

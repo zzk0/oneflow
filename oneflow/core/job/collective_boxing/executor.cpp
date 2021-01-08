@@ -103,7 +103,7 @@ class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBacke
             std::shared_ptr<RequestStore> request_store) override;
   void GroupRequests(const std::vector<int32_t>& request_ids,
                      std::vector<std::vector<int32_t>>* groups) override;
-  void ExecuteGroup(const std::vector<int32_t>& request_ids) override;
+  void ExecuteRequests(const std::vector<int32_t>& request_ids) override;
 
   struct Event {
     int64_t device_id;
@@ -281,7 +281,7 @@ void NcclCollectiveBoxingExecutorBackend::GroupRequests(const std::vector<int32_
   }
 }
 
-void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(const std::vector<int32_t>& request_ids) {
+void NcclCollectiveBoxingExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_ids) {
   std::vector<const RequestDesc*> group;
   std::vector<std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>> ranks;
   group.reserve(request_ids.size());
@@ -531,20 +531,82 @@ void NcclCollectiveBoxingExecutorBackend::Init(const CollectiveBoxingPlan& colle
 
 #endif  // WITH_CUDA
 
-Scheduler::Scheduler(const Plan& plan) : collective_boxing_plan_(plan.collective_boxing_plan()) {
-  request_store_.reset(new RequestStore(collective_boxing_plan_));
+class RequestHandle final {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(RequestHandle)
+  RequestHandle(int32_t request_id, int64_t local_rank)
+      : request_id_(request_id), local_rank_(local_rank) {}
+  ~RequestHandle() = default;
+
+  int32_t request_id() const { return request_id_; }
+
+  int64_t local_rank() const { return local_rank_; }
+
+ private:
+  int32_t request_id_;
+  int64_t local_rank_;
+};
+
+class ExecutorImpl : public Executor {
+ public:
+  ExecutorImpl() = default;
+  ~ExecutorImpl() override = default;
+
+  void Init(const CollectiveBoxingPlan& collective_boxing_plan,
+            std::shared_ptr<RequestStore> request_store) override;
+  void GroupRequests(const std::vector<int32_t>& request_ids,
+                     std::vector<std::vector<int32_t>>* groups) override;
+  void ExecuteRequests(const std::vector<int32_t>& request_ids) override;
+
+ private:
+  Backend GetUniqueBackend(const std::vector<int32_t>& request_ids);
+
+  std::map<Backend, std::unique_ptr<CollectiveBoxingExecutorBackend>> backends_;
+  std::shared_ptr<RequestStore> request_store_;
+};
+
+void ExecutorImpl::Init(const CollectiveBoxingPlan& collective_boxing_plan,
+                        std::shared_ptr<RequestStore> request_store) {
+  request_store_ = request_store;
 #ifdef WITH_CUDA
   auto it =
       backends_
           .emplace(Backend::kBackendNCCL, std::make_unique<NcclCollectiveBoxingExecutorBackend>())
           .first;
-  it->second->Init(collective_boxing_plan_, request_store_);
+  it->second->Init(collective_boxing_plan, request_store_);
 #endif
+}
+
+void ExecutorImpl::GroupRequests(const std::vector<int32_t>& request_ids,
+                                 std::vector<std::vector<int32_t>>* groups) {
+  if (request_ids.empty()) { return; }
+  const Backend backend = GetUniqueBackend(request_ids);
+  backends_.at(backend)->GroupRequests(request_ids, groups);
+}
+
+void ExecutorImpl::ExecuteRequests(const std::vector<int32_t>& request_ids) {
+  if (request_ids.empty()) { return; }
+  const Backend backend = GetUniqueBackend(request_ids);
+  backends_.at(backend)->ExecuteRequests(request_ids);
+}
+
+Backend ExecutorImpl::GetUniqueBackend(const std::vector<int32_t>& request_ids) {
+  const Backend backend = request_store_->GetRequestDesc(request_ids.front()).op_desc().backend();
+  for (int64_t i = 1; i < request_ids.size(); ++i) {
+    CHECK_EQ(request_store_->GetRequestDesc(request_ids.at(i)).op_desc().backend(), backend);
+  }
+  return backend;
+}
+
+Scheduler::Scheduler(const Plan& plan) : collective_boxing_plan_(plan.collective_boxing_plan()) {
   Init();
   DumpSummary();
 }
 
 void Scheduler::Init() {
+  request_store_.reset(new RequestStore(collective_boxing_plan_));
+  executor_.reset(new ExecutorImpl());
+  executor_->Init(collective_boxing_plan_, request_store_);
   const CollectiveBoxingConf collective_boxing_conf =
       Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf();
   HashMap<int64_t, std::vector<int32_t>> job_id2request_ids;
@@ -587,13 +649,11 @@ void Scheduler::Init() {
       }
     }
     for (const auto& rough_group : rough_request_id_groups) {
-      auto* backend = backends_.at(GetRequestDesc(rough_group.front()).op_desc().backend()).get();
       std::vector<std::vector<int32_t>> groups;
-      backend->GroupRequests(rough_group, &groups);
+      executor_->GroupRequests(rough_group, &groups);
       for (const auto& group : groups) {
         const int64_t group_id = group_id2group_state_.size();
-        group_id2group_state_.emplace_back(backend,
-                                           std::set<int32_t>({group.cbegin(), group.cend()}));
+        group_id2group_state_.emplace_back(std::set<int32_t>({group.cbegin(), group.cend()}));
         job_id2group_ids_[job_id].push_back(group_id);
         for (int32_t r : group) { request_id2group_id_[r] = group_id; }
       }
@@ -612,22 +672,6 @@ void Scheduler::DumpSummary() const {
   }
 }
 
-class RequestHandle final {
- public:
-  OF_DISALLOW_COPY_AND_MOVE(RequestHandle)
-  RequestHandle(int32_t request_id, int64_t local_rank)
-      : request_id_(request_id), local_rank_(local_rank) {}
-  ~RequestHandle() = default;
-
-  int32_t request_id() const { return request_id_; }
-
-  int64_t local_rank() const { return local_rank_; }
-
- private:
-  int32_t request_id_;
-  int64_t local_rank_;
-};
-
 std::shared_ptr<RequestHandle> Scheduler::CreateRequestHandle(const RankDesc& rank_desc) {
   const int32_t request_id = request_store_->GetRequestIdByName(rank_desc.op_desc().name());
   const RequestDesc& request_desc = request_store_->GetRequestDesc(request_id);
@@ -638,13 +682,14 @@ std::shared_ptr<RequestHandle> Scheduler::CreateRequestHandle(const RankDesc& ra
 
 void Scheduler::Schedule(const std::shared_ptr<RequestHandle>& handle,
                          std::shared_ptr<const RuntimeRequestInfo> request_info) {
+  const int64_t request_id = handle->request_id();
+  const int64_t local_rank = handle->local_rank();
+  const bool ready =
+      request_store_->SetRuntimeRequest(request_id, local_rank, std::move(request_info));
+  if (ready) { coordinator_->AddRequest(request_id); }
+  const int64_t job_id = request_store_->GetJobId(request_id);
   std::unique_lock<std::mutex> lock(mutex_);
   {
-    const int64_t request_id = handle->request_id();
-    const int64_t local_rank = handle->local_rank();
-    const bool ready =
-        request_store_->SetRuntimeRequest(request_id, local_rank, std::move(request_info));
-    const int64_t job_id = request_store_->GetJobId(request_id);
     if (current_job_id_ == -1) {
       current_job_id_ = job_id;
       current_group_idx_in_job_ = 0;
@@ -661,7 +706,7 @@ void Scheduler::Schedule(const std::shared_ptr<RequestHandle>& handle,
     const int64_t group_id = group_ids.at(current_group_idx_in_job_);
     auto& group_state = group_id2group_state_.at(group_id);
     if (group_state.IsReady()) {
-      group_state.backend->ExecuteGroup(
+      executor_->ExecuteRequests(
           std::vector<int32_t>({group_state.request_ids.cbegin(), group_state.request_ids.cend()}));
       group_state.ready_request_ids.clear();
       current_group_idx_in_job_ = (current_group_idx_in_job_ + 1) % group_ids.size();
