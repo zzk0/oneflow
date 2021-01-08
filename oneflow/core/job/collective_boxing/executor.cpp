@@ -598,15 +598,45 @@ Backend ExecutorImpl::GetUniqueBackend(const std::vector<int32_t>& request_ids) 
   return backend;
 }
 
-Scheduler::Scheduler(const Plan& plan) : collective_boxing_plan_(plan.collective_boxing_plan()) {
-  Init();
-  DumpSummary();
-}
+class StaticGroupCoordinator : public Coordinator {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(StaticGroupCoordinator);
+  StaticGroupCoordinator() = default;
+  ~StaticGroupCoordinator() override = default;
 
-void Scheduler::Init() {
-  request_store_.reset(new RequestStore(collective_boxing_plan_));
-  executor_.reset(new ExecutorImpl());
-  executor_->Init(collective_boxing_plan_, request_store_);
+  void Init(const CollectiveBoxingPlan& collective_boxing_plan,
+            std::shared_ptr<RequestStore> request_store,
+            std::shared_ptr<Executor> executor) override;
+  void AddRequest(int32_t request_id) override;
+
+ private:
+  struct GroupState {
+    explicit GroupState(std::set<int32_t> request_ids)
+        : request_ids(std::move(request_ids)), ready_request_ids() {}
+    const std::set<int32_t> request_ids;
+    std::set<int32_t> ready_request_ids;
+
+    void AddReadyRequest(int32_t request_id);
+    bool IsReady() const;
+  };
+
+  void DumpSummary() const;
+
+  std::shared_ptr<RequestStore> request_store_;
+  std::shared_ptr<Executor> executor_;
+  std::mutex mutex_;
+  std::map<int64_t, std::vector<int64_t>> job_id2group_ids_;
+  std::vector<GroupState> group_id2group_state_;
+  std::vector<int64_t> request_id2group_id_;
+  int64_t current_job_id_ = -1;
+  int64_t current_group_idx_in_job_ = -1;
+};
+
+void StaticGroupCoordinator::Init(const CollectiveBoxingPlan& collective_boxing_plan,
+                                  std::shared_ptr<RequestStore> request_store,
+                                  std::shared_ptr<Executor> executor) {
+  request_store_ = request_store;
+  executor_ = executor;
   const CollectiveBoxingConf collective_boxing_conf =
       Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf();
   HashMap<int64_t, std::vector<int32_t>> job_id2request_ids;
@@ -659,47 +689,19 @@ void Scheduler::Init() {
       }
     }
   }
+  DumpSummary();
 }
 
-void Scheduler::DumpSummary() const {
-  if (!Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) { return; }
-  auto group_ls = TeePersistentLogStream::Create("boxing/collective/group");
-  for (int64_t group_id = 0; group_id < group_id2group_state_.size(); ++group_id) {
-    group_ls << "group id: " << std::to_string(group_id) << "\n";
-    for (const int32_t request_id : group_id2group_state_.at(group_id).request_ids) {
-      group_ls->Write(request_store_->GetRequestDesc(request_id));
-    }
-  }
-}
-
-std::shared_ptr<RequestHandle> Scheduler::CreateRequestHandle(const RankDesc& rank_desc) {
-  const int32_t request_id = request_store_->GetRequestIdByName(rank_desc.op_desc().name());
-  const RequestDesc& request_desc = request_store_->GetRequestDesc(request_id);
-  CHECK(rank_desc.op_desc() == request_desc.op_desc());
-  const int64_t local_rank = request_store_->GetLocalRank(request_id, rank_desc.rank());
-  return std::make_shared<RequestHandle>(request_id, local_rank);
-}
-
-void Scheduler::Schedule(const std::shared_ptr<RequestHandle>& handle,
-                         std::shared_ptr<const RuntimeRequestInfo> request_info) {
-  const int64_t request_id = handle->request_id();
-  const int64_t local_rank = handle->local_rank();
-  const bool ready =
-      request_store_->SetRuntimeRequest(request_id, local_rank, std::move(request_info));
-  if (ready) { coordinator_->AddRequest(request_id); }
+void StaticGroupCoordinator::AddRequest(int32_t request_id) {
   const int64_t job_id = request_store_->GetJobId(request_id);
   std::unique_lock<std::mutex> lock(mutex_);
-  {
-    if (current_job_id_ == -1) {
-      current_job_id_ = job_id;
-      current_group_idx_in_job_ = 0;
-    } else {
-      CHECK_EQ(current_job_id_, job_id);
-    }
-    if (ready) {
-      group_id2group_state_.at(request_id2group_id_.at(request_id)).AddReadyRequest(request_id);
-    }
+  if (current_job_id_ == -1) {
+    current_job_id_ = job_id;
+    current_group_idx_in_job_ = 0;
+  } else {
+    CHECK_EQ(current_job_id_, job_id);
   }
+  group_id2group_state_.at(request_id2group_id_.at(request_id)).AddReadyRequest(request_id);
   const std::vector<int64_t>& group_ids = job_id2group_ids_.at(current_job_id_);
   int64_t num_launched_groups = 0;
   while (true) {
@@ -721,13 +723,60 @@ void Scheduler::Schedule(const std::shared_ptr<RequestHandle>& handle,
   }
 }
 
-void Scheduler::GroupState::AddReadyRequest(int32_t request_id) {
+void StaticGroupCoordinator::GroupState::AddReadyRequest(int32_t request_id) {
   CHECK(request_ids.find(request_id) != request_ids.end());
   CHECK(ready_request_ids.emplace(request_id).second);
 }
 
-bool Scheduler::GroupState::IsReady() const {
+void StaticGroupCoordinator::DumpSummary() const {
+  if (!Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) { return; }
+  auto group_ls = TeePersistentLogStream::Create("boxing/collective/group");
+  for (int64_t group_id = 0; group_id < group_id2group_state_.size(); ++group_id) {
+    group_ls << "group id: " << std::to_string(group_id) << "\n";
+    for (const int32_t request_id : group_id2group_state_.at(group_id).request_ids) {
+      group_ls->Write(request_store_->GetRequestDesc(request_id));
+    }
+  }
+}
+
+bool StaticGroupCoordinator::GroupState::IsReady() const {
   return ready_request_ids.size() == request_ids.size();
+}
+
+struct Scheduler::Impl {
+  explicit Impl(const CollectiveBoxingPlan& collective_boxing_plan);
+
+  CollectiveBoxingPlan collective_boxing_plan;
+  std::shared_ptr<RequestStore> request_store;
+  std::shared_ptr<Coordinator> coordinator;
+};
+
+Scheduler::Impl::Impl(const CollectiveBoxingPlan& collective_boxing_plan)
+    : collective_boxing_plan(collective_boxing_plan) {
+  request_store.reset(new RequestStore(collective_boxing_plan));
+  std::shared_ptr<Executor> executor(new ExecutorImpl());
+  executor->Init(collective_boxing_plan, request_store);
+  coordinator.reset(new StaticGroupCoordinator());
+  coordinator->Init(collective_boxing_plan, request_store, executor);
+}
+
+Scheduler::Scheduler(const Plan& plan) { impl_.reset(new Impl(plan.collective_boxing_plan())); }
+
+std::shared_ptr<RequestHandle> Scheduler::CreateRequestHandle(const RankDesc& rank_desc) {
+  const int32_t request_id = impl_->request_store->GetRequestIdByName(rank_desc.op_desc().name());
+  const RequestDesc& request_desc = impl_->request_store->GetRequestDesc(request_id);
+  CHECK(rank_desc.op_desc() == request_desc.op_desc());
+  const int64_t local_rank = impl_->request_store->GetLocalRank(request_id, rank_desc.rank());
+  return std::make_shared<RequestHandle>(request_id, local_rank);
+}
+
+void Scheduler::Schedule(const std::shared_ptr<RequestHandle>& handle,
+                         std::shared_ptr<const RuntimeRequestInfo> request_info) {
+  const int64_t request_id = handle->request_id();
+  const int64_t local_rank = handle->local_rank();
+  const bool ready =
+      impl_->request_store->SetRuntimeRequest(request_id, local_rank, std::move(request_info));
+  if (ready) { impl_->coordinator->AddRequest(request_id); }
 }
 
 struct RequestStore::Impl {

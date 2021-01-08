@@ -111,31 +111,8 @@ class Scheduler final {
   friend class Global<Scheduler>;
   explicit Scheduler(const Plan& plan);
 
-  void Init();
-  void DumpSummary() const;
-
-  struct GroupState {
-    explicit GroupState(std::set<int32_t> request_ids)
-        : request_ids(std::move(request_ids)), ready_request_ids() {}
-    const std::set<int32_t> request_ids;
-    std::set<int32_t> ready_request_ids;
-
-    void AddReadyRequest(int32_t request_id);
-    bool IsReady() const;
-  };
-
-  std::mutex mutex_;
-
-  const CollectiveBoxingPlan collective_boxing_plan_;
-  std::map<int64_t, std::vector<int64_t>> job_id2group_ids_;
-  std::vector<GroupState> group_id2group_state_;
-  std::vector<int64_t> request_id2group_id_;
-  int64_t current_job_id_ = -1;
-  int64_t current_group_idx_in_job_ = -1;
-
-  std::shared_ptr<RequestStore> request_store_;
-  std::shared_ptr<Coordinator> coordinator_;
-  std::shared_ptr<Executor> executor_;
+  struct Impl;
+  std::shared_ptr<Impl> impl_;
 };
 
 }  // namespace collective
