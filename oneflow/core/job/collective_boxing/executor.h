@@ -46,6 +46,7 @@ class RequestStore {
   int32_t GetRequestIdByName(const std::string& name) const;
   int64_t GetJobId(int32_t request_id) const;
   int64_t GetGlobalRank(int32_t request_id, int32_t local_rank) const;
+  int64_t GetLocalRank(int32_t request_id, int32_t global_rank) const;
   bool HasRankOnThisNode(int32_t request_id) const;
 
   bool SetRuntimeRequest(int32_t request_id, int32_t local_rank,
@@ -77,7 +78,7 @@ class CollectiveBoxingExecutor final {
   OF_DISALLOW_COPY_AND_MOVE(CollectiveBoxingExecutor);
   ~CollectiveBoxingExecutor() = default;
 
-  void Enqueue(const RankDesc& rank_desc, const RuntimeRequestInfo& request_info);
+  void Enqueue(const RankDesc& rank_desc, std::shared_ptr<const RuntimeRequestInfo> request_info);
 
  private:
   friend class Global<CollectiveBoxingExecutor>;
@@ -85,24 +86,6 @@ class CollectiveBoxingExecutor final {
 
   void Init();
   void DumpSummary() const;
-
-  struct RequestState {
-    RequestState(const RequestDesc* p_request_desc, int64_t p_job_id, int64_t p_group_id,
-                 std::set<int64_t> p_local_ranks)
-        : request_desc(p_request_desc),
-          job_id(p_job_id),
-          group_id(p_group_id),
-          local_ranks(std::move(p_local_ranks)),
-          ready_ranks() {}
-    const RequestDesc* const request_desc;
-    const int64_t job_id;
-    const int64_t group_id;
-    const std::set<int64_t> local_ranks;
-    std::map<int64_t, RuntimeRequestInfo> ready_ranks;
-
-    void AddReadyRank(const RankDesc& rank_desc, const RuntimeRequestInfo& request_info);
-    bool IsReady() const;
-  };
 
   struct GroupState {
     GroupState(CollectiveBoxingExecutorBackend* backend, std::set<int32_t> request_ids)
@@ -119,11 +102,9 @@ class CollectiveBoxingExecutor final {
 
   const CollectiveBoxingPlan collective_boxing_plan_;
   std::map<Backend, std::unique_ptr<CollectiveBoxingExecutorBackend>> backends_;
-  HashMap<std::string, int64_t> name2request_id_;
-  std::vector<RequestState> request_id2request_state_;
   std::map<int64_t, std::vector<int64_t>> job_id2group_ids_;
   std::vector<GroupState> group_id2group_state_;
-
+  std::vector<int64_t> request_id2group_id_;
   int64_t current_job_id_ = -1;
   int64_t current_group_idx_in_job_ = -1;
 

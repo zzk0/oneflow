@@ -39,29 +39,29 @@ class CollectiveBoxingGenericKernel final : public KernelIf<device_type> {
 template<DeviceType device_type>
 void CollectiveBoxingGenericKernel<device_type>::ForwardDataContent(
     const KernelCtx& ctx, std::function<Blob*(const std::string&)> BnInOp2Blob) const {
-  RuntimeRequestInfo request;
+  auto request = std::make_shared<RuntimeRequestInfo>();
   const RankDesc& rank_desc = this->op_conf().collective_boxing_generic_conf().rank_desc();
   const DataType data_type = rank_desc.op_desc().data_type();
   if (GenericOpHasInput(rank_desc)) {
     const Blob* in = BnInOp2Blob("in");
     CHECK_EQ(in->data_type(), data_type);
     CHECK(in->shape() == ShapeView(GenericOpGetInputShape(rank_desc)));
-    request.send_buff = in->dptr();
+    request->send_buff = in->dptr();
   } else {
-    request.send_buff = nullptr;
+    request->send_buff = nullptr;
   }
   if (GenericOpHasOutput(rank_desc)) {
     Blob* out = BnInOp2Blob("out");
     CHECK_EQ(out->data_type(), data_type);
     CHECK(out->shape() == ShapeView(GenericOpGetOutputShape(rank_desc)));
-    request.recv_buff = out->mut_dptr();
+    request->recv_buff = out->mut_dptr();
   } else {
-    request.recv_buff = nullptr;
+    request->recv_buff = nullptr;
   }
   auto* device_ctx = dynamic_cast<CollectiveBoxingDeviceCtx*>(ctx.device_ctx);
   CHECK_NOTNULL(device_ctx);
   std::shared_ptr<CollectiveBoxingDeviceCtxCheckpoint> checkpoint = device_ctx->AddCheckpoint();
-  request.callback = std::make_shared<const std::function<void(const Maybe<void>&)>>(
+  request->callback = std::make_shared<const std::function<void(const Maybe<void>&)>>(
       [checkpoint](const Maybe<void>& status) {
         CHECK(status.IsOk());
         checkpoint->SetDone();

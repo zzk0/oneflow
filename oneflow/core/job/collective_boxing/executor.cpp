@@ -293,6 +293,7 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteGroup(const std::vector<int32_t
       ranks.back()[request_store_->GetGlobalRank(request_id, local_rank)] =
           request_store_->GetRuntimeRequest(request_id, local_rank);
     }
+    request_store_->ResetRuntimeRequest(request_id);
   }
   CHECK_EQ(group.size(), ranks.size());
   if (group.empty()) { return; }
@@ -557,6 +558,7 @@ void CollectiveBoxingExecutor::Init() {
   const auto GetRequestDesc = [&](int32_t request_id) -> const RequestDesc& {
     return request_store_->GetRequestDesc(request_id);
   };
+  request_id2group_id_.resize(request_store_->RequestCount());
   for (auto& job_id7request_ids : job_id2request_ids) {
     const int64_t job_id = job_id7request_ids.first;
     auto& request_ids = job_id7request_ids.second;
@@ -594,6 +596,7 @@ void CollectiveBoxingExecutor::Init() {
         group_id2group_state_.emplace_back(backend,
                                            std::set<int32_t>({group.cbegin(), group.cend()}));
         job_id2group_ids_[job_id].push_back(group_id);
+        for (int32_t r : group) { request_id2group_id_[r] = group_id; }
       }
     }
   }
@@ -611,24 +614,22 @@ void CollectiveBoxingExecutor::DumpSummary() const {
 }
 
 void CollectiveBoxingExecutor::Enqueue(const RankDesc& rank_desc,
-                                       const RuntimeRequestInfo& request_info) {
-  const std::string& name = rank_desc.op_desc().name();
-  auto it = name2request_id_.find(name);
-  CHECK(it != name2request_id_.end());
+                                       std::shared_ptr<const RuntimeRequestInfo> request_info) {
   std::unique_lock<std::mutex> lock(mutex_);
   {
-    const int64_t request_id = it->second;
-    RequestState& request_state = request_id2request_state_.at(it->second);
+    const int64_t request_id = request_store_->GetRequestIdByName(rank_desc.op_desc().name());
+    const int64_t local_rank = request_store_->GetLocalRank(request_id, rank_desc.rank());
+    const bool ready =
+        request_store_->SetRuntimeRequest(request_id, local_rank, std::move(request_info));
+    const int64_t job_id = request_store_->GetJobId(request_id);
     if (current_job_id_ == -1) {
-      current_job_id_ = request_state.job_id;
+      current_job_id_ = job_id;
       current_group_idx_in_job_ = 0;
     } else {
-      CHECK_EQ(current_job_id_, request_state.job_id);
+      CHECK_EQ(current_job_id_, job_id);
     }
-
-    request_state.AddReadyRank(rank_desc, request_info);
-    if (request_state.IsReady()) {
-      group_id2group_state_.at(request_state.group_id).AddReadyRequest(request_id);
+    if (ready) {
+      group_id2group_state_.at(request_id2group_id_.at(request_id)).AddReadyRequest(request_id);
     }
   }
   const std::vector<int64_t>& group_ids = job_id2group_ids_.at(current_job_id_);
@@ -637,13 +638,6 @@ void CollectiveBoxingExecutor::Enqueue(const RankDesc& rank_desc,
     const int64_t group_id = group_ids.at(current_group_idx_in_job_);
     auto& group_state = group_id2group_state_.at(group_id);
     if (group_state.IsReady()) {
-      std::vector<std::map<int64_t, RuntimeRequestInfo>> ranks;
-      ranks.reserve(group_state.request_ids.size());
-      for (const int64_t request_id : group_state.request_ids) {
-        auto& rank = request_id2request_state_.at(request_id).ready_ranks;
-        ranks.emplace_back(std::move(rank));
-        rank.clear();
-      }
       group_state.backend->ExecuteGroup(
           std::vector<int32_t>({group_state.request_ids.cbegin(), group_state.request_ids.cend()}));
       group_state.ready_request_ids.clear();
@@ -657,17 +651,6 @@ void CollectiveBoxingExecutor::Enqueue(const RankDesc& rank_desc,
     current_job_id_ = -1;
     current_group_idx_in_job_ = -1;
   }
-}
-
-void CollectiveBoxingExecutor::RequestState::AddReadyRank(const RankDesc& rank_desc,
-                                                          const RuntimeRequestInfo& request_info) {
-  CHECK(local_ranks.find(rank_desc.rank()) != local_ranks.end());
-  CHECK_LT(ready_ranks.size(), local_ranks.size());
-  CHECK(ready_ranks.emplace(rank_desc.rank(), request_info).second);
-}
-
-bool CollectiveBoxingExecutor::RequestState::IsReady() const {
-  return ready_ranks.size() == local_ranks.size();
 }
 
 void CollectiveBoxingExecutor::GroupState::AddReadyRequest(int32_t request_id) {
@@ -688,7 +671,8 @@ struct RequestStore::Impl {
         const DeviceDesc& device = desc.device_set().device(global_rank);
         if (IsDeviceOnThisMachine(device)) {
           local_device_vec.push_back(device);
-          global_rank_vec.push_back(global_rank);
+          global_rank2local_rank.emplace(global_rank, local_rank2global_rank.size());
+          local_rank2global_rank.push_back(global_rank);
         }
         node_ids.emplace(device.machine_id());
       }
@@ -705,7 +689,8 @@ struct RequestStore::Impl {
     std::vector<std::shared_ptr<const RuntimeRequestInfo>> runtime_request_info_vec;
     int32_t runtime_request_info_count;
     std::vector<DeviceDesc> local_device_vec;
-    std::vector<int64_t> global_rank_vec;
+    std::vector<int64_t> local_rank2global_rank;
+    std::map<int64_t, int64_t> global_rank2local_rank;
   };
 
   std::vector<RequestInfo> request_info_vec;
@@ -760,7 +745,11 @@ int64_t RequestStore::GetJobId(int32_t request_id) const {
 }
 
 int64_t RequestStore::GetGlobalRank(int32_t request_id, int32_t local_rank) const {
-  return impl_->request_info_vec.at(request_id).global_rank_vec.at(local_rank);
+  return impl_->request_info_vec.at(request_id).local_rank2global_rank.at(local_rank);
+}
+
+int64_t RequestStore::GetLocalRank(int32_t request_id, int32_t global_rank) const {
+  return impl_->request_info_vec.at(request_id).global_rank2local_rank.at(global_rank);
 }
 
 bool RequestStore::HasRankOnThisNode(int32_t request_id) const {
@@ -799,7 +788,7 @@ void RequestStore::ResetRuntimeRequest(int32_t request_id) {
   request_info.runtime_request_info_count = 0;
 }
 
-};  // namespace collective
+}  // namespace collective
 
 }  // namespace boxing
 
