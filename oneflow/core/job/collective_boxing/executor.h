@@ -60,11 +60,11 @@ class RequestStore {
   std::unique_ptr<Impl> impl_;
 };
 
-class CollectiveBoxingExecutorBackend {
+class ExecutorBackend {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(CollectiveBoxingExecutorBackend);
-  CollectiveBoxingExecutorBackend() = default;
-  virtual ~CollectiveBoxingExecutorBackend() = default;
+  OF_DISALLOW_COPY_AND_MOVE(ExecutorBackend);
+  ExecutorBackend() = default;
+  virtual ~ExecutorBackend() = default;
 
   virtual void Init(const CollectiveBoxingPlan& collective_boxing_plan,
                     std::shared_ptr<RequestStore> request_store){};

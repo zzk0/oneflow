@@ -85,18 +85,18 @@ int64_t GetAlignedRequestSize(const RequestDesc& request) {
 
 #ifdef WITH_CUDA
 
-void CollectiveBoxingExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
-                                                    std::vector<std::vector<int32_t>>* groups) {
+void ExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
+                                    std::vector<std::vector<int32_t>>* groups) {
   for (const int32_t request_id : request_ids) {
     groups->emplace_back(std::vector<int32_t>({request_id}));
   }
 }
 
-class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBackend {
+class NcclExecutorBackend : public ExecutorBackend {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(NcclCollectiveBoxingExecutorBackend)
-  NcclCollectiveBoxingExecutorBackend();
-  ~NcclCollectiveBoxingExecutorBackend() override;
+  OF_DISALLOW_COPY_AND_MOVE(NcclExecutorBackend)
+  NcclExecutorBackend();
+  ~NcclExecutorBackend() override;
 
  private:
   void Init(const CollectiveBoxingPlan& collective_boxing_plan,
@@ -139,7 +139,7 @@ class NcclCollectiveBoxingExecutorBackend : public CollectiveBoxingExecutorBacke
   std::shared_ptr<RequestStore> request_store_;
 };
 
-NcclCollectiveBoxingExecutorBackend::NcclCollectiveBoxingExecutorBackend()
+NcclExecutorBackend::NcclExecutorBackend()
     : collective_boxing_conf_(Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf()),
       shutdown_(false) {
   OF_CUDA_CHECK(cudaGetDeviceCount(&num_devices_));
@@ -181,7 +181,7 @@ NcclCollectiveBoxingExecutorBackend::NcclCollectiveBoxingExecutorBackend()
   });
 }
 
-NcclCollectiveBoxingExecutorBackend::~NcclCollectiveBoxingExecutorBackend() {
+NcclExecutorBackend::~NcclExecutorBackend() {
   {
     std::unique_lock<std::mutex> lock(event_list_mutex_);
     shutdown_ = true;
@@ -208,8 +208,8 @@ NcclCollectiveBoxingExecutorBackend::~NcclCollectiveBoxingExecutorBackend() {
   }
 }
 
-void NcclCollectiveBoxingExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
-                                                        std::vector<std::vector<int32_t>>* groups) {
+void NcclExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
+                                        std::vector<std::vector<int32_t>>* groups) {
   std::vector<int32_t> group;
   int64_t group_size = 0;
   auto IsOpFusionEnabled = [&](const RequestDesc& request) -> bool {
@@ -281,7 +281,7 @@ void NcclCollectiveBoxingExecutorBackend::GroupRequests(const std::vector<int32_
   }
 }
 
-void NcclCollectiveBoxingExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_ids) {
+void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_ids) {
   std::vector<const RequestDesc*> group;
   std::vector<std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>> ranks;
   group.reserve(request_ids.size());
@@ -455,8 +455,8 @@ void NcclCollectiveBoxingExecutorBackend::ExecuteRequests(const std::vector<int3
   }
 }
 
-void NcclCollectiveBoxingExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_plan,
-                                               std::shared_ptr<RequestStore> request_store) {
+void NcclExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_plan,
+                               std::shared_ptr<RequestStore> request_store) {
   request_store_ = request_store;
   CudaCurrentDeviceGuard guard;
   std::set<int64_t> local_device_ids;
@@ -561,7 +561,7 @@ class ExecutorImpl : public Executor {
  private:
   Backend GetUniqueBackend(const std::vector<int32_t>& request_ids);
 
-  std::map<Backend, std::unique_ptr<CollectiveBoxingExecutorBackend>> backends_;
+  std::map<Backend, std::unique_ptr<ExecutorBackend>> backends_;
   std::shared_ptr<RequestStore> request_store_;
 };
 
@@ -569,10 +569,7 @@ void ExecutorImpl::Init(const CollectiveBoxingPlan& collective_boxing_plan,
                         std::shared_ptr<RequestStore> request_store) {
   request_store_ = request_store;
 #ifdef WITH_CUDA
-  auto it =
-      backends_
-          .emplace(Backend::kBackendNCCL, std::make_unique<NcclCollectiveBoxingExecutorBackend>())
-          .first;
+  auto it = backends_.emplace(Backend::kBackendNCCL, std::make_unique<NcclExecutorBackend>()).first;
   it->second->Init(collective_boxing_plan, request_store_);
 #endif
 }
