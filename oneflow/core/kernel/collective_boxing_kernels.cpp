@@ -75,7 +75,7 @@ void CollectiveBoxingGenericKernel<device_type>::ForwardDataContent(
         CHECK(status.IsOk());
         checkpoint->SetDone();
       });
-  Global<Scheduler>::Get()->Schedule(rank_desc, request);
+  Global<Scheduler>::Get()->Schedule(request_handle_, request);
 }
 
 ADD_DEVICE_TYPE_KERNEL_CREATOR(OperatorConf::kCollectiveBoxingGenericConf,
