@@ -20,6 +20,7 @@ limitations under the License.
 #include "oneflow/core/job/plan.pb.h"
 #include "oneflow/core/common/maybe.h"
 #include "oneflow/core/device/device_context.h"
+#include "oneflow/core/job/collective_boxing/runtime_request_info.h"
 
 namespace oneflow {
 
@@ -27,38 +28,9 @@ namespace boxing {
 
 namespace collective {
 
-struct RuntimeRequestInfo {
-  const void* send_buff;
-  void* recv_buff;
-  std::shared_ptr<const std::function<void(const Maybe<void>&)>> callback;
-};
+struct RuntimeRequestInfo;
 
-class RequestStore {
- public:
-  OF_DISALLOW_COPY_AND_MOVE(RequestStore);
-  explicit RequestStore(const CollectiveBoxingPlan& collective_boxing_plan);
-  ~RequestStore() = default;
-
-  int32_t RequestCount() const;
-  int32_t MaxMultiNodeRequestId() const;
-  const RequestDesc& GetRequestDesc(int32_t request_id) const;
-  int32_t GetLocalRankCount(int32_t request_id) const;
-  int32_t GetRequestIdByName(const std::string& name) const;
-  int64_t GetJobId(int32_t request_id) const;
-  int64_t GetGlobalRank(int32_t request_id, int32_t local_rank) const;
-  int64_t GetLocalRank(int32_t request_id, int32_t global_rank) const;
-  bool HasRankOnThisNode(int32_t request_id) const;
-
-  bool SetRuntimeRequest(int32_t request_id, int32_t local_rank,
-                         std::shared_ptr<const RuntimeRequestInfo> runtime_request_info);
-  const std::shared_ptr<const RuntimeRequestInfo>& GetRuntimeRequest(int32_t request_id,
-                                                                     int32_t local_rank) const;
-  void ResetRuntimeRequest(int32_t request_id);
-
- private:
-  struct Impl;
-  std::unique_ptr<Impl> impl_;
-};
+class RequestStore;
 
 class ExecutorBackend {
  public:

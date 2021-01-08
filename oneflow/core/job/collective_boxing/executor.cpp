@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "oneflow/core/job/collective_boxing/executor.h"
+#include "oneflow/core/job/collective_boxing/request_store.h"
 #include "oneflow/core/device/nccl_util.h"
 #include "oneflow/core/graph/boxing/collective_boxing_util.h"
 #include "oneflow/core/job/resource_desc.h"
@@ -52,9 +53,10 @@ void SortRequestsByOrder(std::vector<const RequestDesc*>* requests) {
             [](const RequestDesc* a, const RequestDesc* b) { return a->order() < b->order(); });
 }
 
-void SortRequestIdsByOrder(const RequestStore* request_store, std::vector<int32_t>* requests) {
+void SortRequestIdsByOrder(RequestStore* request_store, std::vector<int32_t>* requests) {
   std::sort(requests->begin(), requests->end(), [request_store](int32_t a, int32_t b) {
-    return request_store->GetRequestDesc(a).order() < request_store->GetRequestDesc(b).order();
+    return request_store->MutRequestEntry(a)->desc().order()
+           < request_store->MutRequestEntry(b)->desc().order();
   });
 }
 
@@ -261,9 +263,9 @@ void NcclExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
   };
 
   for (const int32_t request_id : request_ids) {
-    const auto& request = request_store_->GetRequestDesc(request_id);
+    const auto& request = request_store_->MutRequestEntry(request_id)->desc();
     const int64_t size = GetAlignedRequestSize(request);
-    if (group.empty() || !CanFuse(request_store_->GetRequestDesc(group.back()), request)
+    if (group.empty() || !CanFuse(request_store_->MutRequestEntry(group.back())->desc(), request)
         || group_size + size > fusion_threshold_
         || group.size() >= collective_boxing_conf_.nccl_fusion_max_ops()) {
       if (!group.empty()) {
@@ -286,14 +288,14 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
   std::vector<std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>> ranks;
   group.reserve(request_ids.size());
   for (const int32_t request_id : request_ids) {
-    group.push_back(&request_store_->GetRequestDesc(request_id));
+    auto* request_entry = request_store_->MutRequestEntry(request_id);
+    group.push_back(&request_entry->desc());
     ranks.emplace_back();
-    for (int32_t local_rank = 0; local_rank < request_store_->GetLocalRankCount(request_id);
-         ++local_rank) {
-      ranks.back()[request_store_->GetGlobalRank(request_id, local_rank)] =
-          request_store_->GetRuntimeRequest(request_id, local_rank);
+    for (int32_t local_rank = 0; local_rank < request_entry->LocalRankCount(); ++local_rank) {
+      ranks.back()[request_entry->LocalRankToGlobalRank(local_rank)] =
+          request_entry->GetRuntimeRequest(local_rank);
     }
-    request_store_->ResetRuntimeRequest(request_id);
+    request_entry->ResetRuntimeRequest();
   }
   CHECK_EQ(group.size(), ranks.size());
   if (group.empty()) { return; }
@@ -588,9 +590,11 @@ void ExecutorImpl::ExecuteRequests(const std::vector<int32_t>& request_ids) {
 }
 
 Backend ExecutorImpl::GetUniqueBackend(const std::vector<int32_t>& request_ids) {
-  const Backend backend = request_store_->GetRequestDesc(request_ids.front()).op_desc().backend();
+  const Backend backend =
+      request_store_->MutRequestEntry(request_ids.front())->desc().op_desc().backend();
   for (int64_t i = 1; i < request_ids.size(); ++i) {
-    CHECK_EQ(request_store_->GetRequestDesc(request_ids.at(i)).op_desc().backend(), backend);
+    CHECK_EQ(request_store_->MutRequestEntry(request_ids.at(i))->desc().op_desc().backend(),
+             backend);
   }
   return backend;
 }
@@ -639,12 +643,13 @@ void StaticGroupCoordinator::Init(const CollectiveBoxingPlan& collective_boxing_
   HashMap<int64_t, std::vector<int32_t>> job_id2request_ids;
   const int32_t request_count = request_store_->RequestCount();
   for (int32_t request_id = 0; request_id < request_count; ++request_id) {
-    if (request_store_->HasRankOnThisNode(request_id)) {
-      job_id2request_ids[request_store_->GetJobId(request_id)].push_back(request_id);
+    auto* request_entry = request_store_->MutRequestEntry(request_id);
+    if (request_entry->HasRankOnThisNode()) {
+      job_id2request_ids[request_entry->job_id()].push_back(request_id);
     }
   }
-  const auto GetRequestDesc = [&](int32_t request_id) -> const RequestDesc& {
-    return request_store_->GetRequestDesc(request_id);
+  const auto& GetRequestDesc = [&](int32_t request_id) -> const RequestDesc& {
+    return request_store_->MutRequestEntry(request_id)->desc();
   };
   request_id2group_id_.resize(request_store_->RequestCount());
   for (auto& job_id7request_ids : job_id2request_ids) {
@@ -690,7 +695,7 @@ void StaticGroupCoordinator::Init(const CollectiveBoxingPlan& collective_boxing_
 }
 
 void StaticGroupCoordinator::AddRequest(int32_t request_id) {
-  const int64_t job_id = request_store_->GetJobId(request_id);
+  const int64_t job_id = request_store_->MutRequestEntry(request_id)->job_id();
   std::unique_lock<std::mutex> lock(mutex_);
   if (current_job_id_ == -1) {
     current_job_id_ = job_id;
@@ -731,7 +736,7 @@ void StaticGroupCoordinator::DumpSummary() const {
   for (int64_t group_id = 0; group_id < group_id2group_state_.size(); ++group_id) {
     group_ls << "group id: " << std::to_string(group_id) << "\n";
     for (const int32_t request_id : group_id2group_state_.at(group_id).request_ids) {
-      group_ls->Write(request_store_->GetRequestDesc(request_id));
+      group_ls->Write(request_store_->MutRequestEntry(request_id)->desc());
     }
   }
 }
@@ -761,9 +766,9 @@ Scheduler::Scheduler(const Plan& plan) { impl_.reset(new Impl(plan.collective_bo
 
 std::shared_ptr<RequestHandle> Scheduler::CreateRequestHandle(const RankDesc& rank_desc) {
   const int32_t request_id = impl_->request_store->GetRequestIdByName(rank_desc.op_desc().name());
-  const RequestDesc& request_desc = impl_->request_store->GetRequestDesc(request_id);
-  CHECK(rank_desc.op_desc() == request_desc.op_desc());
-  const int64_t local_rank = impl_->request_store->GetLocalRank(request_id, rank_desc.rank());
+  auto* request_entry = impl_->request_store->MutRequestEntry(request_id);
+  CHECK(rank_desc.op_desc() == request_entry->desc().op_desc());
+  const int64_t local_rank = request_entry->GlobalRankToLocalRank(rank_desc.rank());
   return std::make_shared<RequestHandle>(request_id, local_rank);
 }
 
@@ -771,135 +776,9 @@ void Scheduler::Schedule(const std::shared_ptr<RequestHandle>& handle,
                          std::shared_ptr<const RuntimeRequestInfo> request_info) {
   const int64_t request_id = handle->request_id();
   const int64_t local_rank = handle->local_rank();
-  const bool ready =
-      impl_->request_store->SetRuntimeRequest(request_id, local_rank, std::move(request_info));
+  const bool ready = impl_->request_store->MutRequestEntry(request_id)
+                         ->AddRuntimeRequest(local_rank, std::move(request_info));
   if (ready) { impl_->coordinator->AddRequest(request_id); }
-}
-
-struct RequestStore::Impl {
-  struct RequestInfo {
-    RequestInfo(int64_t job_id, const RequestDesc& desc) : job_id(job_id), desc(desc) {
-      std::set<int64_t> node_ids;
-      for (int64_t global_rank = 0; global_rank < desc.device_set().device().size();
-           ++global_rank) {
-        const DeviceDesc& device = desc.device_set().device(global_rank);
-        if (IsDeviceOnThisMachine(device)) {
-          local_device_vec.push_back(device);
-          global_rank2local_rank.emplace(global_rank, local_rank2global_rank.size());
-          local_rank2global_rank.push_back(global_rank);
-        }
-        node_ids.emplace(device.machine_id());
-      }
-      local_rank_count = local_device_vec.size();
-      node_count = node_ids.size();
-      runtime_request_info_vec.resize(local_rank_count);
-      runtime_request_info_count = 0;
-    }
-
-    int64_t job_id;
-    RequestDesc desc;
-    int32_t local_rank_count;
-    int32_t node_count;
-    std::vector<std::shared_ptr<const RuntimeRequestInfo>> runtime_request_info_vec;
-    int32_t runtime_request_info_count;
-    std::vector<DeviceDesc> local_device_vec;
-    std::vector<int64_t> local_rank2global_rank;
-    std::map<int64_t, int64_t> global_rank2local_rank;
-  };
-
-  std::vector<RequestInfo> request_info_vec;
-  int32_t max_multi_node_request_id = 0;
-  std::vector<std::mutex> mutex_vec;
-  HashMap<std::string, int32_t> name2request_id;
-};
-
-RequestStore::RequestStore(const CollectiveBoxingPlan& collective_boxing_plan) {
-  impl_.reset(new Impl());
-  for (const auto& job_id7request_set : collective_boxing_plan.job_id2request_set()) {
-    const int64_t job_id = job_id7request_set.first;
-    const RequestSet& request_set = job_id7request_set.second;
-    for (const RequestDesc& desc : request_set.request()) {
-      impl_->request_info_vec.emplace_back(job_id, desc);
-    }
-  }
-  std::sort(impl_->request_info_vec.begin(), impl_->request_info_vec.end(),
-            [](const Impl::RequestInfo& a, const Impl::RequestInfo& b) {
-              return a.node_count == b.node_count
-                         ? a.desc.op_desc().name() < b.desc.op_desc().name()
-                         : a.node_count > b.node_count;
-            });
-  for (int32_t i = 0; i < impl_->request_info_vec.size(); ++i) {
-    CHECK(impl_->name2request_id.emplace(impl_->request_info_vec.at(i).desc.op_desc().name(), i)
-              .second);
-  }
-  impl_->mutex_vec = std::vector<std::mutex>(impl_->request_info_vec.size());
-  impl_->max_multi_node_request_id =
-      std::count_if(impl_->request_info_vec.cbegin(), impl_->request_info_vec.cend(),
-                    [](const Impl::RequestInfo& info) { return info.node_count > 1; });
-}
-
-int32_t RequestStore::RequestCount() const { return impl_->request_info_vec.size(); }
-
-int32_t RequestStore::MaxMultiNodeRequestId() const { return impl_->max_multi_node_request_id; }
-
-const RequestDesc& RequestStore::GetRequestDesc(int32_t request_id) const {
-  return impl_->request_info_vec.at(request_id).desc;
-}
-
-int32_t RequestStore::GetLocalRankCount(int32_t request_id) const {
-  return impl_->request_info_vec.at(request_id).local_rank_count;
-}
-
-int32_t RequestStore::GetRequestIdByName(const std::string& name) const {
-  return impl_->name2request_id.at(name);
-}
-
-int64_t RequestStore::GetJobId(int32_t request_id) const {
-  return impl_->request_info_vec.at(request_id).job_id;
-}
-
-int64_t RequestStore::GetGlobalRank(int32_t request_id, int32_t local_rank) const {
-  return impl_->request_info_vec.at(request_id).local_rank2global_rank.at(local_rank);
-}
-
-int64_t RequestStore::GetLocalRank(int32_t request_id, int32_t global_rank) const {
-  return impl_->request_info_vec.at(request_id).global_rank2local_rank.at(global_rank);
-}
-
-bool RequestStore::HasRankOnThisNode(int32_t request_id) const {
-  return impl_->request_info_vec.at(request_id).local_rank_count > 0;
-}
-
-bool RequestStore::SetRuntimeRequest(
-    int32_t request_id, int32_t local_rank,
-    std::shared_ptr<const RuntimeRequestInfo> runtime_request_info) {
-  auto& mutex = impl_->mutex_vec.at(request_id);
-  auto& request_info = impl_->request_info_vec.at(request_id);
-  CHECK_LT(local_rank, request_info.local_rank_count);
-  std::lock_guard<std::mutex> lock(mutex);
-  CHECK(!request_info.runtime_request_info_vec.at(local_rank));
-  request_info.runtime_request_info_vec.at(local_rank) = std::move(runtime_request_info);
-  request_info.runtime_request_info_count += 1;
-  return request_info.runtime_request_info_count == request_info.local_rank_count;
-}
-
-const std::shared_ptr<const RuntimeRequestInfo>& RequestStore::GetRuntimeRequest(
-    int32_t request_id, int32_t local_rank) const {
-  auto& mutex = impl_->mutex_vec.at(request_id);
-  auto& request_info = impl_->request_info_vec.at(request_id);
-  CHECK_LT(local_rank, request_info.local_rank_count);
-  std::lock_guard<std::mutex> lock(mutex);
-  return request_info.runtime_request_info_vec.at(local_rank);
-}
-
-void RequestStore::ResetRuntimeRequest(int32_t request_id) {
-  auto& mutex = impl_->mutex_vec.at(request_id);
-  auto& request_info = impl_->request_info_vec.at(request_id);
-  std::lock_guard<std::mutex> lock(mutex);
-  for (auto& runtime_request_info : request_info.runtime_request_info_vec) {
-    runtime_request_info.reset();
-  }
-  request_info.runtime_request_info_count = 0;
 }
 
 }  // namespace collective
