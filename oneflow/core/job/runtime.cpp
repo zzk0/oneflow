@@ -123,7 +123,7 @@ void Runtime::NewAllGlobal(const Plan& plan, size_t total_piece_num, bool is_exp
     }
 #endif
   }
-  Global<boxing::collective::CollectiveBoxingExecutor>::New(plan);
+  Global<boxing::collective::Scheduler>::New(plan);
   Global<MemoryAllocator>::New();
   Global<RegstMgr>::New(plan);
   Global<ActorMsgBus>::New();
@@ -140,7 +140,7 @@ void Runtime::DeleteAllGlobal() {
   Global<ActorMsgBus>::Delete();
   Global<RegstMgr>::Delete();
   Global<MemoryAllocator>::Delete();
-  Global<boxing::collective::CollectiveBoxingExecutor>::Delete();
+  Global<boxing::collective::Scheduler>::Delete();
 
   // should be called after Global<Transport>::Delete()
   if (Global<ResourceDesc, ForSession>::Get()->TotalMachineNum() > 1) {

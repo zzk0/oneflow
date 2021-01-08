@@ -531,8 +531,7 @@ void NcclCollectiveBoxingExecutorBackend::Init(const CollectiveBoxingPlan& colle
 
 #endif  // WITH_CUDA
 
-CollectiveBoxingExecutor::CollectiveBoxingExecutor(const Plan& plan)
-    : collective_boxing_plan_(plan.collective_boxing_plan()) {
+Scheduler::Scheduler(const Plan& plan) : collective_boxing_plan_(plan.collective_boxing_plan()) {
   request_store_.reset(new RequestStore(collective_boxing_plan_));
 #ifdef WITH_CUDA
   auto it =
@@ -545,7 +544,7 @@ CollectiveBoxingExecutor::CollectiveBoxingExecutor(const Plan& plan)
   DumpSummary();
 }
 
-void CollectiveBoxingExecutor::Init() {
+void Scheduler::Init() {
   const CollectiveBoxingConf collective_boxing_conf =
       Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf();
   HashMap<int64_t, std::vector<int32_t>> job_id2request_ids;
@@ -602,7 +601,7 @@ void CollectiveBoxingExecutor::Init() {
   }
 }
 
-void CollectiveBoxingExecutor::DumpSummary() const {
+void Scheduler::DumpSummary() const {
   if (!Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) { return; }
   auto group_ls = TeePersistentLogStream::Create("boxing/collective/group");
   for (int64_t group_id = 0; group_id < group_id2group_state_.size(); ++group_id) {
@@ -613,8 +612,8 @@ void CollectiveBoxingExecutor::DumpSummary() const {
   }
 }
 
-void CollectiveBoxingExecutor::Enqueue(const RankDesc& rank_desc,
-                                       std::shared_ptr<const RuntimeRequestInfo> request_info) {
+void Scheduler::Schedule(const RankDesc& rank_desc,
+                         std::shared_ptr<const RuntimeRequestInfo> request_info) {
   std::unique_lock<std::mutex> lock(mutex_);
   {
     const int64_t request_id = request_store_->GetRequestIdByName(rank_desc.op_desc().name());
@@ -653,12 +652,12 @@ void CollectiveBoxingExecutor::Enqueue(const RankDesc& rank_desc,
   }
 }
 
-void CollectiveBoxingExecutor::GroupState::AddReadyRequest(int32_t request_id) {
+void Scheduler::GroupState::AddReadyRequest(int32_t request_id) {
   CHECK(request_ids.find(request_id) != request_ids.end());
   CHECK(ready_request_ids.emplace(request_id).second);
 }
 
-bool CollectiveBoxingExecutor::GroupState::IsReady() const {
+bool Scheduler::GroupState::IsReady() const {
   return ready_request_ids.size() == request_ids.size();
 }
 

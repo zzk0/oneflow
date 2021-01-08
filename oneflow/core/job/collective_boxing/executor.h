@@ -73,16 +73,16 @@ class CollectiveBoxingExecutorBackend {
   virtual void ExecuteGroup(const std::vector<int32_t>& request_ids) = 0;
 };
 
-class CollectiveBoxingExecutor final {
+class Scheduler final {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(CollectiveBoxingExecutor);
-  ~CollectiveBoxingExecutor() = default;
+  OF_DISALLOW_COPY_AND_MOVE(Scheduler);
+  ~Scheduler() = default;
 
-  void Enqueue(const RankDesc& rank_desc, std::shared_ptr<const RuntimeRequestInfo> request_info);
+  void Schedule(const RankDesc& rank_desc, std::shared_ptr<const RuntimeRequestInfo> request_info);
 
  private:
-  friend class Global<CollectiveBoxingExecutor>;
-  explicit CollectiveBoxingExecutor(const Plan& plan);
+  friend class Global<Scheduler>;
+  explicit Scheduler(const Plan& plan);
 
   void Init();
   void DumpSummary() const;
