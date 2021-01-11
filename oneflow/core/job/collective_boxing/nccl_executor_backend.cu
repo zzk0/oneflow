@@ -120,6 +120,16 @@ class CommRank final {
         local_rank_count_(local_rank_count),
         nccl_comm_(nullptr) {}
 
+  CommRank(CommRank&& rhs) noexcept {
+    this->device_id_ = rhs.device_id_;
+    this->global_rank_ = rhs.global_rank_;
+    this->global_rank_count_ = rhs.global_rank_count_;
+    this->local_rank_ = rhs.local_rank_;
+    this->local_rank_count_ = rhs.local_rank_count_;
+    this->nccl_comm_ = rhs.nccl_comm_;
+    rhs.nccl_comm_ = nullptr;
+  }
+
   ~CommRank() {
     if (nccl_comm_ != nullptr) {
       CudaCurrentDeviceGuard(device_id_);
