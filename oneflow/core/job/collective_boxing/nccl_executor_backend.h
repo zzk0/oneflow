@@ -16,6 +16,8 @@ limitations under the License.
 #ifndef ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_NCCL_EXECUTOR_BACKEND_H_
 #define ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_NCCL_EXECUTOR_BACKEND_H_
 
+#ifdef WITH_CUDA
+
 #include "oneflow/core/job/collective_boxing/executor.h"
 #include "oneflow/core/thread/thread_pool.h"
 #include "oneflow/core/graph/boxing/collective_boxing_util.h"
@@ -78,5 +80,7 @@ class NcclExecutorBackend : public ExecutorBackend {
 }  // namespace boxing
 
 }  // namespace oneflow
+
+#endif  // WITH_CUDA
 
 #endif  // ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_NCCL_EXECUTOR_BACKEND_H_

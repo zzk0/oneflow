@@ -23,9 +23,7 @@ limitations under the License.
 #include "oneflow/core/kernel/batch_memcpy_kernel_util.h"
 #include "oneflow/core/job/global_for.h"
 #include "oneflow/core/thread/thread_pool.h"
-#ifdef WITH_CUDA
 #include <nccl.h>
-#endif
 
 namespace oneflow {
 
@@ -35,7 +33,6 @@ namespace collective {
 
 namespace {
 
-#ifdef WITH_CUDA
 ncclRedOp_t GetNcclReduceOp(ReduceMethod reduce_method) {
   if (reduce_method == kReduceMethodSum) {
     return ncclRedOp_t::ncclSum;
@@ -43,7 +40,6 @@ ncclRedOp_t GetNcclReduceOp(ReduceMethod reduce_method) {
     UNIMPLEMENTED();
   }
 }
-#endif
 
 std::string GetNcclUniqueIdRpcKey(const std::string& name, int64_t stream_id) {
   return "CollectiveBoxingExecutorNcclUniqueIdRpcKey-" + name + "-" + std::to_string(stream_id);
@@ -59,15 +55,6 @@ int64_t GetAlignedRequestSize(const RequestDesc& request) {
 }
 
 }  // namespace
-
-#ifdef WITH_CUDA
-
-void ExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
-                                    std::vector<std::vector<int32_t>>* groups) {
-  for (const int32_t request_id : request_ids) {
-    groups->emplace_back(std::vector<int32_t>({request_id}));
-  }
-}
 
 NcclExecutorBackend::NcclExecutorBackend()
     : collective_boxing_conf_(Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf()),
@@ -448,8 +435,6 @@ void NcclExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_pla
     }
   }
 }
-
-#endif  // WITH_CUDA
 
 }  // namespace collective
 
