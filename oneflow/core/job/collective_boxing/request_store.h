@@ -43,6 +43,12 @@ class RequestEntry final {
   }
   bool HasRankOnThisNode() const { return !local_rank2global_rank_.empty(); }
   int32_t NodeCount() const { return node_count_; }
+  const DeviceDesc& LocalDeviceDesc(int32_t local_rank) const {
+    return local_device_vec_.at(local_rank);
+  }
+  bool IsRootOnThisNode() const {
+    return (!local_rank2global_rank_.empty()) && local_rank2global_rank_.front() == 0;
+  }
 
   bool AddRuntimeRequest(int32_t local_rank,
                          std::shared_ptr<const RuntimeRequestInfo> runtime_request_info);
