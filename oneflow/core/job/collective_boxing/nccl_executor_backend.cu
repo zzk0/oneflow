@@ -147,6 +147,8 @@ class CommRank final {
 
   int32_t local_rank_count() const { return local_rank_count_; }
 
+  ncclComm_t nccl_comm() const { return nccl_comm_; }
+
   void InitRank(ncclUniqueId unique_id) {
     CudaCurrentDeviceGuard(device_id_);
     OF_NCCL_CHECK(ncclCommInitRank(&nccl_comm_, global_rank_count_, unique_id, global_rank_));
@@ -172,7 +174,10 @@ class CommGroup final {
     global_rank_count_ = device_set.device_size();
     std::vector<int32_t> local_ranks;
     for (int32_t i = 0; i < global_rank_count_; ++i) {
-      if (device_set.device(i).machine_id() == this_machine_id) { local_ranks.push_back(i); }
+      if (device_set.device(i).machine_id() == this_machine_id) {
+        global_rank2local_rank_.emplace(i, local_ranks.size());
+        local_ranks.push_back(i);
+      }
     }
     const int32_t local_rank_count = local_ranks.size();
     CHECK_GT(local_rank_count, 0);
@@ -204,9 +209,16 @@ class CommGroup final {
 
   int32_t local_rank_count() const { return rank_vec_.size(); }
 
+  const CommRank& GetCommRank(int32_t local_rank) const { return rank_vec_.at(local_rank); }
+
+  int32_t GetLocalRank(int32_t global_rank) const {
+    return global_rank2local_rank_.at(global_rank);
+  }
+
  private:
   std::vector<CommRank> rank_vec_;
   int32_t global_rank_count_ = 0;
+  HashMap<int32_t, int32_t> global_rank2local_rank_;
 };
 
 class StreamCtx {
@@ -384,10 +396,8 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
   const int64_t stream_id = current_stream_id_;
   current_stream_id_ = (current_stream_id_ + 1) % num_streams_;
   CudaCurrentDeviceGuard device_guard;
-  auto& device_id2comm =
-      device_set2stream_id2device_id2comm_.size() == 1
-          ? device_set2stream_id2device_id2comm_.begin()->second.at(stream_id)
-          : device_set2stream_id2device_id2comm_.at(group.front()->device_set()).at(stream_id);
+  auto& comm_group =
+      impl_->device_set2stream_id2comm_group.at(group.front()->device_set()).at(stream_id);
   auto& device_id2device_ctx = stream_id2device_id2device_ctx_.at(stream_id);
   if (group.front()->op_desc().op_type() == OpType::kOpTypeAllReduce
       && collective_boxing_conf_.nccl_fusion_all_reduce_use_buffer() && group.size() > 1) {
@@ -437,13 +447,14 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
     const int64_t size_of_data_type = GetSizeOfDataType(group.front()->op_desc().data_type());
     CHECK_EQ(offset % size_of_data_type, 0);
     const int64_t elem_cnt = offset / size_of_data_type;
-    for (auto& device_id7comm : device_id2comm) {
-      OF_CUDA_CHECK(cudaSetDevice(device_id7comm.first));
-      auto& device_ctx = device_id2device_ctx.at(device_id7comm.first);
+    for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
+      const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
+      OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
+      auto& device_ctx = device_id2device_ctx.at(comm_rank.device_id());
       OF_NCCL_CHECK(ncclAllReduce(device_ctx->fusion_buffer, device_ctx->fusion_buffer, elem_cnt,
                                   GetNcclDataType(group.front()->op_desc().data_type()),
                                   GetNcclReduceOp(group.front()->op_desc().reduce_method()),
-                                  device_id7comm.second, device_ctx->stream));
+                                  comm_rank.nccl_comm(), device_ctx->stream));
     }
     OF_NCCL_CHECK(ncclGroupEnd());
     for (auto& device_id7copy_out_params : device_id2copy_out_params) {
@@ -465,7 +476,9 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
         const DeviceDesc& device_desc = request_desc->device_set().device().Get(rank);
         const int64_t device_id = device_desc.device_id();
         OF_CUDA_CHECK(cudaSetDevice(device_id));
-        ncclComm_t comm = device_id2comm.at(device_id);
+        const int32_t local_rank = comm_group.GetLocalRank(rank);
+        const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
+        ncclComm_t comm = comm_rank.nccl_comm();
         auto& device_ctx = device_id2device_ctx.at(device_id);
         ncclDataType_t nccl_data_type = GetNcclDataType(op_desc.data_type());
         const OpType op_type = op_desc.op_type();
@@ -549,39 +562,12 @@ void NcclExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_pla
     if (request.op_desc().backend() != Backend::kBackendNCCL) { continue; }
     if (!request_entry->HasRankOnThisNode()) { continue; }
     const DeviceSet& device_set = request.device_set();
-    if (device_set2stream_id2device_id2comm_.count(device_set) > 0) { continue; }
-    auto& stream_id2device_id2comm = device_set2stream_id2device_id2comm_[device_set];
-    stream_id2device_id2comm.resize(num_streams_);
+    if (impl_->device_set2stream_id2comm_group.count(device_set) > 0) { continue; }
+    auto& stream_id2comm_group = impl_->device_set2stream_id2comm_group[device_set];
+    stream_id2comm_group.resize(num_streams_);
     for (int32_t stream_id = 0; stream_id < num_streams_; ++stream_id) {
-      auto& device_id2comm = stream_id2device_id2comm.at(stream_id);
-      for (int32_t local_rank = 0; local_rank < request_entry->LocalRankCount(); ++local_rank) {
-        const int64_t device_id = request_entry->LocalDeviceDesc(local_rank).device_id();
-        device_id2comm.emplace(device_id, ncclComm_t{});
-        local_device_ids.emplace(device_id);
-      }
-      ncclUniqueId nccl_unique_id{};
-      if (request_entry->IsRootOnThisNode()) {
-        OF_NCCL_CHECK(ncclGetUniqueId(&nccl_unique_id));
-        if (request_entry->NodeCount() > 1) {
-          const std::string rpc_key = GetNcclUniqueIdRpcKey(request.op_desc().name(), stream_id);
-          Global<CtrlClient>::Get()->PushKV(rpc_key, NcclUniqueIdToString(nccl_unique_id));
-        }
-      } else {
-        const std::string rpc_key = GetNcclUniqueIdRpcKey(request.op_desc().name(), stream_id);
-        Global<CtrlClient>::Get()->PullKV(rpc_key, [&nccl_unique_id](const std::string& val) {
-          NcclUniqueIdFromString(val, &nccl_unique_id);
-        });
-      }
-      OF_NCCL_CHECK(ncclGroupStart());
-      for (int32_t local_rank = 0; local_rank < request_entry->LocalRankCount(); ++local_rank) {
-        const int64_t device_id = request_entry->LocalDeviceDesc(local_rank).device_id();
-        OF_CUDA_CHECK(cudaSetDevice(device_id));
-        const int32_t global_rank = request_entry->LocalRankToGlobalRank(local_rank);
-        OF_NCCL_CHECK(ncclCommInitRank(&device_id2comm.at(device_id), device_set.device_size(),
-                                       nccl_unique_id, global_rank));
-      }
-      OF_NCCL_CHECK(ncclGroupEnd())
-          << "To see more detail, please run OneFlow with system variable NCCL_DEBUG=INFO";
+      stream_id2comm_group.at(stream_id).InitGroup(
+          device_set, GetNcclUniqueIdRpcKey(request.op_desc().name(), stream_id));
     }
   }
   int cuda_stream_greatest_priority;
