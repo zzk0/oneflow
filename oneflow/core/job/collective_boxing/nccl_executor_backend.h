@@ -73,6 +73,9 @@ class NcclExecutorBackend : public ExecutorBackend {
 
   int64_t current_stream_id_ = 0;
   std::shared_ptr<RequestStore> request_store_;
+
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
 };
 
 }  // namespace collective

@@ -23,7 +23,10 @@ limitations under the License.
 #include "oneflow/core/kernel/batch_memcpy_kernel_util.h"
 #include "oneflow/core/job/global_for.h"
 #include "oneflow/core/thread/thread_pool.h"
+#include "oneflow/core/device/cuda_util.h"
 #include <nccl.h>
+
+#include <memory>
 
 namespace oneflow {
 
@@ -54,7 +57,158 @@ int64_t GetAlignedRequestSize(const RequestDesc& request) {
   return GetCudaAlignedSize(GetRequestSize(request));
 }
 
-}  // namespace
+struct CopyParams {
+  void* dst;
+  const void* src;
+  int64_t count;
+};
+
+constexpr int64_t kMultiCopyParamsMaxSize = 128;
+
+struct MultiCopyParams {
+  CopyParams params[kMultiCopyParamsMaxSize];
+  int64_t count;
+
+  MultiCopyParams() : count(0), params{} {}
+
+  void Add(void* dst, const void* src, int64_t count) {
+    CHECK_LT(this->count, kMultiCopyParamsMaxSize);
+    params[this->count].dst = dst;
+    params[this->count].src = src;
+    params[this->count].count = count;
+    this->count += 1;
+  }
+};
+
+using BulkType = ulonglong2;
+
+__global__ void MultiCopyGpu(MultiCopyParams multi_params) {
+  for (int64_t p = 0; p < multi_params.count; ++p) {
+    const CopyParams params = multi_params.params[p];
+    auto* bulk_dst = reinterpret_cast<BulkType*>(params.dst);
+    const auto* bulk_src = reinterpret_cast<const BulkType*>(params.src);
+    const int64_t bulk_count = params.count / sizeof(BulkType);
+    CUDA_1D_KERNEL_LOOP_T(int64_t, i, bulk_count) { bulk_dst[i] = bulk_src[i]; }
+    const int64_t tail_offset = bulk_count * sizeof(BulkType);
+    auto* tail_dst = reinterpret_cast<char*>(params.dst) + tail_offset;
+    const auto* tail_src = reinterpret_cast<const char*>(params.src) + tail_offset;
+    const int64_t tail_count = params.count - tail_offset;
+    CUDA_1D_KERNEL_LOOP_T(int64_t, i, tail_count) { tail_dst[i] = tail_src[i]; }
+  }
+}
+
+void MultiCopy(cudaStream_t stream, const MultiCopyParams& multi_params) {
+  if (multi_params.count <= 0) { return; }
+  CHECK_LE(multi_params.count, kMultiCopyParamsMaxSize);
+  int64_t max_count = multi_params.params[0].count;
+  for (int64_t i = i; i < multi_params.count; ++i) {
+    max_count = std::max(max_count, multi_params.params[i].count);
+  }
+  MultiCopyGpu<<<BlocksNum4ThreadsNum(max_count), kCudaThreadsNumPerBlock, 0, stream)>>>(
+      multi_params);
+}
+
+class CommRank final {
+ public:
+  OF_DISALLOW_COPY(CommRank);
+  CommRank(int32_t device_id, int32_t global_rank, int32_t global_rank_count, int32_t local_rank,
+           int32_t local_rank_count)
+      : device_id_(device_id),
+        global_rank_(global_rank),
+        global_rank_count_(global_rank_count),
+        local_rank_(local_rank),
+        local_rank_count_(local_rank_count),
+        nccl_comm_(nullptr) {}
+
+  ~CommRank() {
+    if (nccl_comm_ != nullptr) {
+      CudaCurrentDeviceGuard(device_id_);
+      OF_NCCL_CHECK(ncclCommDestroy(nccl_comm_));
+    }
+  }
+
+  int32_t device_id() const { return device_id_; }
+
+  int32_t global_rank() const { return global_rank_; }
+
+  int32_t global_rank_count() const { return global_rank_count_; }
+
+  int32_t local_rank() const { return local_rank_; }
+
+  int32_t local_rank_count() const { return local_rank_count_; }
+
+  void InitRank(ncclUniqueId unique_id) {
+    CudaCurrentDeviceGuard(device_id_);
+    OF_NCCL_CHECK(ncclCommInitRank(&nccl_comm_, global_rank_count_, unique_id, global_rank_));
+  }
+
+ private:
+  int32_t device_id_;
+  int32_t global_rank_;
+  int32_t global_rank_count_;
+  int32_t local_rank_;
+  int32_t local_rank_count_;
+  ncclComm_t nccl_comm_;
+};
+
+class CommGroup final {
+ public:
+  OF_DISALLOW_COPY(CommGroup);
+  CommGroup() = default;
+  ~CommGroup() = default;
+
+  void InitGroup(const DeviceSet& device_set, const std::string& unique_name) {
+    const int64_t this_machine_id = Global<MachineCtx>::Get()->this_machine_id();
+    global_rank_count_ = device_set.device_size();
+    std::vector<int32_t> local_ranks;
+    for (int32_t i = 0; i < global_rank_count_; ++i) {
+      if (device_set.device(i).machine_id() == this_machine_id) { local_ranks.push_back(i); }
+    }
+    const int32_t local_rank_count = local_ranks.size();
+    CHECK_GT(local_rank_count, 0);
+    ncclUniqueId nccl_unique_id{};
+    if (local_ranks.front() == 0) {
+      if (local_rank_count != global_rank_count_) {
+        Global<CtrlClient>::Get()->PushKV(unique_name, NcclUniqueIdToString(nccl_unique_id));
+      }
+      OF_NCCL_CHECK(ncclGetUniqueId(&nccl_unique_id));
+    } else {
+      Global<CtrlClient>::Get()->PullKV(unique_name, [&nccl_unique_id](const std::string& val) {
+        NcclUniqueIdFromString(val, &nccl_unique_id);
+      });
+    }
+    rank_vec_.reserve(local_rank_count);
+    OF_NCCL_CHECK(ncclGroupStart());
+    for (int32_t local_rank = 0; local_rank < local_ranks.size(); ++local_rank) {
+      const int32_t global_rank = local_ranks.at(local_rank);
+      const int32_t device_id = device_set.device(global_rank).device_id();
+      OF_CUDA_CHECK(cudaSetDevice(device_id));
+      rank_vec_.emplace_back(device_id, global_rank, global_rank_count_, local_rank,
+                             local_rank_count);
+      rank_vec_.at(local_rank).InitRank(nccl_unique_id);
+    }
+    OF_NCCL_CHECK(ncclGroupEnd());
+  }
+
+  int32_t global_rank_count() const { return global_rank_count_; }
+
+  int32_t local_rank_count() const { return rank_vec_.size(); }
+
+ private:
+  std::vector<CommRank> rank_vec_;
+  int32_t global_rank_count_ = 0;
+};
+
+class StreamCtx {
+ public:
+  OF_DISALLOW_COPY(StreamCtx);
+};
+
+};  // namespace
+
+struct NcclExecutorBackend::Impl {
+  HashMap<DeviceSet, std::vector<CommGroup>> device_set2stream_id2comm_group;
+};
 
 NcclExecutorBackend::NcclExecutorBackend()
     : collective_boxing_conf_(Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf()),
@@ -264,6 +418,7 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
     }
     for (auto& device_id7copy_in_params : device_id2copy_in_params) {
       OF_CUDA_CHECK(cudaSetDevice(device_id7copy_in_params.first));
+
       BatchMemcpyKernelUtil<DeviceType::kGPU>::Copy(
           device_id2device_ctx.at(device_id7copy_in_params.first).get(),
           device_id7copy_in_params.second);
@@ -375,6 +530,7 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
 void NcclExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_plan,
                                std::shared_ptr<RequestStore> request_store) {
   request_store_ = request_store;
+  impl_ = std::make_unique<Impl>();
   CudaCurrentDeviceGuard guard;
   std::set<int64_t> local_device_ids;
   for (int32_t request_id = 0; request_id < request_store_->RequestCount(); ++request_id) {
