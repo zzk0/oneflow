@@ -291,14 +291,6 @@ NcclExecutorBackend::~NcclExecutorBackend() {
       OF_CUDA_CHECK(cudaFree(device_id7device_ctx.second->fusion_buffer));
     }
   }
-  for (auto& device_set7stream_id2device_id2comm : device_set2stream_id2device_id2comm_) {
-    for (auto& device_id2comm : device_set7stream_id2device_id2comm.second) {
-      for (auto& device_id7comm : device_id2comm) {
-        OF_CUDA_CHECK(cudaSetDevice(device_id7comm.first));
-        OF_NCCL_CHECK(ncclCommDestroy(device_id7comm.second));
-      }
-    }
-  }
 }
 
 void NcclExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,

@@ -60,8 +60,6 @@ class NcclExecutorBackend : public ExecutorBackend {
   int64_t fusion_threshold_;
   const CollectiveBoxingConf collective_boxing_conf_;
 
-  HashMap<DeviceSet, std::vector<std::map<int64_t, ncclComm_t>>>
-      device_set2stream_id2device_id2comm_;
   std::vector<std::map<int64_t, std::unique_ptr<NcclDeviceCtx>>> stream_id2device_id2device_ctx_;
   std::list<Event> event_list_;
   std::thread event_list_poll_thread_;
