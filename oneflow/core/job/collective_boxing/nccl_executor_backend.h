@@ -47,20 +47,11 @@ class NcclExecutorBackend : public ExecutorBackend {
     std::function<void(Maybe<void>)> callback;
   };
 
-  struct NcclDeviceCtx : public DeviceCtx {
-    const cudaStream_t& cuda_stream() const override { return stream; }
-    void AddCallBack(std::function<void()>) const override { UNIMPLEMENTED(); }
-
-    cudaStream_t stream = nullptr;
-    char* fusion_buffer = nullptr;
-  };
-
   int32_t num_devices_;
   int64_t num_streams_;
   int64_t fusion_threshold_;
   const CollectiveBoxingConf collective_boxing_conf_;
 
-  std::vector<std::map<int64_t, std::unique_ptr<NcclDeviceCtx>>> stream_id2device_id2device_ctx_;
   std::list<Event> event_list_;
   std::thread event_list_poll_thread_;
   std::mutex event_list_mutex_;

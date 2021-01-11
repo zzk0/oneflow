@@ -175,6 +175,7 @@ class CommGroup final {
   }
 
   void InitGroup(const DeviceSet& device_set, const std::string& unique_name) {
+    CudaCurrentDeviceGuard guard;
     const int64_t this_machine_id = Global<MachineCtx>::Get()->this_machine_id();
     global_rank_count_ = device_set.device_size();
     std::vector<int32_t> local_ranks;
@@ -231,6 +232,7 @@ class StreamCtx {
   OF_DISALLOW_COPY(StreamCtx);
   StreamCtx(int32_t device_id, size_t fusion_buffer_size)
       : device_id_(device_id), fusion_buffer_size_(fusion_buffer_size) {
+    CudaCurrentDeviceGuard guard(device_id_);
     int priority;
     OF_CUDA_CHECK(cudaDeviceGetStreamPriorityRange(nullptr, &priority));
     OF_CUDA_CHECK(cudaStreamCreateWithPriority(&stream_, cudaStreamNonBlocking, priority));
@@ -243,17 +245,41 @@ class StreamCtx {
     OF_CUDA_CHECK(cudaFree(fusion_buffer_));
   }
 
+  int32_t device_id() const { return device_id_; }
+
+  cudaStream_t stream() const { return stream_; }
+
+  size_t fusion_buffer_size() const { return fusion_buffer_size_; }
+
+  char* fusion_buffer() const { return fusion_buffer_; }
+
  private:
   int32_t device_id_;
-  cudaStream_t stream_;
+  cudaStream_t stream_ = nullptr;
   size_t fusion_buffer_size_;
-  char* fusion_buffer_;
+  char* fusion_buffer_ = nullptr;
 };
 
 };  // namespace
 
 struct NcclExecutorBackend::Impl {
+  Impl() = default;
+  ~Impl() {
+    request_id2stream_id2comm_group.clear();
+    stream_id2device_id2stream_ctx.clear();
+    device_set2stream_id2comm_group.clear();
+  }
   HashMap<DeviceSet, std::vector<CommGroup>> device_set2stream_id2comm_group;
+  std::vector<std::vector<std::unique_ptr<StreamCtx>>> stream_id2device_id2stream_ctx;
+  std::vector<std::vector<CommGroup>*> request_id2stream_id2comm_group;
+
+  const CommGroup& GetCommGroup(const std::vector<int32_t>& request_ids, int32_t stream_id) const {
+    const auto* stream_id2comm_group = request_id2stream_id2comm_group.at(request_ids.at(0));
+    for (int64_t request_id = 0; request_id < request_ids.size(); ++request_id) {
+      CHECK_EQ(request_id2stream_id2comm_group.at(request_id), stream_id2comm_group);
+    }
+    return stream_id2comm_group->at(stream_id);
+  }
 };
 
 NcclExecutorBackend::NcclExecutorBackend()
@@ -306,15 +332,7 @@ NcclExecutorBackend::~NcclExecutorBackend() {
   }
   event_list_poll_thread_.join();
   callback_executor_pool_.reset();
-  CudaCurrentDeviceGuard guard;
-  for (auto& device_id2device_ctx : stream_id2device_id2device_ctx_) {
-    for (auto& device_id7device_ctx : device_id2device_ctx) {
-      OF_CUDA_CHECK(cudaSetDevice(device_id7device_ctx.first));
-      OF_CUDA_CHECK(cudaStreamSynchronize(device_id7device_ctx.second->stream));
-      OF_CUDA_CHECK(cudaStreamDestroy(device_id7device_ctx.second->stream));
-      OF_CUDA_CHECK(cudaFree(device_id7device_ctx.second->fusion_buffer));
-    }
-  }
+  impl_.reset();
 }
 
 void NcclExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
@@ -406,20 +424,20 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
   }
   CHECK_EQ(group.size(), ranks.size());
   if (group.empty()) { return; }
+
   const int64_t group_size = group.size();
   std::map<int64_t, std::vector<std::shared_ptr<const std::function<void(const Maybe<void>&)>>>>
       device_id2callbacks;
   const int64_t stream_id = current_stream_id_;
   current_stream_id_ = (current_stream_id_ + 1) % num_streams_;
   CudaCurrentDeviceGuard device_guard;
-  auto& comm_group =
-      impl_->device_set2stream_id2comm_group.at(group.front()->device_set()).at(stream_id);
-  auto& device_id2device_ctx = stream_id2device_id2device_ctx_.at(stream_id);
+  auto& comm_group = impl_->GetCommGroup(request_ids, stream_id);
+  auto& device_id2stream_ctx = impl_->stream_id2device_id2stream_ctx.at(stream_id);
   if (group.front()->op_desc().op_type() == OpType::kOpTypeAllReduce
       && collective_boxing_conf_.nccl_fusion_all_reduce_use_buffer() && group.size() > 1) {
     int64_t offset = 0;
-    std::map<int64_t, std::vector<MemcpyParam>> device_id2copy_in_params;
-    std::map<int64_t, std::vector<MemcpyParam>> device_id2copy_out_params;
+    std::map<int64_t, MultiCopyParams> device_id2copy_in_params;
+    std::map<int64_t, MultiCopyParams> device_id2copy_out_params;
     for (int64_t i = 0; i < group.size(); ++i) {
       const RequestDesc* request_desc = group.at(i);
       if (i != 0) {
@@ -436,17 +454,11 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
         const RuntimeRequestInfo& request_info = *rank7request_info.second;
         const DeviceDesc& device_desc = request_desc->device_set().device().Get(rank);
         const int64_t device_id = device_desc.device_id();
-        auto& device_ctx = device_id2device_ctx.at(device_id);
-        device_id2copy_in_params[device_id].push_back(MemcpyParam{
-            .dst = device_ctx->fusion_buffer + offset,
-            .src = request_info.send_buff,
-            .count = static_cast<size_t>(size),
-        });
-        device_id2copy_out_params[device_id].push_back(MemcpyParam{
-            .dst = request_info.recv_buff,
-            .src = device_ctx->fusion_buffer + offset,
-            .count = static_cast<size_t>(size),
-        });
+        auto& stream_ctx = device_id2stream_ctx.at(device_id);
+        device_id2copy_in_params[device_id].Add(stream_ctx->fusion_buffer() + offset,
+                                                request_info.send_buff, size);
+        device_id2copy_out_params[device_id].Add(request_info.recv_buff,
+                                                 stream_ctx->fusion_buffer() + offset, size);
         device_id2callbacks[device_id].reserve(group_size);
         device_id2callbacks[device_id].push_back(request_info.callback);
       }
@@ -454,10 +466,8 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
     }
     for (auto& device_id7copy_in_params : device_id2copy_in_params) {
       OF_CUDA_CHECK(cudaSetDevice(device_id7copy_in_params.first));
-
-      BatchMemcpyKernelUtil<DeviceType::kGPU>::Copy(
-          device_id2device_ctx.at(device_id7copy_in_params.first).get(),
-          device_id7copy_in_params.second);
+      MultiCopy(device_id2stream_ctx.at(device_id7copy_in_params.first)->stream(),
+                device_id7copy_in_params.second);
     }
     OF_NCCL_CHECK(ncclGroupStart());
     const int64_t size_of_data_type = GetSizeOfDataType(group.front()->op_desc().data_type());
@@ -466,21 +476,21 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
     for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
       const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
       OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
-      auto& device_ctx = device_id2device_ctx.at(comm_rank.device_id());
-      OF_NCCL_CHECK(ncclAllReduce(device_ctx->fusion_buffer, device_ctx->fusion_buffer, elem_cnt,
-                                  GetNcclDataType(group.front()->op_desc().data_type()),
+      auto& stream_ctx = device_id2stream_ctx.at(comm_rank.device_id());
+      OF_NCCL_CHECK(ncclAllReduce(stream_ctx->fusion_buffer(), stream_ctx->fusion_buffer(),
+                                  elem_cnt, GetNcclDataType(group.front()->op_desc().data_type()),
                                   GetNcclReduceOp(group.front()->op_desc().reduce_method()),
-                                  comm_rank.nccl_comm(), device_ctx->stream));
+                                  comm_rank.nccl_comm(), stream_ctx->stream()));
     }
     OF_NCCL_CHECK(ncclGroupEnd());
     for (auto& device_id7copy_out_params : device_id2copy_out_params) {
       OF_CUDA_CHECK(cudaSetDevice(device_id7copy_out_params.first));
-      BatchMemcpyKernelUtil<DeviceType::kGPU>::Copy(
-          device_id2device_ctx.at(device_id7copy_out_params.first).get(),
-          device_id7copy_out_params.second);
+      MultiCopy(device_id2stream_ctx.at(device_id7copy_out_params.first)->stream(),
+                device_id7copy_out_params.second);
     }
   } else {
     OF_NCCL_CHECK(ncclGroupStart());
+
     for (int64_t i = 0; i < group.size(); ++i) {
       const RequestDesc* request_desc = group.at(i);
       const OpDesc& op_desc = request_desc->op_desc();
@@ -495,7 +505,7 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
         const int32_t local_rank = comm_group.GetLocalRank(rank);
         const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
         ncclComm_t comm = comm_rank.nccl_comm();
-        auto& device_ctx = device_id2device_ctx.at(device_id);
+        auto& stream_ctx = device_id2stream_ctx.at(device_id);
         ncclDataType_t nccl_data_type = GetNcclDataType(op_desc.data_type());
         const OpType op_type = op_desc.op_type();
         const int64_t num_ranks = op_desc.num_ranks();
@@ -507,23 +517,23 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
         if (op_type == OpType::kOpTypeAllReduce) {
           OF_NCCL_CHECK(ncclAllReduce(send_buff, recv_buff, elem_cnt, nccl_data_type,
                                       GetNcclReduceOp(op_desc.reduce_method()), comm,
-                                      device_ctx->stream));
+                                      stream_ctx->stream()));
         } else if (op_type == OpType::kOpTypeAllGather) {
           CHECK_EQ(elem_cnt % num_ranks, 0);
           OF_NCCL_CHECK(ncclAllGather(send_buff, recv_buff, elem_cnt / num_ranks, nccl_data_type,
-                                      comm, device_ctx->stream));
+                                      comm, stream_ctx->stream()));
         } else if (op_type == OpType::kOpTypeReduceScatter) {
           CHECK_EQ(elem_cnt % num_ranks, 0);
           OF_NCCL_CHECK(ncclReduceScatter(send_buff, recv_buff, elem_cnt / num_ranks,
                                           nccl_data_type, GetNcclReduceOp(op_desc.reduce_method()),
-                                          comm, device_ctx->stream));
+                                          comm, stream_ctx->stream()));
         } else if (op_type == OpType::kOpTypeReduce) {
           OF_NCCL_CHECK(ncclReduce(send_buff, recv_buff, elem_cnt, nccl_data_type,
                                    GetNcclReduceOp(op_desc.reduce_method()), op_desc.root(), comm,
-                                   device_ctx->stream));
+                                   stream_ctx->stream()));
         } else if (op_type == OpType::kOpTypeBroadcast) {
           OF_NCCL_CHECK(ncclBroadcast(send_buff, recv_buff, elem_cnt, nccl_data_type,
-                                      op_desc.root(), comm, device_ctx->stream));
+                                      op_desc.root(), comm, stream_ctx->stream()));
         } else if (op_type == OpType::kOpTypeAll2All) {
 #if NCCL_VERSION_CODE > 2700
           const int64_t elem_per_rank = elem_cnt / num_ranks;
@@ -533,10 +543,10 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
           for (int64_t j = 0; j < num_ranks; ++j) {
             OF_NCCL_CHECK(ncclSend(reinterpret_cast<const void*>(
                                        reinterpret_cast<const char*>(send_buff) + j * chunk_size),
-                                   elem_per_chunk, nccl_data_type, j, comm, device_ctx->stream));
+                                   elem_per_chunk, nccl_data_type, j, comm, stream_ctx->stream()));
             OF_NCCL_CHECK(ncclRecv(
                 reinterpret_cast<void*>(reinterpret_cast<char*>(recv_buff) + j * chunk_size),
-                elem_per_chunk, nccl_data_type, j, comm, device_ctx->stream));
+                elem_per_chunk, nccl_data_type, j, comm, stream_ctx->stream()));
           }
 #else
           UNIMPLEMENTED();
@@ -553,7 +563,7 @@ void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_id
     OF_CUDA_CHECK(cudaSetDevice(device_id));
     cudaEvent_t event;
     OF_CUDA_CHECK(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
-    OF_CUDA_CHECK(cudaEventRecord(event, device_id2device_ctx.at(device_id)->stream));
+    OF_CUDA_CHECK(cudaEventRecord(event, device_id2stream_ctx.at(device_id)->stream()));
     {
       std::unique_lock<std::mutex> event_list_lock(event_list_mutex_);
       event_list_.emplace_back(Event{device_id, event, [=](const Maybe<void>& status) {
@@ -589,20 +599,22 @@ void NcclExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_pla
       local_device_ids.emplace(stream_id2comm_group.at(0).GetCommRank(i).device_id());
     }
   }
-  int cuda_stream_greatest_priority;
-  OF_CUDA_CHECK(cudaDeviceGetStreamPriorityRange(nullptr, &cuda_stream_greatest_priority));
-  stream_id2device_id2device_ctx_.resize(num_streams_);
-  for (int64_t stream_id = 0; stream_id < num_streams_; ++stream_id) {
-    auto& device_id2device_ctx_ = stream_id2device_id2device_ctx_.at(stream_id);
-    for (const int64_t device_id : local_device_ids) {
-      device_id2device_ctx_.emplace(device_id, std::make_unique<NcclDeviceCtx>());
+  impl_->request_id2stream_id2comm_group.resize(request_store_->RequestCount());
+  for (int32_t request_id = 0; request_id < request_store_->RequestCount(); ++request_id) {
+    const DeviceSet& device_set = request_store_->MutRequestEntry(request_id)->desc().device_set();
+    auto it = impl_->device_set2stream_id2comm_group.find(device_set);
+    if (it != impl_->device_set2stream_id2comm_group.end()) {
+      impl_->request_id2stream_id2comm_group.at(request_id) = &it->second;
+    } else {
+      impl_->request_id2stream_id2comm_group.at(request_id) = nullptr;
     }
+  }
+  impl_->stream_id2device_id2stream_ctx.resize(num_streams_);
+  for (int64_t stream_id = 0; stream_id < num_streams_; ++stream_id) {
+    impl_->stream_id2device_id2stream_ctx.at(stream_id).resize(num_devices_);
     for (const int64_t device_id : local_device_ids) {
-      auto& device_ctx = device_id2device_ctx_.at(device_id);
-      OF_CUDA_CHECK(cudaSetDevice(device_id));
-      OF_CUDA_CHECK(cudaStreamCreateWithPriority(&device_ctx->stream, cudaStreamNonBlocking,
-                                                 cuda_stream_greatest_priority));
-      OF_CUDA_CHECK(cudaMalloc(&device_ctx->fusion_buffer, fusion_threshold_));
+      impl_->stream_id2device_id2stream_ctx.at(stream_id).at(device_id) =
+          std::make_unique<StreamCtx>(device_id, fusion_threshold_);
     }
   }
 }
