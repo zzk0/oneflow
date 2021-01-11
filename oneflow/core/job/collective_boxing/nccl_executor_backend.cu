@@ -104,7 +104,7 @@ void MultiCopy(cudaStream_t stream, const MultiCopyParams& multi_params) {
   for (int64_t i = i; i < multi_params.count; ++i) {
     max_count = std::max(max_count, multi_params.params[i].count);
   }
-  MultiCopyGpu<<<BlocksNum4ThreadsNum(max_count), kCudaThreadsNumPerBlock, 0, stream)>>>(
+  MultiCopyGpu<<<BlocksNum4ThreadsNum(max_count), kCudaThreadsNumPerBlock, 0, stream>>>(
       multi_params);
 }
 
