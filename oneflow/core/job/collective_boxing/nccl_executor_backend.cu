@@ -229,6 +229,25 @@ class CommGroup final {
 class StreamCtx {
  public:
   OF_DISALLOW_COPY(StreamCtx);
+  StreamCtx(int32_t device_id, size_t fusion_buffer_size)
+      : device_id_(device_id), fusion_buffer_size_(fusion_buffer_size) {
+    int priority;
+    OF_CUDA_CHECK(cudaDeviceGetStreamPriorityRange(nullptr, &priority));
+    OF_CUDA_CHECK(cudaStreamCreateWithPriority(&stream_, cudaStreamNonBlocking, priority));
+    OF_CUDA_CHECK(cudaMalloc(&fusion_buffer_, fusion_buffer_size_));
+  }
+  ~StreamCtx() {
+    CudaCurrentDeviceGuard guard(device_id_);
+    OF_CUDA_CHECK(cudaStreamSynchronize(stream_));
+    OF_CUDA_CHECK(cudaStreamDestroy(stream_));
+    OF_CUDA_CHECK(cudaFree(fusion_buffer_));
+  }
+
+ private:
+  int32_t device_id_;
+  cudaStream_t stream_;
+  size_t fusion_buffer_size_;
+  char* fusion_buffer_;
 };
 
 };  // namespace
@@ -565,6 +584,9 @@ void NcclExecutorBackend::Init(const CollectiveBoxingPlan& collective_boxing_pla
     for (int32_t stream_id = 0; stream_id < num_streams_; ++stream_id) {
       stream_id2comm_group.at(stream_id).InitGroup(
           device_set, GetNcclUniqueIdRpcKey(request.op_desc().name(), stream_id));
+    }
+    for (int32_t i = 0; i < stream_id2comm_group.at(0).local_rank_count(); ++i) {
+      local_device_ids.emplace(stream_id2comm_group.at(0).GetCommRank(i).device_id());
     }
   }
   int cuda_stream_greatest_priority;
