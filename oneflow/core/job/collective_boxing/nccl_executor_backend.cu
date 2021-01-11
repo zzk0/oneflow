@@ -168,6 +168,11 @@ class CommGroup final {
   OF_DISALLOW_COPY(CommGroup);
   CommGroup() = default;
   ~CommGroup() = default;
+  CommGroup(CommGroup&& rhs) noexcept {
+    rank_vec_.swap(rhs.rank_vec_);
+    global_rank2local_rank_.swap(rhs.global_rank2local_rank_);
+    global_rank_count_ = rhs.global_rank_count_;
+  }
 
   void InitGroup(const DeviceSet& device_set, const std::string& unique_name) {
     const int64_t this_machine_id = Global<MachineCtx>::Get()->this_machine_id();
