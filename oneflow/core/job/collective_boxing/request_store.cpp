@@ -44,6 +44,7 @@ RequestEntry::RequestEntry(int64_t job_id, const RequestDesc& desc) : job_id_(jo
   runtime_request_info_count_ = 0;
   elem_cnt_ = Shape(desc.op_desc().shape()).elem_cnt();
   size_in_bytes_ = elem_cnt_ * GetSizeOfDataType(desc.op_desc().data_type());
+  device_set_symbol_.reset(desc.device_set());
 }
 
 bool RequestEntry::AddRuntimeRequest(

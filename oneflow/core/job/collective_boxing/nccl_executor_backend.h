@@ -41,14 +41,6 @@ class NcclExecutorBackend : public ExecutorBackend {
                      std::vector<std::vector<int32_t>>* groups) override;
   void ExecuteRequests(const std::vector<int32_t>& request_ids) override;
 
-  int32_t num_devices_;
-  int64_t num_streams_;
-  int64_t fusion_threshold_;
-  const CollectiveBoxingConf collective_boxing_conf_;
-
-  int64_t current_stream_id_ = 0;
-  std::shared_ptr<RequestStore> request_store_;
-
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

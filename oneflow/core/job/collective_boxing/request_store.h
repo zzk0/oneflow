@@ -19,6 +19,7 @@ limitations under the License.
 #include "oneflow/core/common/util.h"
 #include "oneflow/core/job/collective_boxing/runtime_request_info.h"
 #include "oneflow/core/job/plan.pb.h"
+#include "oneflow/core/common/symbol.h"
 
 namespace oneflow {
 
@@ -56,6 +57,7 @@ class RequestEntry final {
   void ResetRuntimeRequest();
   int64_t elem_cnt() const { return elem_cnt_; }
   int64_t size_in_bytes() const { return size_in_bytes_; }
+  const Symbol<DeviceSet>& device_set_symbol() const { return device_set_symbol_; }
 
  private:
   std::mutex mutex_;
@@ -69,6 +71,7 @@ class RequestEntry final {
   std::map<int64_t, int64_t> global_rank2local_rank_;
   int64_t elem_cnt_;
   int64_t size_in_bytes_;
+  Symbol<DeviceSet> device_set_symbol_;
 };
 
 class RequestStore {
