@@ -42,7 +42,7 @@ class Scheduler final {
   explicit Scheduler(const Plan& plan);
 
   struct Impl;
-  std::unique_ptr<Impl> impl_;
+  std::shared_ptr<Impl> impl_;
 };
 
 }  // namespace collective
