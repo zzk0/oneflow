@@ -18,9 +18,7 @@ limitations under the License.
 
 #ifdef WITH_CUDA
 
-#include "oneflow/core/job/collective_boxing/executor.h"
-#include "oneflow/core/thread/thread_pool.h"
-#include "oneflow/core/graph/boxing/collective_boxing_util.h"
+#include "oneflow/core/job/collective_boxing/executor_backend.h"
 
 namespace oneflow {
 

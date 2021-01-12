@@ -24,6 +24,8 @@ limitations under the License.
 #include "oneflow/core/job/global_for.h"
 #include "oneflow/core/thread/thread_pool.h"
 #include "oneflow/core/device/cuda_util.h"
+#include "oneflow/core/job/plan.pb.h"
+
 #include <nccl.h>
 
 #include <memory>
