@@ -64,6 +64,11 @@ struct CopyParams {
 };
 
 constexpr int64_t kMultiCopyParamsMaxSize = 128;
+constexpr int64_t kMultiCopyAlignSize = 32;
+
+int64_t GetMultiCopyAlignedSize(int64_t size) {
+  return ((size + kMultiCopyAlignSize - 1) / kMultiCopyAlignSize) * kMultiCopyAlignSize;
+}
 
 struct MultiCopyParams {
   CopyParams params[kMultiCopyParamsMaxSize];
@@ -237,12 +242,34 @@ class StreamCtx {
     OF_CUDA_CHECK(cudaDeviceGetStreamPriorityRange(nullptr, &priority));
     OF_CUDA_CHECK(cudaStreamCreateWithPriority(&stream_, cudaStreamNonBlocking, priority));
     OF_CUDA_CHECK(cudaMalloc(&fusion_buffer_, fusion_buffer_size_));
+    cb_event_poller_ = std::thread(&StreamCtx::PollEvent, this);
   }
   ~StreamCtx() {
+    cb_event_chan_.Close();
+    cb_event_poller_.join();
     CudaCurrentDeviceGuard guard(device_id_);
     OF_CUDA_CHECK(cudaStreamSynchronize(stream_));
     OF_CUDA_CHECK(cudaStreamDestroy(stream_));
     OF_CUDA_CHECK(cudaFree(fusion_buffer_));
+  }
+
+  void PollEvent() {
+    while (true) {
+      std::pair<cudaEvent_t, std::function<void()>> cb_event;
+      ChannelStatus status = cb_event_chan_.Receive(&cb_event);
+      if (status == kChannelStatusErrorClosed) { break; }
+      CHECK_EQ(status, kChannelStatusSuccess);
+      OF_CUDA_CHECK(cudaEventSynchronize(cb_event.first));
+      cb_event.second();
+      OF_CUDA_CHECK(cudaEventDestroy(cb_event.first));
+    }
+  }
+
+  void AddCallback(const std::function<void()>& callback) {
+    cudaEvent_t event;
+    OF_CUDA_CHECK(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+    OF_CUDA_CHECK(cudaEventRecord(event, stream_));
+    CHECK_EQ(cb_event_chan_.Send(std::make_pair(event, callback)), kChannelStatusSuccess);
   }
 
   int32_t device_id() const { return device_id_; }
@@ -258,9 +285,138 @@ class StreamCtx {
   cudaStream_t stream_ = nullptr;
   size_t fusion_buffer_size_;
   char* fusion_buffer_ = nullptr;
+  Channel<std::pair<cudaEvent_t, std::function<void()>>> cb_event_chan_;
+  std::thread cb_event_poller_;
 };
 
-};  // namespace
+void LaunchFusedAllReduce(const CommGroup& comm_group,
+                          const std::vector<std::unique_ptr<StreamCtx>>& device_id2stream_ctx,
+                          const std::shared_ptr<RequestStore>& request_store,
+                          const std::vector<int32_t>& request_ids) {
+  CHECK_LE(request_ids.size(), kMultiCopyParamsMaxSize);
+  RequestEntry* first_request_entry = request_store->MutRequestEntry(request_ids.front());
+  const ncclDataType_t nccl_data_type =
+      GetNcclDataType(first_request_entry->desc().op_desc().data_type());
+  const ncclRedOp_t nccl_reduce_op =
+      GetNcclReduceOp(first_request_entry->desc().op_desc().reduce_method());
+  const int64_t size_of_data_type =
+      GetSizeOfDataType(first_request_entry->desc().op_desc().data_type());
+  std::vector<int64_t> offset_vec;
+  offset_vec.reserve(request_ids.size());
+  int64_t offset = 0;
+  for (const int32_t request_id : request_ids) {
+    offset_vec.emplace_back(offset);
+    offset += GetMultiCopyAlignedSize(request_store->MutRequestEntry(request_id)->size_in_bytes());
+  }
+  const int64_t elem_cnt = offset / size_of_data_type;
+  for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
+    MultiCopyParams copy_in_params;
+    const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
+    const StreamCtx* stream_ctx = device_id2stream_ctx.at(comm_rank.device_id()).get();
+    CHECK_LE(offset, stream_ctx->fusion_buffer_size());
+    for (int i = 0; i < request_ids.size(); ++i) {
+      RequestEntry* request_entry = request_store->MutRequestEntry(request_ids.at(i));
+      copy_in_params.Add(stream_ctx->fusion_buffer() + offset_vec.at(i),
+                         request_entry->GetRuntimeRequest(local_rank)->send_buff,
+                         request_entry->size_in_bytes());
+    }
+    OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
+    MultiCopy(stream_ctx->stream(), copy_in_params);
+  }
+
+  OF_NCCL_CHECK(ncclGroupStart());
+  for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
+    const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
+    const StreamCtx* stream_ctx = device_id2stream_ctx.at(comm_rank.device_id()).get();
+    OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
+    OF_NCCL_CHECK(ncclAllReduce(stream_ctx->fusion_buffer(), stream_ctx->fusion_buffer(), elem_cnt,
+                                nccl_data_type, nccl_reduce_op, comm_rank.nccl_comm(),
+                                stream_ctx->stream()));
+  }
+  OF_NCCL_CHECK(ncclGroupEnd());
+
+  for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
+    MultiCopyParams copy_out_params;
+    const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
+    const StreamCtx* stream_ctx = device_id2stream_ctx.at(comm_rank.device_id()).get();
+    for (int i = 0; i < request_ids.size(); ++i) {
+      RequestEntry* request_entry = request_store->MutRequestEntry(request_ids.at(i));
+      copy_out_params.Add(request_entry->GetRuntimeRequest(local_rank)->recv_buff,
+                          stream_ctx->fusion_buffer() + offset_vec.at(i),
+                          request_entry->size_in_bytes());
+    }
+    OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
+    MultiCopy(stream_ctx->stream(), copy_out_params);
+  }
+}
+
+void LaunchAggregatedOps(const CommGroup& comm_group,
+                         const std::vector<std::unique_ptr<StreamCtx>>& device_id2stream_ctx,
+                         const std::shared_ptr<RequestStore>& request_store,
+                         const std::vector<int32_t>& request_ids) {
+  OF_NCCL_CHECK(ncclGroupStart());
+  for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
+    const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
+    const auto comm = comm_rank.nccl_comm();
+    const StreamCtx* stream_ctx = device_id2stream_ctx.at(comm_rank.device_id()).get();
+    OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
+    for (int request_id : request_ids) {
+      RequestEntry* request_entry = request_store->MutRequestEntry(request_id);
+      const auto& op_desc = request_entry->desc().op_desc();
+      const std::shared_ptr<const RuntimeRequestInfo>& runtime_request_info =
+          request_entry->GetRuntimeRequest(local_rank);
+      const OpType op_type = op_desc.op_type();
+      const void* send_buff = runtime_request_info->send_buff;
+      void* recv_buff = runtime_request_info->recv_buff;
+      const int64_t elem_cnt = request_entry->elem_cnt();
+      const ncclDataType_t nccl_data_type = GetNcclDataType(op_desc.data_type());
+      const int32_t num_ranks = comm_group.global_rank_count();
+      if (op_type == OpType::kOpTypeAllReduce) {
+        OF_NCCL_CHECK(ncclAllReduce(send_buff, recv_buff, elem_cnt, nccl_data_type,
+                                    GetNcclReduceOp(op_desc.reduce_method()), comm,
+                                    stream_ctx->stream()));
+      } else if (op_type == OpType::kOpTypeAllGather) {
+        CHECK_EQ(elem_cnt % num_ranks, 0);
+        OF_NCCL_CHECK(ncclAllGather(send_buff, recv_buff, elem_cnt / num_ranks, nccl_data_type,
+                                    comm, stream_ctx->stream()));
+      } else if (op_type == OpType::kOpTypeReduceScatter) {
+        CHECK_EQ(elem_cnt % num_ranks, 0);
+        OF_NCCL_CHECK(ncclReduceScatter(send_buff, recv_buff, elem_cnt / num_ranks, nccl_data_type,
+                                        GetNcclReduceOp(op_desc.reduce_method()), comm,
+                                        stream_ctx->stream()));
+      } else if (op_type == OpType::kOpTypeReduce) {
+        OF_NCCL_CHECK(ncclReduce(send_buff, recv_buff, elem_cnt, nccl_data_type,
+                                 GetNcclReduceOp(op_desc.reduce_method()), op_desc.root(), comm,
+                                 stream_ctx->stream()));
+      } else if (op_type == OpType::kOpTypeBroadcast) {
+        OF_NCCL_CHECK(ncclBroadcast(send_buff, recv_buff, elem_cnt, nccl_data_type, op_desc.root(),
+                                    comm, stream_ctx->stream()));
+      } else if (op_type == OpType::kOpTypeAll2All) {
+#if NCCL_VERSION_CODE > 2700
+        const int64_t elem_per_rank = elem_cnt / num_ranks;
+        const int64_t elem_per_chunk = elem_per_rank / num_ranks;
+        const int64_t dtype_size = GetSizeOfDataType(op_desc.data_type());
+        const int64_t chunk_size = elem_per_chunk * dtype_size;
+        for (int64_t j = 0; j < num_ranks; ++j) {
+          OF_NCCL_CHECK(ncclSend(reinterpret_cast<const void*>(
+                                     reinterpret_cast<const char*>(send_buff) + j * chunk_size),
+                                 elem_per_chunk, nccl_data_type, j, comm, stream_ctx->stream()));
+          OF_NCCL_CHECK(
+              ncclRecv(reinterpret_cast<void*>(reinterpret_cast<char*>(recv_buff) + j * chunk_size),
+                       elem_per_chunk, nccl_data_type, j, comm, stream_ctx->stream()));
+        }
+#else
+        UNIMPLEMENTED();
+#endif
+      } else {
+        UNIMPLEMENTED();
+      }
+    }
+  }
+  OF_NCCL_CHECK(ncclGroupEnd());
+}
+
+}  // namespace
 
 struct NcclExecutorBackend::Impl {
   Impl() = default;
@@ -283,57 +439,15 @@ struct NcclExecutorBackend::Impl {
 };
 
 NcclExecutorBackend::NcclExecutorBackend()
-    : collective_boxing_conf_(Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf()),
-      shutdown_(false) {
+    : collective_boxing_conf_(Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf()) {
   OF_CUDA_CHECK(cudaGetDeviceCount(&num_devices_));
-  callback_executor_pool_.reset(new ThreadPool(num_devices_));
   CHECK_GT(collective_boxing_conf_.nccl_num_streams(), 0);
   num_streams_ = collective_boxing_conf_.nccl_num_streams();
   CHECK_GE(collective_boxing_conf_.nccl_fusion_threshold_mb(), 0);
   fusion_threshold_ = collective_boxing_conf_.nccl_fusion_threshold_mb() * 1024 * 1024;
-  event_list_poll_thread_ = std::thread([this]() {
-    std::list<Event> local_event_list;
-    while (true) {
-      {
-        std::unique_lock<std::mutex> lock(event_list_mutex_);
-        if (local_event_list.empty()) {
-          event_list_cond_.wait(lock, [this]() { return (!event_list_.empty()) || shutdown_; });
-        }
-        local_event_list.splice(local_event_list.end(), event_list_);
-      }
-      if (local_event_list.empty() && shutdown_) { break; }
-      for (auto it = local_event_list.begin(); it != local_event_list.end();) {
-        OF_CUDA_CHECK(cudaSetDevice(it->device_id));
-        cudaError_t err = cudaEventQuery(it->cuda_event);
-        if (err == cudaErrorNotReady) {
-          ++it;
-          continue;
-        } else if (err == cudaSuccess) {
-          OF_CUDA_CHECK(cudaEventDestroy(it->cuda_event));
-          auto callback_ptr =
-              std::make_shared<std::function<void(Maybe<void>)>>(std::move(it->callback));
-          callback_executor_pool_->AddWork(
-              [callback_ptr]() { (*callback_ptr)(Maybe<void>::Ok()); });
-          local_event_list.erase(it++);
-        } else {
-          OF_CUDA_CHECK(err);
-          UNIMPLEMENTED();
-        }
-      }
-    }
-  });
 }
 
-NcclExecutorBackend::~NcclExecutorBackend() {
-  {
-    std::unique_lock<std::mutex> lock(event_list_mutex_);
-    shutdown_ = true;
-    event_list_cond_.notify_all();
-  }
-  event_list_poll_thread_.join();
-  callback_executor_pool_.reset();
-  impl_.reset();
-}
+NcclExecutorBackend::~NcclExecutorBackend() { impl_.reset(); }
 
 void NcclExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
                                         std::vector<std::vector<int32_t>>* groups) {
@@ -409,170 +523,38 @@ void NcclExecutorBackend::GroupRequests(const std::vector<int32_t>& request_ids,
 }
 
 void NcclExecutorBackend::ExecuteRequests(const std::vector<int32_t>& request_ids) {
-  std::vector<const RequestDesc*> group;
-  std::vector<std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>> ranks;
-  group.reserve(request_ids.size());
-  for (const int32_t request_id : request_ids) {
-    auto* request_entry = request_store_->MutRequestEntry(request_id);
-    group.push_back(&request_entry->desc());
-    ranks.emplace_back();
-    for (int32_t local_rank = 0; local_rank < request_entry->LocalRankCount(); ++local_rank) {
-      ranks.back()[request_entry->LocalRankToGlobalRank(local_rank)] =
-          request_entry->GetRuntimeRequest(local_rank);
-    }
-    request_entry->ResetRuntimeRequest();
-  }
-  CHECK_EQ(group.size(), ranks.size());
-  if (group.empty()) { return; }
-
-  const int64_t group_size = group.size();
-  std::map<int64_t, std::vector<std::shared_ptr<const std::function<void(const Maybe<void>&)>>>>
-      device_id2callbacks;
   const int64_t stream_id = current_stream_id_;
   current_stream_id_ = (current_stream_id_ + 1) % num_streams_;
   CudaCurrentDeviceGuard device_guard;
   auto& comm_group = impl_->GetCommGroup(request_ids, stream_id);
   auto& device_id2stream_ctx = impl_->stream_id2device_id2stream_ctx.at(stream_id);
-  if (group.front()->op_desc().op_type() == OpType::kOpTypeAllReduce
-      && collective_boxing_conf_.nccl_fusion_all_reduce_use_buffer() && group.size() > 1) {
-    int64_t offset = 0;
-    std::map<int64_t, MultiCopyParams> device_id2copy_in_params;
-    std::map<int64_t, MultiCopyParams> device_id2copy_out_params;
-    for (int64_t i = 0; i < group.size(); ++i) {
-      const RequestDesc* request_desc = group.at(i);
-      if (i != 0) {
-        CHECK_EQ(request_desc->op_desc().reduce_method(), group.front()->op_desc().reduce_method());
-        CHECK_EQ(request_desc->op_desc().data_type(), group.front()->op_desc().data_type());
-      }
-      const std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>& rank2request_info =
-          ranks.at(i);
-      const int64_t size = GetRequestSize(*request_desc);
-      CHECK_LE(offset + size, fusion_threshold_);
-      const int64_t aligned_size = GetCudaAlignedSize(size);
-      for (const auto& rank7request_info : rank2request_info) {
-        const int64_t rank = rank7request_info.first;
-        const RuntimeRequestInfo& request_info = *rank7request_info.second;
-        const DeviceDesc& device_desc = request_desc->device_set().device().Get(rank);
-        const int64_t device_id = device_desc.device_id();
-        auto& stream_ctx = device_id2stream_ctx.at(device_id);
-        device_id2copy_in_params[device_id].Add(stream_ctx->fusion_buffer() + offset,
-                                                request_info.send_buff, size);
-        device_id2copy_out_params[device_id].Add(request_info.recv_buff,
-                                                 stream_ctx->fusion_buffer() + offset, size);
-        device_id2callbacks[device_id].reserve(group_size);
-        device_id2callbacks[device_id].push_back(request_info.callback);
-      }
-      offset += aligned_size;
-    }
-    for (auto& device_id7copy_in_params : device_id2copy_in_params) {
-      OF_CUDA_CHECK(cudaSetDevice(device_id7copy_in_params.first));
-      MultiCopy(device_id2stream_ctx.at(device_id7copy_in_params.first)->stream(),
-                device_id7copy_in_params.second);
-    }
-    OF_NCCL_CHECK(ncclGroupStart());
-    const int64_t size_of_data_type = GetSizeOfDataType(group.front()->op_desc().data_type());
-    CHECK_EQ(offset % size_of_data_type, 0);
-    const int64_t elem_cnt = offset / size_of_data_type;
-    for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
-      const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
-      OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
-      auto& stream_ctx = device_id2stream_ctx.at(comm_rank.device_id());
-      OF_NCCL_CHECK(ncclAllReduce(stream_ctx->fusion_buffer(), stream_ctx->fusion_buffer(),
-                                  elem_cnt, GetNcclDataType(group.front()->op_desc().data_type()),
-                                  GetNcclReduceOp(group.front()->op_desc().reduce_method()),
-                                  comm_rank.nccl_comm(), stream_ctx->stream()));
-    }
-    OF_NCCL_CHECK(ncclGroupEnd());
-    for (auto& device_id7copy_out_params : device_id2copy_out_params) {
-      OF_CUDA_CHECK(cudaSetDevice(device_id7copy_out_params.first));
-      MultiCopy(device_id2stream_ctx.at(device_id7copy_out_params.first)->stream(),
-                device_id7copy_out_params.second);
-    }
+  if (request_store_->MutRequestEntry(request_ids.front())->desc().op_desc().op_type()
+          == OpType::kOpTypeAllReduce
+      && collective_boxing_conf_.nccl_fusion_all_reduce_use_buffer() && request_ids.size() > 1) {
+    LaunchFusedAllReduce(comm_group, device_id2stream_ctx, request_store_, request_ids);
   } else {
-    OF_NCCL_CHECK(ncclGroupStart());
-
-    for (int64_t i = 0; i < group.size(); ++i) {
-      const RequestDesc* request_desc = group.at(i);
-      const OpDesc& op_desc = request_desc->op_desc();
-      const std::map<int64_t, std::shared_ptr<const RuntimeRequestInfo>>& rank2request_info =
-          ranks.at(i);
-      for (const auto& rank7request_info : rank2request_info) {
-        const int64_t rank = rank7request_info.first;
-        const RuntimeRequestInfo& request_info = *rank7request_info.second;
-        const DeviceDesc& device_desc = request_desc->device_set().device().Get(rank);
-        const int64_t device_id = device_desc.device_id();
-        OF_CUDA_CHECK(cudaSetDevice(device_id));
-        const int32_t local_rank = comm_group.GetLocalRank(rank);
-        const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
-        ncclComm_t comm = comm_rank.nccl_comm();
-        auto& stream_ctx = device_id2stream_ctx.at(device_id);
-        ncclDataType_t nccl_data_type = GetNcclDataType(op_desc.data_type());
-        const OpType op_type = op_desc.op_type();
-        const int64_t num_ranks = op_desc.num_ranks();
-        const int64_t elem_cnt = Shape(op_desc.shape()).elem_cnt();
-        const void* send_buff = request_info.send_buff;
-        void* recv_buff = request_info.recv_buff;
-        device_id2callbacks[device_id].reserve(group_size);
-        device_id2callbacks[device_id].push_back(request_info.callback);
-        if (op_type == OpType::kOpTypeAllReduce) {
-          OF_NCCL_CHECK(ncclAllReduce(send_buff, recv_buff, elem_cnt, nccl_data_type,
-                                      GetNcclReduceOp(op_desc.reduce_method()), comm,
-                                      stream_ctx->stream()));
-        } else if (op_type == OpType::kOpTypeAllGather) {
-          CHECK_EQ(elem_cnt % num_ranks, 0);
-          OF_NCCL_CHECK(ncclAllGather(send_buff, recv_buff, elem_cnt / num_ranks, nccl_data_type,
-                                      comm, stream_ctx->stream()));
-        } else if (op_type == OpType::kOpTypeReduceScatter) {
-          CHECK_EQ(elem_cnt % num_ranks, 0);
-          OF_NCCL_CHECK(ncclReduceScatter(send_buff, recv_buff, elem_cnt / num_ranks,
-                                          nccl_data_type, GetNcclReduceOp(op_desc.reduce_method()),
-                                          comm, stream_ctx->stream()));
-        } else if (op_type == OpType::kOpTypeReduce) {
-          OF_NCCL_CHECK(ncclReduce(send_buff, recv_buff, elem_cnt, nccl_data_type,
-                                   GetNcclReduceOp(op_desc.reduce_method()), op_desc.root(), comm,
-                                   stream_ctx->stream()));
-        } else if (op_type == OpType::kOpTypeBroadcast) {
-          OF_NCCL_CHECK(ncclBroadcast(send_buff, recv_buff, elem_cnt, nccl_data_type,
-                                      op_desc.root(), comm, stream_ctx->stream()));
-        } else if (op_type == OpType::kOpTypeAll2All) {
-#if NCCL_VERSION_CODE > 2700
-          const int64_t elem_per_rank = elem_cnt / num_ranks;
-          const int64_t elem_per_chunk = elem_per_rank / num_ranks;
-          const int64_t dtype_size = GetSizeOfDataType(op_desc.data_type());
-          const int64_t chunk_size = elem_per_chunk * dtype_size;
-          for (int64_t j = 0; j < num_ranks; ++j) {
-            OF_NCCL_CHECK(ncclSend(reinterpret_cast<const void*>(
-                                       reinterpret_cast<const char*>(send_buff) + j * chunk_size),
-                                   elem_per_chunk, nccl_data_type, j, comm, stream_ctx->stream()));
-            OF_NCCL_CHECK(ncclRecv(
-                reinterpret_cast<void*>(reinterpret_cast<char*>(recv_buff) + j * chunk_size),
-                elem_per_chunk, nccl_data_type, j, comm, stream_ctx->stream()));
-          }
-#else
-          UNIMPLEMENTED();
-#endif
-        } else {
-          UNIMPLEMENTED();
-        }
-      }
-    }
-    OF_NCCL_CHECK(ncclGroupEnd());
+    LaunchAggregatedOps(comm_group, device_id2stream_ctx, request_store_, request_ids);
   }
-  for (auto& device_id7callbacks : device_id2callbacks) {
-    const int64_t device_id = device_id7callbacks.first;
-    OF_CUDA_CHECK(cudaSetDevice(device_id));
-    cudaEvent_t event;
-    OF_CUDA_CHECK(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
-    OF_CUDA_CHECK(cudaEventRecord(event, device_id2stream_ctx.at(device_id)->stream()));
-    {
-      std::unique_lock<std::mutex> event_list_lock(event_list_mutex_);
-      event_list_.emplace_back(Event{device_id, event, [=](const Maybe<void>& status) {
-                                       for (const auto& callback : device_id7callbacks.second) {
-                                         (*callback)(status);
-                                       }
-                                     }});
-      event_list_cond_.notify_all();
+  for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
+    const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
+    StreamCtx* stream_ctx = device_id2stream_ctx.at(comm_rank.device_id()).get();
+    auto runtime_request_info_vec =
+        std::make_shared<std::vector<std::shared_ptr<const RuntimeRequestInfo>>>();
+    runtime_request_info_vec->reserve(request_ids.size());
+    for (int request_id : request_ids) {
+      RequestEntry* request_entry = request_store_->MutRequestEntry(request_id);
+      runtime_request_info_vec->emplace_back(request_entry->GetRuntimeRequest(local_rank));
     }
+    OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
+    stream_ctx->AddCallback([runtime_request_info_vec]() {
+      for (auto& runtime_request_info : *runtime_request_info_vec) {
+        (*runtime_request_info->callback)(Maybe<void>::Ok());
+      }
+    });
+  }
+  for (int request_id : request_ids) {
+    RequestEntry* request_entry = request_store_->MutRequestEntry(request_id);
+    request_entry->ResetRuntimeRequest();
   }
 }
 

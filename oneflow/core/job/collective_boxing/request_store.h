@@ -54,6 +54,8 @@ class RequestEntry final {
                          std::shared_ptr<const RuntimeRequestInfo> runtime_request_info);
   const std::shared_ptr<const RuntimeRequestInfo>& GetRuntimeRequest(int32_t local_rank);
   void ResetRuntimeRequest();
+  int64_t elem_cnt() const { return elem_cnt_; }
+  int64_t size_in_bytes() const { return size_in_bytes_; }
 
  private:
   std::mutex mutex_;
@@ -65,6 +67,8 @@ class RequestEntry final {
   std::vector<DeviceDesc> local_device_vec_;
   std::vector<int64_t> local_rank2global_rank_;
   std::map<int64_t, int64_t> global_rank2local_rank_;
+  int64_t elem_cnt_;
+  int64_t size_in_bytes_;
 };
 
 class RequestStore {

@@ -18,6 +18,8 @@ limitations under the License.
 #include "oneflow/core/common/maybe.h"
 #include "oneflow/core/job/machine_context.h"
 #include "oneflow/core/job/global_for.h"
+#include "oneflow/core/common/shape.h"
+#include "oneflow/core/common/data_type.h"
 
 namespace oneflow {
 
@@ -40,6 +42,8 @@ RequestEntry::RequestEntry(int64_t job_id, const RequestDesc& desc) : job_id_(jo
   node_count_ = node_ids.size();
   runtime_request_info_vec_.resize(local_rank_count);
   runtime_request_info_count_ = 0;
+  elem_cnt_ = Shape(desc.op_desc().shape()).elem_cnt();
+  size_in_bytes_ = elem_cnt_ * GetSizeOfDataType(desc.op_desc().data_type());
 }
 
 bool RequestEntry::AddRuntimeRequest(

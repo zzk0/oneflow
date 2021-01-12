@@ -41,24 +41,10 @@ class NcclExecutorBackend : public ExecutorBackend {
                      std::vector<std::vector<int32_t>>* groups) override;
   void ExecuteRequests(const std::vector<int32_t>& request_ids) override;
 
-  struct Event {
-    int64_t device_id;
-    cudaEvent_t cuda_event;
-    std::function<void(Maybe<void>)> callback;
-  };
-
   int32_t num_devices_;
   int64_t num_streams_;
   int64_t fusion_threshold_;
   const CollectiveBoxingConf collective_boxing_conf_;
-
-  std::list<Event> event_list_;
-  std::thread event_list_poll_thread_;
-  std::mutex event_list_mutex_;
-  std::condition_variable event_list_cond_;
-  bool shutdown_;
-  std::mutex mutex_;
-  std::shared_ptr<ThreadPool> callback_executor_pool_;
 
   int64_t current_stream_id_ = 0;
   std::shared_ptr<RequestStore> request_store_;
