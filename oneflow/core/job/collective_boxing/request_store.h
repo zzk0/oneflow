@@ -20,6 +20,7 @@ limitations under the License.
 #include "oneflow/core/job/collective_boxing/runtime_request_info.h"
 #include "oneflow/core/job/plan.pb.h"
 #include "oneflow/core/common/symbol.h"
+#include "oneflow/core/graph/boxing/collective_boxing_util.h"
 
 namespace oneflow {
 
