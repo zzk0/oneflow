@@ -13,36 +13,30 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-#ifndef ONEFLOW_CORE_JOB_EAGER_NCCL_COMM_MANAGER_H_
-#define ONEFLOW_CORE_JOB_EAGER_NCCL_COMM_MANAGER_H_
+#ifndef ONEFLOW_CORE_JOB_MPI_MANAGER_H_
+#define ONEFLOW_CORE_JOB_MPI_MANAGER_H_
 
 #include "oneflow/core/common/util.h"
 #include "oneflow/core/job/plan.pb.h"
 
-#ifdef WITH_CUDA
-
-#include "oneflow/core/device/cuda_util.h"
+#ifdef WITH_MPI
 
 namespace oneflow {
 
-class EagerNcclCommMgr final {
+class MPIMgr final {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(EagerNcclCommMgr);
-  ~EagerNcclCommMgr();
-
-  ncclComm_t GetCommForDevice(const std::set<std::pair<int64_t, int64_t>>& device_set);
+  OF_DISALLOW_COPY_AND_MOVE(MPIMgr);
+  ~MPIMgr();
 
  private:
-  friend class Global<EagerNcclCommMgr>;
-  EagerNcclCommMgr() = default;
+  friend class Global<MPIMgr>;
+  MPIMgr();
 
-  std::map<std::set<std::pair<int64_t, int64_t>>, HashMap<int64_t, ncclComm_t>>
-      device_set2device_id2comm_;
-  std::mutex mutex_;
+  bool inited_;
 };
 
 }  // namespace oneflow
 
-#endif  // WITH_CUDA
+#endif  // WITH_MPI
 
-#endif  // ONEFLOW_CORE_JOB_EAGER_NCCL_COMM_MANAGER_H_
+#endif  // ONEFLOW_CORE_JOB_MPI_MANAGER_H_
