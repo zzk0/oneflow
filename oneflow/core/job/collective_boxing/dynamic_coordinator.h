@@ -18,6 +18,8 @@ limitations under the License.
 
 #include "oneflow/core/job/collective_boxing/coordinator.h"
 
+#ifdef WITH_MPI
+
 namespace oneflow {
 
 class CollectiveBoxingPlan;
@@ -49,5 +51,7 @@ class DynamicCoordinator : public Coordinator {
 }  // namespace boxing
 
 }  // namespace oneflow
+
+#endif  // WITH_MPI
 
 #endif  // ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_DYNAMIC_COORDINATOR_H_

@@ -36,9 +36,7 @@ MPIMgr::MPIMgr() {
   LOG(INFO) << "MPI init success, rank = " << rank << ", size = " << size;
 }
 
-MPIMgr::~MPIMgr() {
-  MPI_Finalize();
-}
+MPIMgr::~MPIMgr() { MPI_Finalize(); }
 
 }  // namespace oneflow
 

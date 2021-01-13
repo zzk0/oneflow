@@ -18,6 +18,9 @@ limitations under the License.
 #include "oneflow/core/job/collective_boxing/request_store.h"
 #include "oneflow/core/graph/boxing/collective_boxing_util.h"
 #include "oneflow/core/job/global_for.h"
+
+#ifdef WITH_MPI
+
 #include <mpi.h>
 
 namespace oneflow {
@@ -73,6 +76,7 @@ struct DynamicCoordinator::Impl {
   ~Impl();
 
   void AddRequest(int32_t request_id);
+  void ExecuteRequests(const std::vector<int32_t>& request_ids);
   void CoordinatingLoop();
 
   std::shared_ptr<RequestStore> request_store;
@@ -101,12 +105,16 @@ DynamicCoordinator::Impl::~Impl() {
 void DynamicCoordinator::Impl::AddRequest(int32_t request_id) {
   RequestEntry* request_entry = request_store->MutRequestEntry(request_id);
   if (request_entry->NodeCount() == 1) {
-    std::lock_guard<std::mutex> lock(executor_mutex);
-    executor->ExecuteRequests(std::vector<int32_t>({request_id}));
+    ExecuteRequests(std::vector<int32_t>({request_id}));
   } else {
     std::lock_guard<std::mutex> lock(pending_requests_mutex);
     pending_requests.push_back(request_id);
   }
+}
+
+void DynamicCoordinator::Impl::ExecuteRequests(const std::vector<int32_t>& request_ids) {
+  std::lock_guard<std::mutex> lock(executor_mutex);
+  executor->ExecuteRequests(std::vector<int32_t>(request_ids));
 }
 
 void DynamicCoordinator::Impl::CoordinatingLoop() {
@@ -143,10 +151,7 @@ void DynamicCoordinator::Impl::CoordinatingLoop() {
         pending -= 1;
       }
     }
-    if (!ready_request_ids.empty()) {
-      std::lock_guard<std::mutex> lock(executor_mutex);
-      executor->ExecuteRequests(std::vector<int32_t>(ready_request_ids));
-    }
+    if (!ready_request_ids.empty()) { ExecuteRequests(std::vector<int32_t>(ready_request_ids)); }
     if (global_ready_vec.Test(shutdown_index)) {
       CHECK_EQ(pending, 0);
       break;
@@ -172,3 +177,5 @@ void DynamicCoordinator::AddRequest(int32_t request_id) { impl_->AddRequest(requ
 }  // namespace boxing
 
 }  // namespace oneflow
+
+#endif  // WITH_MPI
