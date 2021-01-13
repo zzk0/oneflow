@@ -115,6 +115,8 @@ Scheduler::Impl::Impl(const CollectiveBoxingPlan& collective_boxing_plan)
 
 Scheduler::Scheduler(const Plan& plan) { impl_.reset(new Impl(plan.collective_boxing_plan())); }
 
+Scheduler::~Scheduler() = default;
+
 std::shared_ptr<RequestHandle> Scheduler::CreateRequestHandle(const RankDesc& rank_desc) {
   const int32_t request_id = impl_->request_store->GetRequestIdByName(rank_desc.op_desc().name());
   auto* request_entry = impl_->request_store->MutRequestEntry(request_id);

@@ -13,36 +13,35 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-#ifndef ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_SCHEDULER_H_
-#define ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_SCHEDULER_H_
+#ifndef ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_DYNAMIC_COORDINATOR_H_
+#define ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_DYNAMIC_COORDINATOR_H_
 
-#include "oneflow/core/common/util.h"
-#include "oneflow/core/job/collective_boxing/runtime_request_info.h"
-#include "oneflow/core/job/plan.pb.h"
+#include "oneflow/core/job/collective_boxing/coordinator.h"
 
 namespace oneflow {
+
+class CollectiveBoxingPlan;
 
 namespace boxing {
 
 namespace collective {
 
-class RequestHandle;
+class RequestStore;
+class Executor;
 
-class Scheduler final {
+class DynamicCoordinator : public Coordinator {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(Scheduler);
-  ~Scheduler();
+  OF_DISALLOW_COPY_AND_MOVE(DynamicCoordinator);
+  DynamicCoordinator();
+  ~DynamicCoordinator() override;
 
-  std::shared_ptr<RequestHandle> CreateRequestHandle(const RankDesc& rank_desc);
-  void Schedule(const std::shared_ptr<RequestHandle>& handle,
-                std::shared_ptr<const RuntimeRequestInfo> request_info);
-
- private:
-  friend class Global<Scheduler>;
-  explicit Scheduler(const Plan& plan);
+  void Init(const CollectiveBoxingPlan& collective_boxing_plan,
+            std::shared_ptr<RequestStore> request_store,
+            std::shared_ptr<Executor> executor) override;
+  void AddRequest(int32_t request_id) override;
 
   struct Impl;
-  std::shared_ptr<Impl> impl_;
+  std::unique_ptr<Impl> impl_;
 };
 
 }  // namespace collective
@@ -51,4 +50,4 @@ class Scheduler final {
 
 }  // namespace oneflow
 
-#endif  // ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_SCHEDULER_H_
+#endif  // ONEFLOW_CORE_JOB_COLLECTIVE_BOXING_DYNAMIC_COORDINATOR_H_
