@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "oneflow/core/job/mpi_manager.h"
-#include <mpi/mpi.h>
+#include <mpi.h>
 
 #ifdef WITH_MPI
 
@@ -37,8 +37,7 @@ MPIMgr::MPIMgr() {
 }
 
 MPIMgr::~MPIMgr() {
-  int flag;
-  MPI_Finalized(&flag);
+  MPI_Finalize();
 }
 
 }  // namespace oneflow
