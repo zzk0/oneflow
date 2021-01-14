@@ -40,7 +40,7 @@ func_config.default_data_type(flow.float)
 func_config.default_logical_view(flow.scope.consistent_view())
 
 
-@flow.global_function(function_config=func_config)
+@flow.global_function(type="train", function_config=func_config)
 def test_job(a: oft.Numpy.Placeholder((96, 8))):
     b = flow.get_variable(
         "b",
@@ -49,7 +49,11 @@ def test_job(a: oft.Numpy.Placeholder((96, 8))):
         initializer=flow.random_uniform_initializer(minval=-1, maxval=1),
         trainable=True,
     )
-    return flow.matmul(a, b)
+    loss = flow.matmul(a, b)
+    flow.optimizer.SGD(
+        flow.optimizer.PiecewiseConstantScheduler([], [1e-4]), momentum=0
+    ).minimize(loss)
+    return loss
 
 
 print(test_job(np.random.rand(96, 8).astype(np.float32)).get().numpy())
