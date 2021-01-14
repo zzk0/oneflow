@@ -28,7 +28,6 @@ limitations under the License.
 #include "oneflow/user/summary/events_writer.h"
 #include "oneflow/core/job/collective_boxing/scheduler.h"
 #include "oneflow/core/job/collective_boxing_device_ctx_poller.h"
-#include "oneflow/core/job/mpi_manager.h"
 
 namespace oneflow {
 
@@ -94,9 +93,6 @@ Runtime::~Runtime() {
 
 void Runtime::NewAllGlobal(const Plan& plan, size_t total_piece_num, bool is_experiment_phase) {
   Global<RuntimeCtx>::New(total_piece_num, is_experiment_phase);
-#ifdef WITH_MPI
-  Global<MPIMgr>::New();
-#endif  // WITH_MPI
   if (Global<MachineCtx>::Get()->IsThisMachineMaster()
       && Global<RuntimeCtx>::Get()->NeedCollectActEvent()) {
     Global<ActEventLogger>::New(is_experiment_phase);
@@ -166,11 +162,7 @@ void Runtime::DeleteAllGlobal() {
     Global<EpollCommNet>::Delete();
 #endif
   }
-
   Global<ActEventLogger>::Delete();
-#ifdef WITH_MPI
-  Global<MPIMgr>::Delete();
-#endif  // WITH_MPI
   Global<RuntimeCtx>::Delete();
   Global<summary::EventsWriter>::Delete();
 }
