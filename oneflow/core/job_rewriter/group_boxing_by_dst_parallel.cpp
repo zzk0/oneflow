@@ -38,8 +38,17 @@ void GroupBoxingByDstParallel(const OpGraph& op_graph, JobBuilder* job_builder) 
       const SbpParallel& producer_sbp = producer.SbpParallel4Lbi(lbi);
       const SbpParallel& consumer_sbp = node->SbpParallel4BnInOp(ibn);
 #ifdef COVER_BY_B_
+      // We are using boxing to pre-transfer blob to a proxy.
+      // Thus can not enforce using same SBP.
+      // IsClassRegistered<int32_t, DisableInputBoxingGroup>(op_type_case) should work.
+      const auto input_blob_modifier_ = node->op().InputBlobModifier4Ibn(ibn);
+      bool is_same_sbp = input_blob_modifier_.has_is_mutable() && input_blob_modifier_.is_mutable();
+      if (is_same_sbp) {
+        std::cout << "Enforcing same SBP. Something wrong with group boxing." << std::endl;
+        continue;
+      }
       // We actually don't have any copy cost for an upstream opeartor with Broadcast SBPParallel.
-      if(producer_sbp.has_broadcast_parallel()) continue;
+      if (producer_sbp.has_broadcast_parallel()) continue;
 #endif  // COVER_BY_B_
       // if we have downstream placement different from upstream placement
       if (producer.parallel_desc() != node->parallel_desc() || producer_sbp != consumer_sbp) {
@@ -56,7 +65,7 @@ void GroupBoxingByDstParallel(const OpGraph& op_graph, JobBuilder* job_builder) 
 #ifdef COVER_BY_B_
   // Use broadcast in the only proxy under some condition.
   for (auto& lbi7groups : lbi2consumer_grouped_by_parallel_sbp) {
-    const LogicalBlobId& lbi = lbi7groups.first;
+    // const LogicalBlobId& lbi = lbi7groups.first;
     HashMap<std::pair<ParallelDesc, SbpParallel>,
             std::vector<std::pair<const OpNode*, std::string>>>& ParallelPairs2NodeBlobs =
         lbi7groups.second;

@@ -216,6 +216,13 @@ class SbpCollector {
       // If not support boxing, just skip it.
       if (IsClassRegistered<int32_t, DisableInputBoxingGroup>(op_type_case)) { return; }
       for (const std::string& ibn : node->op().input_bns()) {
+        // Skip those blobs who enforc same SBP.
+        const auto input_blob_modifier_ = node->op().InputBlobModifier4Ibn(ibn);
+        bool is_same_sbp = input_blob_modifier_.has_is_mutable() && input_blob_modifier_.is_mutable();
+        if(is_same_sbp){
+          std::cout << "Enforcing same SBP. Can not use sbp_collector here." << std::endl;
+          continue;
+        }
         const LogicalBlobId& lbi = node->op().BnInOp2Lbi(ibn);
         const OpNode& producer = node->ProducerOpNode4Lbi(lbi);
         // a set to store the id of all possible SBP Parallel for a downstream op
