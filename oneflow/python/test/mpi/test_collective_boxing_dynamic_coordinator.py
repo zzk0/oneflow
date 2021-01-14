@@ -30,11 +30,11 @@ next_ip = socket.gethostbyname(node_list[(rank + 1) % size])
 shifted_ip_list = comm.allgather(next_ip)
 ip_list = shifted_ip_list[1:] + shifted_ip_list[:1]
 
-flow.env.machine(ip_list.join(","))
+flow.env.machine(ip_list)
 flow.env.ctrl_port(50051)
 
 flow.clear_default_session()
-flow.config.gpu_device_num(4)
+flow.config.gpu_device_num(4) 
 func_config = flow.FunctionConfig()
 func_config.default_data_type(flow.float)
 func_config.default_logical_view(flow.scope.consistent_view())
