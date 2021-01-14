@@ -15,13 +15,16 @@ limitations under the License.
 """
 
 from mpi4py import MPI
+import socket
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
-
 node_name = MPI.Get_processor_name()
 
 node_list = comm.allgather(node_name)
+next_ip = socket.gethostbyname(node_list[(rank + 1) % size])
+shifted_ip_list = comm.allgather(next_ip)
+ip_list = shifted_ip_list[1:] + shifted_ip_list[:1]
 
-print(node_list)
+print(ip_list)
