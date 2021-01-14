@@ -118,6 +118,9 @@ void DynamicCoordinator::Impl::ExecuteRequests(const std::vector<int32_t>& reque
 }
 
 void DynamicCoordinator::Impl::CoordinatingLoop() {
+  int inited;
+  MPI_Initialized(&inited);
+  CHECK(inited);
   MPI_Comm mpi_comm;
   MPI_Comm_dup(MPI_COMM_WORLD, &mpi_comm);
   const size_t max_multi_node_request_id = request_store->MaxMultiNodeRequestId();

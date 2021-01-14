@@ -18,8 +18,8 @@ limitations under the License.
 #include "oneflow/core/job/collective_boxing/request_store.h"
 #include "oneflow/core/job/collective_boxing/coordinator.h"
 #include "oneflow/core/job/collective_boxing/static_group_coordinator.h"
+#include "oneflow/core/job/collective_boxing/dynamic_coordinator.h"
 #include "oneflow/core/graph/boxing/collective_boxing_util.h"
-#include "oneflow/core/control/ctrl_client.h"
 #include "oneflow/core/job/global_for.h"
 #include "oneflow/core/job/collective_boxing/nccl_executor_backend.h"
 #include "oneflow/core/job/plan.pb.h"
@@ -109,7 +109,8 @@ Scheduler::Impl::Impl(const CollectiveBoxingPlan& collective_boxing_plan)
   request_store.reset(new RequestStore(collective_boxing_plan));
   std::shared_ptr<Executor> executor(new ExecutorImpl());
   executor->Init(collective_boxing_plan, request_store);
-  coordinator.reset(new StaticGroupCoordinator());
+  // coordinator.reset(new StaticGroupCoordinator());
+  coordinator.reset(new DynamicCoordinator());
   coordinator->Init(collective_boxing_plan, request_store, executor);
 }
 
