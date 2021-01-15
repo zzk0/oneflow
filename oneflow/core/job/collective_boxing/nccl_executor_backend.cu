@@ -174,10 +174,10 @@ class CommGroup final {
     CHECK_GT(local_rank_count, 0);
     ncclUniqueId nccl_unique_id{};
     if (local_ranks.front() == 0) {
+      OF_NCCL_CHECK(ncclGetUniqueId(&nccl_unique_id));
       if (local_rank_count != global_rank_count_) {
         Global<CtrlClient>::Get()->PushKV(unique_name, NcclUniqueIdToString(nccl_unique_id));
       }
-      OF_NCCL_CHECK(ncclGetUniqueId(&nccl_unique_id));
     } else {
       Global<CtrlClient>::Get()->PullKV(unique_name, [&nccl_unique_id](const std::string& val) {
         NcclUniqueIdFromString(val, &nccl_unique_id);
