@@ -163,7 +163,10 @@ void DynamicCoordinator::Impl::CoordinatingLoop() {
         pending -= 1;
       }
     }
-    if (!ready_request_ids.empty()) { ExecuteRequests(std::vector<int32_t>(ready_request_ids)); }
+    if (!ready_request_ids.empty()) {
+      ExecuteRequests(std::vector<int32_t>(ready_request_ids));
+      ready_request_ids.clear();
+    }
     if (global_ready_vec.Test(shutdown_index)) {
       CHECK_EQ(pending, 0);
       break;
