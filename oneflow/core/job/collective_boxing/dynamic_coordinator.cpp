@@ -42,8 +42,8 @@ class BitVector final {
   inline bool Test(size_t index) {
     CHECK_LT(index, size_);
     const size_t store_index = index / kStoreBits;
-    const size_t bit_idx = store_index % kStoreBits;
-    const uint64_t mask = static_cast<uint64_t>(1) << bit_idx;
+    const size_t bit_idx = index % kStoreBits;
+    const uint64_t mask = (static_cast<uint64_t>(1) << bit_idx);
     const uint64_t set = (store_[store_index] & mask);
     return set;
   }
@@ -62,8 +62,8 @@ class BitVector final {
   inline bool SetValue(size_t index, bool value) {
     CHECK_LT(index, size_);
     const size_t store_index = index / kStoreBits;
-    const size_t bit_idx = store_index % kStoreBits;
-    const uint64_t mask = static_cast<uint64_t>(1) << bit_idx;
+    const size_t bit_idx = index % kStoreBits;
+    const uint64_t mask = (static_cast<uint64_t>(1) << bit_idx);
     const bool old_value = static_cast<bool>(store_[store_index] & mask);
     if (value) {
       store_[store_index] |= mask;
