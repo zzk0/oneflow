@@ -85,12 +85,12 @@ RequestStore::RequestStore(const CollectiveBoxingPlan& collective_boxing_plan) {
                          ? a->desc().op_desc().name() < b->desc().op_desc().name()
                          : a->NodeCount() > a->NodeCount();
             });
+  max_multi_node_request_id_ = 0;
   for (int32_t i = 0; i < request_entry_vec_.size(); ++i) {
-    CHECK(name2request_id_.emplace(request_entry_vec_.at(i)->desc().op_desc().name(), i).second);
+    const std::unique_ptr<RequestEntry>& entry = request_entry_vec_.at(i);
+    CHECK(name2request_id_.emplace(entry->desc().op_desc().name(), i).second);
+    if (entry->NodeCount() > 1) { max_multi_node_request_id_ = i + 1; }
   }
-  max_multi_node_request_id_ = std::count_if(
-      request_entry_vec_.cbegin(), request_entry_vec_.cend(),
-      [](const std::unique_ptr<RequestEntry>& info) { return info->NodeCount() > 1; });
 }
 
 }  // namespace collective
