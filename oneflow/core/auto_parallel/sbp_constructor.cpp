@@ -77,9 +77,11 @@ void SbpConstructor::constructSbpGraph(OpGraph& op_graph, Job& job) {
   // Compute computation cost for all sbp nodes
   InitializeComputationCost(op_graph, op_name2sbp_node, op_name2is_fixed);
 
+#ifdef SBP_COLLECTOR_
   // Use sbp collector to create sbp proxy for nodes with multiple downstream operators.
-  // SbpCollector sbp_collector;
-  // sbp_collector.ProxySbpCandidate(op_graph, op_name2sbp_node, sbp_graph);
+  SbpCollector sbp_collector;
+  sbp_collector.ProxySbpCandidate(op_graph, op_name2sbp_node, sbp_graph);
+#endif  // SBP_COLLECTOR_
 
   // Initialize copy cost
   InitializeCopyCost(op_graph, op_name2sbp_node, op_name2is_fixed);
@@ -194,8 +196,6 @@ bool CheckSbpParallel(const SbpParallel& sbp_parallel) {
          || sbp_parallel.has_partial_sum_parallel();
 }
 
-}  // namespace
-
 // compute copy cost
 double ComputCopyCostBetweenTwoSbpParallel(const SbpParallel& producer_sbp_parallel,
                                            const SbpParallel& consumer_sbp_parallel,
@@ -233,8 +233,8 @@ double ComputCopyCostBetweenTwoSbpParallel(const SbpParallel& producer_sbp_paral
 }
 
 // Find sbp edge between two given sbp nodes
-SbpEdge<SbpSignature>* FindEdgeBetweenNodes(SbpNode<SbpSignature>* sbp_node_producer,
-                                            SbpNode<SbpSignature>* sbp_node_consumer) {
+SbpEdge<SbpSignature>* FindEdgeBetweenNodes(const SbpNode<SbpSignature>* sbp_node_producer,
+                                            const SbpNode<SbpSignature>* sbp_node_consumer) {
   // Look through Edges for SbpEdge(sbp_node_producer->sbp_node_consumer)
   // Might need to use HashMap for sbp_edge
   if (sbp_node_producer->EdgesOut.size() > sbp_node_consumer->EdgesIn.size()) {
@@ -248,6 +248,8 @@ SbpEdge<SbpSignature>* FindEdgeBetweenNodes(SbpNode<SbpSignature>* sbp_node_prod
   }
   return NULL;
 }
+
+}  // namespace
 
 // Should customize a function to compute computation cost for each kind of op
 // compute computation cost
@@ -271,7 +273,7 @@ void SbpConstructor::InitializeCopyCost(
     // skip it if fixed
     if (op_name2is_fixed[op_node->op().op_name()]) return;
     // get corresponding sbp node consumer
-    Algorithm::SbpNode<SbpSignature>* sbp_node_consumer = op_name2sbp_node[op_node->op().op_name()];
+    const Algorithm::SbpNode<SbpSignature>* sbp_node_consumer = op_name2sbp_node[op_node->op().op_name()];
     // get parallel description. Number of devices.
     const ParallelDesc& parallel_desc = op_node->parallel_desc();
     // Initialize copy cost between two nodes
@@ -296,21 +298,25 @@ void SbpConstructor::InitializeCopyCost(
       // into SbpGraph.
       if (op_name2is_fixed[producer->op().op_name()]) continue;
       // producer sbp node
-      auto* sbp_node_producer = op_name2sbp_node[producer->op().op_name()];
+      const auto* sbp_node_producer = op_name2sbp_node[producer->op().op_name()];
       // TODO: recode this
       // if (op_node->op().op_name().find("Return") != std::string::npos) is_same_sbp = true;
       SbpEdge<SbpSignature>* edge_found =
           FindEdgeBetweenNodes(sbp_node_producer, sbp_node_consumer);
       // Edge is clipped. Skip it.
-      if (edge_found == NULL){
+      if (edge_found == NULL) {
         std::cout << "SbpEdge not found while computing copy cost!" << std::endl;
         continue;
       }
 
       // Add copy cost for each blob
       const LogicalBlobId& lbi = op_node->op().BnInOp2Lbi(ibn);
+
+#ifdef SBP_COLLECTOR_
       // Check whether lbi is transferred by this edge
-      if(!edge_found->SearchLbi(lbi)) continue;
+      if (!edge_found->SearchLbi(lbi)) continue;
+#endif  // SBP_COLLECTOR_
+
       // Need to be careful, the logical blob description should be independent to current
       // SbpParallel. Use producer or op_node?
       const BlobDesc& logical_blob_desc = producer->LogicalBlobDesc4Lbi(lbi);
@@ -359,7 +365,7 @@ void SbpConstructor::LoadLbi2SbpEdge(
     // skip it if fixed
     if (op_name2is_fixed[op_node->op().op_name()]) return;
     // get corresponding sbp node consumer
-    Algorithm::SbpNode<SbpSignature>* sbp_node_consumer = op_name2sbp_node[op_node->op().op_name()];
+    const Algorithm::SbpNode<SbpSignature>* sbp_node_consumer = op_name2sbp_node[op_node->op().op_name()];
 
     // Loading logical blobs between two nodes
     // look through input blobs
@@ -370,7 +376,7 @@ void SbpConstructor::LoadLbi2SbpEdge(
       // into SbpGraph.
       if (op_name2is_fixed[producer->op().op_name()]) continue;
       // producer sbp node
-      auto* sbp_node_producer = op_name2sbp_node[producer->op().op_name()];
+      const auto* sbp_node_producer = op_name2sbp_node[producer->op().op_name()];
       // TODO: recode this
       SbpEdge<SbpSignature>* edge_found =
           FindEdgeBetweenNodes(sbp_node_producer, sbp_node_consumer);
