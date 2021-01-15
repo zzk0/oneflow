@@ -407,9 +407,10 @@ void AddCallbackAndResetRuntimeRequest(
     auto runtime_request_info_vec =
         std::make_shared<std::vector<std::shared_ptr<const RuntimeRequestInfo>>>();
     runtime_request_info_vec->reserve(request_ids.size());
-    for (int32_t request_id : request_ids) {
-      RequestEntry* request_entry = request_store->MutRequestEntry(request_id);
-      runtime_request_info_vec->emplace_back(request_entry->GetRuntimeRequest(local_rank));
+    for (int32_t i = 0; i < request_ids.size(); ++i) {
+      RequestEntry* request_entry = request_store->MutRequestEntry(request_ids.at(i));
+      runtime_request_info_vec->emplace_back(
+          std::move(saved_runtime_request_info.at(i).at(local_rank)));
     }
     OF_CUDA_CHECK(cudaSetDevice(comm_rank.device_id()));
     stream_ctx->AddCallback([runtime_request_info_vec]() {
