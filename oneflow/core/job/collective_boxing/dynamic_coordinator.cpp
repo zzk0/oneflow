@@ -149,6 +149,7 @@ void DynamicCoordinator::Impl::CoordinatingLoop() {
         CHECK(!local_ready_vec.Set(request_id));
         pending += 1;
       }
+      pending_requests.clear();
       if (shutdown) { local_ready_vec.Set(shutdown_index); }
     }
 
