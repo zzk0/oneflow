@@ -64,6 +64,8 @@ def env_init():
     c_api_util.InitEnv(default_env_proto)
     if oneflow_api.CurrentMachineId() == 0:
         scope_util.InitScopeStack()
+    else:
+        exit(0)
     return True
 
 

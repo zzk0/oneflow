@@ -39,25 +39,22 @@ func_config = flow.FunctionConfig()
 func_config.default_data_type(flow.float)
 func_config.default_logical_view(flow.scope.consistent_view())
 
-if rank == 0:
 
-    @flow.global_function(type="train", function_config=func_config)
-    def test_job(a: oft.Numpy.Placeholder((96, 8))):
-        b = flow.get_variable(
-            "b",
-            shape=(8, 32),
-            dtype=flow.float,
-            initializer=flow.random_uniform_initializer(minval=-1, maxval=1),
-            trainable=True,
-        )
-        loss = flow.matmul(a, b)
-        flow.optimizer.SGD(
-            flow.optimizer.PiecewiseConstantScheduler([], [1e-4]), momentum=0
-        ).minimize(loss)
-        return loss
+@flow.global_function(type="train", function_config=func_config)
+def test_job(a: oft.Numpy.Placeholder((96, 8))):
+    b = flow.get_variable(
+        "b",
+        shape=(8, 32),
+        dtype=flow.float,
+        initializer=flow.random_uniform_initializer(minval=-1, maxval=1),
+        trainable=True,
+    )
+    loss = flow.matmul(a, b)
+    flow.optimizer.SGD(
+        flow.optimizer.PiecewiseConstantScheduler([], [1e-4]), momentum=0
+    ).minimize(loss)
+    return loss
 
-    for i in range(10):
-        print(test_job(np.random.rand(96, 8).astype(np.float32)).get().numpy())
 
-else:
-    flow.env.init()
+for i in range(10):
+    print(test_job(np.random.rand(96, 8).astype(np.float32)).get().numpy())
