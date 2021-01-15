@@ -56,4 +56,5 @@ def test_job(a: oft.Numpy.Placeholder((96, 8))):
     return loss
 
 
-print(test_job(np.random.rand(96, 8).astype(np.float32)).get().numpy())
+for i in range(10):
+    print(test_job(np.random.rand(96, 8).astype(np.float32)).get().numpy())
