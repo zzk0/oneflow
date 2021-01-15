@@ -48,15 +48,9 @@ class BitVector final {
     return set;
   }
 
-  inline bool Set(size_t index) {
-    CHECK_LT(index, size_);
-    const size_t store_index = index / kStoreBits;
-    const size_t bit_idx = store_index % kStoreBits;
-    const uint64_t mask = static_cast<uint64_t>(1) << bit_idx;
-    const uint64_t set = (store_[store_index] & mask);
-    store_[store_index] |= mask;
-    return set;
-  }
+  inline bool Set(size_t index) { return SetValue(index, true); }
+
+  inline bool Clear(size_t index) { return SetValue(index, false); }
 
   inline size_t Size() const { return size_; }
 
@@ -65,6 +59,20 @@ class BitVector final {
   uint64_t* StorePtr() { return store_.data(); }
 
  private:
+  inline bool SetValue(size_t index, bool value) {
+    CHECK_LT(index, size_);
+    const size_t store_index = index / kStoreBits;
+    const size_t bit_idx = store_index % kStoreBits;
+    const uint64_t mask = static_cast<uint64_t>(1) << bit_idx;
+    const bool old_value = static_cast<bool>(store_[store_index] & mask);
+    if (value) {
+      store_[store_index] |= mask;
+    } else {
+      store_[store_index] &= (~mask);
+    }
+    return old_value;
+  }
+
   size_t size_;
   std::vector<uint64_t> store_;
 };
@@ -150,7 +158,7 @@ void DynamicCoordinator::Impl::CoordinatingLoop() {
     for (int32_t i = 0; i < max_multi_node_request_id; ++i) {
       if (global_ready_vec.Test(i) && request_store->MutRequestEntry(i)->HasRankOnThisNode()) {
         ready_request_ids.push_back(i);
-        CHECK(local_ready_vec.Set(i));
+        CHECK(local_ready_vec.Clear(i));
         pending -= 1;
       }
     }
