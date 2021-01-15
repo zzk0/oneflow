@@ -63,10 +63,12 @@ const std::shared_ptr<const RuntimeRequestInfo>& RequestEntry::GetRuntimeRequest
   return runtime_request_info_vec_.at(local_rank);
 }
 
-void RequestEntry::ResetRuntimeRequest() {
+std::vector<std::shared_ptr<const RuntimeRequestInfo>> RequestEntry::ResetRuntimeRequest() {
   std::lock_guard<std::mutex> lock(mutex_);
-  for (auto& runtime_request_info : runtime_request_info_vec_) { runtime_request_info.reset(); }
+  std::vector<std::shared_ptr<const RuntimeRequestInfo>> ret(runtime_request_info_vec_.size());
+  ret.swap(runtime_request_info_vec_);
   runtime_request_info_count_ = 0;
+  return ret;
 }
 
 RequestStore::RequestStore(const CollectiveBoxingPlan& collective_boxing_plan) {

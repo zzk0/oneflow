@@ -55,7 +55,7 @@ class RequestEntry final {
   bool AddRuntimeRequest(int32_t local_rank,
                          std::shared_ptr<const RuntimeRequestInfo> runtime_request_info);
   const std::shared_ptr<const RuntimeRequestInfo>& GetRuntimeRequest(int32_t local_rank);
-  void ResetRuntimeRequest();
+  std::vector<std::shared_ptr<const RuntimeRequestInfo>> ResetRuntimeRequest();
   int64_t elem_cnt() const { return elem_cnt_; }
   int64_t size_in_bytes() const { return size_in_bytes_; }
   const Symbol<DeviceSet>& device_set_symbol() const { return device_set_symbol_; }

@@ -391,17 +391,23 @@ void LaunchAggregatedOps(const CommGroup& comm_group,
   OF_NCCL_CHECK(ncclGroupEnd());
 }
 
-void AddCallback(const CommGroup& comm_group,
-                 const std::vector<std::unique_ptr<StreamCtx>>& device_id2stream_ctx,
-                 const std::shared_ptr<RequestStore>& request_store,
-                 const std::vector<int32_t>& request_ids) {
+void AddCallbackAndResetRuntimeRequest(
+    const CommGroup& comm_group,
+    const std::vector<std::unique_ptr<StreamCtx>>& device_id2stream_ctx,
+    const std::shared_ptr<RequestStore>& request_store, const std::vector<int32_t>& request_ids) {
+  std::vector<std::vector<std::shared_ptr<const RuntimeRequestInfo>>> saved_runtime_request_info(
+      request_ids.size());
+  for (int32_t i = 0; i < request_ids.size(); i++) {
+    saved_runtime_request_info.at(i) =
+        std::move(request_store->MutRequestEntry(request_ids.at(i))->ResetRuntimeRequest());
+  }
   for (int32_t local_rank = 0; local_rank < comm_group.local_rank_count(); ++local_rank) {
     const CommRank& comm_rank = comm_group.GetCommRank(local_rank);
     StreamCtx* stream_ctx = device_id2stream_ctx.at(comm_rank.device_id()).get();
     auto runtime_request_info_vec =
         std::make_shared<std::vector<std::shared_ptr<const RuntimeRequestInfo>>>();
     runtime_request_info_vec->reserve(request_ids.size());
-    for (int request_id : request_ids) {
+    for (int32_t request_id : request_ids) {
       RequestEntry* request_entry = request_store->MutRequestEntry(request_id);
       runtime_request_info_vec->emplace_back(request_entry->GetRuntimeRequest(local_rank));
     }
@@ -411,14 +417,6 @@ void AddCallback(const CommGroup& comm_group,
         (*runtime_request_info->callback)(Maybe<void>::Ok());
       }
     });
-  }
-}
-
-void ResetRuntimeRequest(const std::shared_ptr<RequestStore>& request_store,
-                         const std::vector<int32_t>& request_ids) {
-  for (int request_id : request_ids) {
-    RequestEntry* request_entry = request_store->MutRequestEntry(request_id);
-    request_entry->ResetRuntimeRequest();
   }
 }
 
@@ -598,8 +596,7 @@ struct NcclExecutorBackend::Impl {
     } else {
       LaunchAggregatedOps(comm_group, device_id2stream_ctx, request_store, request_ids);
     }
-    AddCallback(comm_group, device_id2stream_ctx, request_store, request_ids);
-    ResetRuntimeRequest(request_store, request_ids);
+    AddCallbackAndResetRuntimeRequest(comm_group, device_id2stream_ctx, request_store, request_ids);
   }
 
   CollectiveBoxingConf conf;
