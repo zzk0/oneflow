@@ -71,13 +71,13 @@ class RequestEntry final {
   int64_t size_in_bytes_;
   Symbol<DeviceSet> device_set_symbol_;
 
-  struct alignas(64) RuntimeRequestInfoStore {
-    std::vector<std::shared_ptr<const RuntimeRequestInfo>> info_vec;
-    int32_t count;
+  struct alignas(64) State {
+    std::vector<std::shared_ptr<const RuntimeRequestInfo>> runtime_request_info_vec;
+    int32_t runtime_request_count;
     std::mutex mutex;
   };
 
-  RuntimeRequestInfoStore runtime_store_;
+  State state_;
 };
 
 class RequestStore {

@@ -41,6 +41,15 @@ class StaticGroupCoordinator : public Coordinator {
   void AddRequest(int32_t request_id) override;
 
  private:
+  void DumpSummary() const;
+
+  std::shared_ptr<RequestStore> request_store_;
+  std::shared_ptr<Executor> executor_;
+  std::map<int64_t, std::vector<int32_t>> job_id2group_ids_;
+  std::vector<int32_t> request_id2group_id_;
+  std::vector<int32_t> request_id2index_in_group_;
+  std::vector<std::vector<int32_t>> group_id2request_ids_;
+
   struct GroupState {
     explicit GroupState(int32_t group_size) : index2is_ready(group_size), ready_request_count(0) {}
 
@@ -51,16 +60,6 @@ class StaticGroupCoordinator : public Coordinator {
     std::vector<bool> index2is_ready;
     int32_t ready_request_count;
   };
-
-  void DumpSummary() const;
-
-  std::shared_ptr<RequestStore> request_store_;
-  std::shared_ptr<Executor> executor_;
-  std::map<int64_t, std::vector<int32_t>> job_id2group_ids_;
-  std::vector<int32_t> request_id2group_id_;
-  std::vector<int32_t> request_id2index_in_group_;
-  std::vector<std::vector<int32_t>> group_id2request_ids_;
-
   std::mutex mutex_;
   std::vector<GroupState> group_id2group_state_;
   int64_t current_job_id_ = -1;

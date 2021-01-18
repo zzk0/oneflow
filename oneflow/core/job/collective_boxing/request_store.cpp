@@ -40,8 +40,8 @@ RequestEntry::RequestEntry(int64_t job_id, const RequestDesc& desc) : job_id_(jo
   }
   const size_t local_rank_count = local_device_vec_.size();
   node_count_ = node_ids.size();
-  runtime_store_.info_vec.resize(local_rank_count);
-  runtime_store_.count = 0;
+  state_.runtime_request_info_vec.resize(local_rank_count);
+  state_.runtime_request_count = 0;
   elem_cnt_ = Shape(desc.op_desc().shape()).elem_cnt();
   size_in_bytes_ = elem_cnt_ * GetSizeOfDataType(desc.op_desc().data_type());
   device_set_symbol_.reset(desc.device_set());
@@ -49,25 +49,26 @@ RequestEntry::RequestEntry(int64_t job_id, const RequestDesc& desc) : job_id_(jo
 
 bool RequestEntry::AddRuntimeRequest(
     int32_t local_rank, std::shared_ptr<const RuntimeRequestInfo> runtime_request_info) {
-  CHECK_LT(local_rank, runtime_store_.info_vec.size());
-  std::lock_guard<std::mutex> lock(runtime_store_.mutex);
-  CHECK(!runtime_store_.info_vec.at(local_rank));
-  runtime_store_.info_vec.at(local_rank) = std::move(runtime_request_info);
-  runtime_store_.count += 1;
-  return runtime_store_.count == runtime_store_.info_vec.size();
+  CHECK_LT(local_rank, state_.runtime_request_info_vec.size());
+  std::lock_guard<std::mutex> lock(state_.mutex);
+  CHECK(!state_.runtime_request_info_vec.at(local_rank));
+  state_.runtime_request_info_vec.at(local_rank) = std::move(runtime_request_info);
+  state_.runtime_request_count += 1;
+  return state_.runtime_request_count == state_.runtime_request_info_vec.size();
 }
 
 const std::shared_ptr<const RuntimeRequestInfo>& RequestEntry::GetRuntimeRequest(
     int32_t local_rank) {
-  std::lock_guard<std::mutex> lock(runtime_store_.mutex);
-  return runtime_store_.info_vec.at(local_rank);
+  std::lock_guard<std::mutex> lock(state_.mutex);
+  return state_.runtime_request_info_vec.at(local_rank);
 }
 
 std::vector<std::shared_ptr<const RuntimeRequestInfo>> RequestEntry::ResetRuntimeRequest() {
-  std::lock_guard<std::mutex> lock(runtime_store_.mutex);
-  std::vector<std::shared_ptr<const RuntimeRequestInfo>> ret(runtime_store_.info_vec.size());
-  ret.swap(runtime_store_.info_vec);
-  runtime_store_.count = 0;
+  std::lock_guard<std::mutex> lock(state_.mutex);
+  std::vector<std::shared_ptr<const RuntimeRequestInfo>> ret(
+      state_.runtime_request_info_vec.size());
+  ret.swap(state_.runtime_request_info_vec);
+  state_.runtime_request_count = 0;
   return ret;
 }
 
