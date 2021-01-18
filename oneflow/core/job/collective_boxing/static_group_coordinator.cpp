@@ -57,6 +57,7 @@ void StaticGroupCoordinator::Init(const CollectiveBoxingPlan& collective_boxing_
     return request_store_->MutRequestEntry(request_id)->desc();
   };
   request_id2group_id_.resize(request_store_->RequestCount());
+  request_id2index_in_group_.resize(request_store_->RequestCount());
   for (auto& job_id7request_ids : job_id2request_ids) {
     const int64_t job_id = job_id7request_ids.first;
     auto& request_ids = job_id7request_ids.second;
@@ -89,10 +90,15 @@ void StaticGroupCoordinator::Init(const CollectiveBoxingPlan& collective_boxing_
       std::vector<std::vector<int32_t>> groups;
       executor_->GroupRequests(rough_group, &groups);
       for (const auto& group : groups) {
-        const int64_t group_id = group_id2group_state_.size();
-        group_id2group_state_.emplace_back(std::set<int32_t>({group.cbegin(), group.cend()}));
+        const int32_t group_id = group_id2group_state_.size();
+        group_id2group_state_.emplace_back(group.size());
         job_id2group_ids_[job_id].push_back(group_id);
-        for (int32_t r : group) { request_id2group_id_[r] = group_id; }
+        for (int32_t idx_in_group = 0; idx_in_group < group.size(); ++idx_in_group) {
+          const int32_t request_id = group.at(idx_in_group);
+          request_id2group_id_.at(request_id) = group_id;
+          request_id2index_in_group_.at(request_id) = idx_in_group;
+        }
+        group_id2request_ids_.push_back(group);
       }
     }
   }
@@ -108,16 +114,17 @@ void StaticGroupCoordinator::AddRequest(int32_t request_id) {
   } else {
     CHECK_EQ(current_job_id_, job_id);
   }
-  group_id2group_state_.at(request_id2group_id_.at(request_id)).AddReadyRequest(request_id);
-  const std::vector<int64_t>& group_ids = job_id2group_ids_.at(current_job_id_);
+
+  group_id2group_state_.at(request_id2group_id_.at(request_id))
+      .AddReadyRequest(request_id2index_in_group_.at(request_id));
+  const std::vector<int32_t>& group_ids = job_id2group_ids_.at(current_job_id_);
   int64_t num_launched_groups = 0;
   while (true) {
-    const int64_t group_id = group_ids.at(current_group_idx_in_job_);
+    const int32_t group_id = group_ids.at(current_group_idx_in_job_);
     auto& group_state = group_id2group_state_.at(group_id);
     if (group_state.IsReady()) {
-      executor_->ExecuteRequests(
-          std::vector<int32_t>({group_state.request_ids.cbegin(), group_state.request_ids.cend()}));
-      group_state.ready_request_ids.clear();
+      executor_->ExecuteRequests(group_id2request_ids_.at(group_id));
+      group_state.Reset();
       current_group_idx_in_job_ = (current_group_idx_in_job_ + 1) % group_ids.size();
       num_launched_groups += 1;
     } else {
@@ -130,24 +137,30 @@ void StaticGroupCoordinator::AddRequest(int32_t request_id) {
   }
 }
 
-void StaticGroupCoordinator::GroupState::AddReadyRequest(int32_t request_id) {
-  CHECK(request_ids.find(request_id) != request_ids.end());
-  CHECK(ready_request_ids.emplace(request_id).second);
-}
-
 void StaticGroupCoordinator::DumpSummary() const {
   if (!Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) { return; }
   auto group_ls = TeePersistentLogStream::Create("boxing/collective/group");
-  for (int64_t group_id = 0; group_id < group_id2group_state_.size(); ++group_id) {
+  for (int32_t group_id = 0; group_id < group_id2group_state_.size(); ++group_id) {
     group_ls << "group id: " << std::to_string(group_id) << "\n";
-    for (const int32_t request_id : group_id2group_state_.at(group_id).request_ids) {
+    for (const int32_t request_id : group_id2request_ids_.at(group_id)) {
       group_ls->Write(request_store_->MutRequestEntry(request_id)->desc());
     }
   }
 }
 
+void StaticGroupCoordinator::GroupState::AddReadyRequest(int32_t index) {
+  CHECK(!index2is_ready.at(index));
+  CHECK(index2is_ready.at(index) = true);
+  ready_request_count += 1;
+}
+
 bool StaticGroupCoordinator::GroupState::IsReady() const {
-  return ready_request_ids.size() == request_ids.size();
+  return ready_request_count == index2is_ready.size();
+}
+
+void StaticGroupCoordinator::GroupState::Reset() {
+  ready_request_count = 0;
+  std::fill(index2is_ready.begin(), index2is_ready.end(), false);
 }
 
 }  // namespace collective
