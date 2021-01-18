@@ -61,18 +61,23 @@ class RequestEntry final {
   const Symbol<DeviceSet>& device_set_symbol() const { return device_set_symbol_; }
 
  private:
-  std::mutex mutex_;
   int64_t job_id_;
   RequestDesc desc_;
   int32_t node_count_;
-  std::vector<std::shared_ptr<const RuntimeRequestInfo>> runtime_request_info_vec_;
-  int32_t runtime_request_info_count_;
   std::vector<DeviceDesc> local_device_vec_;
   std::vector<int64_t> local_rank2global_rank_;
   std::map<int64_t, int64_t> global_rank2local_rank_;
   int64_t elem_cnt_;
   int64_t size_in_bytes_;
   Symbol<DeviceSet> device_set_symbol_;
+
+  struct alignas(64) RuntimeRequestInfoStore {
+    std::vector<std::shared_ptr<const RuntimeRequestInfo>> info_vec;
+    int32_t count;
+    std::mutex mutex;
+  };
+
+  RuntimeRequestInfoStore runtime_store_;
 };
 
 class RequestStore {

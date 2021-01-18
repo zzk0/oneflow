@@ -60,16 +60,18 @@ class ExecutorImpl : public Executor {
  private:
   Backend GetUniqueBackend(const std::vector<int32_t>& request_ids);
 
-  std::map<Backend, std::unique_ptr<ExecutorBackend>> backends_;
+  std::vector<std::unique_ptr<ExecutorBackend>> backends_;
   std::shared_ptr<RequestStore> request_store_;
 };
 
 void ExecutorImpl::Init(const CollectiveBoxingPlan& collective_boxing_plan,
                         std::shared_ptr<RequestStore> request_store) {
   request_store_ = request_store;
+  backends_.resize(Backend_ARRAYSIZE);
 #ifdef WITH_CUDA
-  auto it = backends_.emplace(Backend::kBackendNCCL, std::make_unique<NcclExecutorBackend>()).first;
-  it->second->Init(collective_boxing_plan, request_store_);
+  std::unique_ptr<ExecutorBackend> nccl_backend = std::make_unique<NcclExecutorBackend>();
+  nccl_backend->Init(collective_boxing_plan, request_store_);
+  backends_.at(Backend::kBackendNCCL) = std::move(nccl_backend);
 #endif
 }
 
