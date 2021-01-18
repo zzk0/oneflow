@@ -109,8 +109,8 @@ Scheduler::Impl::Impl(const CollectiveBoxingPlan& collective_boxing_plan)
   request_store.reset(new RequestStore(collective_boxing_plan));
   std::shared_ptr<Executor> executor(new ExecutorImpl());
   executor->Init(collective_boxing_plan, request_store);
-  // coordinator.reset(new StaticGroupCoordinator());
-  coordinator.reset(new DynamicCoordinator());
+  coordinator.reset(new StaticGroupCoordinator());
+  // coordinator.reset(new DynamicCoordinator());
   coordinator->Init(collective_boxing_plan, request_store, executor);
 }
 
