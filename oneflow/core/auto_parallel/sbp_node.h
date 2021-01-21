@@ -26,9 +26,9 @@ limitations under the License.
 #include "binary_set.h"
 #endif  // USE_SBP_COLLECTOR_
 
-#ifdef SBP_CONSTRUCTOR_
+#ifdef USE_SBP_COLLECTOR_
 #include "oneflow/core/graph/op_graph.h"
-#endif  // SBP_CONSTRUCTOR_
+#endif  // USE_SBP_COLLECTOR_
 
 namespace Algorithm {
 
@@ -85,9 +85,9 @@ class SbpNode {
   std::vector<BinarySet> ParallelCandidates;
 #endif  // USE_SBP_COLLECTOR_
 
-#ifdef SBP_CONSTRUCTOR_
-  oneflow::OpNode *op_node;
-#endif  // SBP_CONSTRUCTOR_
+#ifdef USE_SBP_COLLECTOR_
+  oneflow::OpNode *op_node = nullptr;
+#endif  // USE_SBP_COLLECTOR_
 
 #ifdef DEBUG_ALGORITHM_
 
@@ -278,6 +278,23 @@ SbpNode<SbpSignature>::SbpNode(SbpNode<SbpSignature> *first, SbpNode<SbpSignatur
 
   // Initialize default sbp choice
   FinalSbpSignatureId = 0;
+
+  // test debug
+  for (const auto &c : Cost) {
+    if (c < 0) {
+      std::cout << "Node edge elimination: " << std::endl;
+      if (first->op_node)
+        std::cout << "First half node is " << first->op_node->op().op_name();
+      else
+        std::cout << "First half node is proxy ";
+      std::cout << std::endl << "Second half node is ";
+      if (second->op_node)
+        std::cout << second->op_node->op().op_name();
+      else
+        std::cout << "proxy";
+      std::cout << std::endl;
+    }
+  }
 }
 
 template<class SbpSignature>
@@ -379,6 +396,18 @@ void SbpNode<SbpSignature>::SummerizeCost() {
       }
       // Add the cost for child node to this node
       Cost[sbp_this] += MinCost;
+    }
+  }
+
+  // test debug
+  for (const auto &c : Cost) {
+    if (c < 0) {
+      std::cout << "Child elimination: " << std::endl;
+      if (op_node)
+        std::cout << "Node is " << op_node->op().op_name();
+      else
+        std::cout << "Node is proxy ";
+      std::cout << std::endl;
     }
   }
 }

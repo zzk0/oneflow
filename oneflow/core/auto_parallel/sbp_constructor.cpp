@@ -17,7 +17,7 @@ limitations under the License.
 #include <type_traits>
 #include <vector>
 #define DEBUG_ALGORITHM_
-// #define TEST_DEBUG_
+#define TEST_DEBUG_
 // #define PRINT_GRAPH_
 // #define TEST_DEBUG_2
 
@@ -77,11 +77,14 @@ void SbpConstructor::constructSbpGraph(OpGraph& op_graph, Job& job) {
   // Compute computation cost for all sbp nodes
   InitializeComputationCost(op_graph, op_name2sbp_node, op_name2is_fixed);
 
-#ifdef SBP_COLLECTOR_
+#ifdef USE_SBP_COLLECTOR_
+  // Load logical blobs on all sbp edges.
+  LoadLbi2SbpEdge(op_graph, op_name2sbp_node, op_name2is_fixed);
   // Use sbp collector to create sbp proxy for nodes with multiple downstream operators.
   SbpCollector sbp_collector;
-  sbp_collector.ProxySbpCandidate(op_graph, op_name2sbp_node, sbp_graph);
-#endif  // SBP_COLLECTOR_
+  sbp_collector.CollectUniverse(sbp_graph);
+  sbp_collector.ProxySbpCandidate(op_graph, op_name2sbp_node, sbp_graph, op_name2is_fixed);
+#endif  // USE_SBP_COLLECTOR_
 
   // Initialize copy cost
   InitializeCopyCost(op_graph, op_name2sbp_node, op_name2is_fixed);
@@ -196,6 +199,8 @@ bool CheckSbpParallel(const SbpParallel& sbp_parallel) {
          || sbp_parallel.has_partial_sum_parallel();
 }
 
+}  // namespace
+
 // compute copy cost
 double ComputCopyCostBetweenTwoSbpParallel(const SbpParallel& producer_sbp_parallel,
                                            const SbpParallel& consumer_sbp_parallel,
@@ -249,8 +254,6 @@ SbpEdge<SbpSignature>* FindEdgeBetweenNodes(const SbpNode<SbpSignature>* sbp_nod
   return NULL;
 }
 
-}  // namespace
-
 // Should customize a function to compute computation cost for each kind of op
 // compute computation cost
 double SbpConstructor::ComputeComputationCost(const SbpParallel& sbp_parallel_,
@@ -273,7 +276,8 @@ void SbpConstructor::InitializeCopyCost(
     // skip it if fixed
     if (op_name2is_fixed[op_node->op().op_name()]) return;
     // get corresponding sbp node consumer
-    const Algorithm::SbpNode<SbpSignature>* sbp_node_consumer = op_name2sbp_node[op_node->op().op_name()];
+    const Algorithm::SbpNode<SbpSignature>* sbp_node_consumer =
+        op_name2sbp_node[op_node->op().op_name()];
     // get parallel description. Number of devices.
     const ParallelDesc& parallel_desc = op_node->parallel_desc();
     // Initialize copy cost between two nodes
@@ -312,10 +316,10 @@ void SbpConstructor::InitializeCopyCost(
       // Add copy cost for each blob
       const LogicalBlobId& lbi = op_node->op().BnInOp2Lbi(ibn);
 
-#ifdef SBP_COLLECTOR_
+#ifdef USE_SBP_COLLECTOR_
       // Check whether lbi is transferred by this edge
       if (!edge_found->SearchLbi(lbi)) continue;
-#endif  // SBP_COLLECTOR_
+#endif  // USE_SBP_COLLECTOR_
 
       // Need to be careful, the logical blob description should be independent to current
       // SbpParallel. Use producer or op_node?
@@ -346,9 +350,11 @@ void SbpConstructor::InitializeCopyCost(
 
 #ifdef TEST_DEBUG_
           // test debug
-          std::cout << "Pre Op:" << producer->op().op_name() << ": " << ibn;
+          if(edge_found->Cost[sbp_id_producer][sbp_id_consumer]<0){
+          std::cout << "Less than 0! Pre Op:" << producer->op().op_name() << ": " << ibn;
           std::cout << sbp_producer.DebugString() << "->" << sbp_consumer.DebugString()
                     << " Cost:" << edge_found->Cost[sbp_id_producer][sbp_id_consumer] << std::endl;
+          }
 #endif
         }
       }
@@ -365,7 +371,8 @@ void SbpConstructor::LoadLbi2SbpEdge(
     // skip it if fixed
     if (op_name2is_fixed[op_node->op().op_name()]) return;
     // get corresponding sbp node consumer
-    const Algorithm::SbpNode<SbpSignature>* sbp_node_consumer = op_name2sbp_node[op_node->op().op_name()];
+    const Algorithm::SbpNode<SbpSignature>* sbp_node_consumer =
+        op_name2sbp_node[op_node->op().op_name()];
 
     // Loading logical blobs between two nodes
     // look through input blobs
@@ -383,7 +390,17 @@ void SbpConstructor::LoadLbi2SbpEdge(
       // should use assert or CHECK process here, skip for speeding up for now
       // TODO: print to error log
       // TODO: move copy cost to proxy
-      CHECK(edge_found == NULL) << "SbpEdge not found while loading!" << std::endl;
+      if(edge_found == NULL){
+        std::cout << "producer:" << producer->op().op_name() << ", out size:" << sbp_node_producer->EdgesOut.size() << std::endl;
+        for(const auto* this_edge: sbp_node_producer->EdgesOut){
+          std::cout << "Out edges:" << this_edge->EndNode->op_node->op().op_name() << std::endl;
+        }
+        std::cout << "consumer:" << op_node->op().op_name() << ", in size:" << sbp_node_consumer->EdgesIn.size() << std::endl;
+        for(const auto* this_edge: sbp_node_producer->EdgesIn){
+          std::cout << "In edges:" << this_edge->StartNode->op_node->op().op_name() << std::endl;
+        }
+      }
+      CHECK(edge_found != NULL) << "SbpEdge not found while loading!" << std::endl;
 
       // Add copy cost for each blob
       const LogicalBlobId& lbi = op_node->op().BnInOp2Lbi(ibn);

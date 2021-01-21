@@ -179,7 +179,14 @@ void SbpGraph<SbpSignature>::AssembleSbpSignature(
 template<class SbpSignature>
 void SbpGraph<SbpSignature>::RandomSbpSignature() {
   for (const auto &this_node : NodeList) {
+#ifdef USE_SBP_COLLECTOR_
+    if (this_node->SbpSignatureList.size() > 0)
+      this_node->FinalSbpSignatureId = rand() % this_node->SbpSignatureList.size();
+    else
+      this_node->FinalSbpSignatureId = rand() % this_node->ParallelCandidates.size();
+#else   // USE_SBP_COLLECTOR_
     this_node->FinalSbpSignatureId = rand() % this_node->SbpSignatureList.size();
+#endif  // USE_SBP_COLLECTOR_
   }
 };
 

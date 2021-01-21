@@ -20,11 +20,11 @@ limitations under the License.
 #include "sbp_node.h"
 #include <assert.h>
 
-#ifdef SBP_CONSTRUCTOR_
+#ifdef USE_SBP_COLLECTOR_
 #include <unordered_set>
 #include "oneflow/core/job/sbp_parallel.pb.h"
 #include "oneflow/core/graph/op_graph.h"
-#endif  // SBP_CONSTRUCTOR_
+#endif  // USE_SBP_COLLECTOR_
 
 namespace Algorithm {
 
@@ -89,7 +89,7 @@ class SbpEdge {
     for (auto &this_edge : EdgeList) { delete this_edge; }
   }
 
-#ifdef SBP_CONSTRUCTOR_
+#ifdef USE_SBP_COLLECTOR_
   // a set of ids of logical blobs carried/transferred on this sbp edge
   std::unordered_set<oneflow::LogicalBlobId> CarryLbis;
 
@@ -97,7 +97,9 @@ class SbpEdge {
   void LoadLbi(oneflow::LogicalBlobId lbi) { CarryLbis.insert(lbi); }
 
   // check existancy of a logical blob
-  bool SearchLbi(oneflow::LogicalBlobId lbi) const { return CarryLbis.find(lbi) != CarryLbis.end(); }
+  bool SearchLbi(oneflow::LogicalBlobId lbi) const {
+    return CarryLbis.find(lbi) != CarryLbis.end();
+  }
 
   // unload a logical blob
   void UnloadLbi(oneflow::LogicalBlobId lbi) {
@@ -106,7 +108,7 @@ class SbpEdge {
 
   // Not carrying any blob
   bool EmptyLbi() const { return CarryLbis.empty(); }
-#endif  // SBP_CONSTRUCTOR_
+#endif  // USE_SBP_COLLECTOR_
 };
 }  // namespace Algorithm
 // function in cpp. Should be put in one file due to use of template
@@ -188,7 +190,32 @@ void SbpEdge<SbpSignature>::SummerizeCost() {
       }
     }
   }
-};
+
+  // test debug
+  for (const auto &v : Cost) {
+    for (const auto &c : v) {
+      if (c < 0) {
+        if(MidNode){
+          std::cout << "Mid Node elimination: " << std::endl;
+          if(MidNode->op_node) std::cout << "MidNode is " << MidNode->op_node->op().op_name() << std::endl;
+          else std::cout << "MidNode is proxy" << std::endl;
+        } 
+        else std::cout << "Edges elimination: " << std::endl;
+        if (StartNode->op_node)
+          std::cout << "Start node is " << StartNode->op_node->op().op_name();
+        else
+          std::cout << "Start node is proxy ";
+        std::cout << std::endl << "End node is ";
+        if (EndNode->op_node)
+          std::cout << EndNode->op_node->op().op_name();
+        else
+          std::cout << "proxy";
+        std::cout << std::endl;
+        break;
+      }
+    }
+  }
+}
 
 template<class SbpSignature>
 void SbpEdge<SbpSignature>::DuplicateCost(
@@ -224,6 +251,25 @@ void SbpEdge<SbpSignature>::DuplicateCost(
 
   Cost = tmpCost;
   if (MidNode) MidNodeSbpSig = tmpMidNodeSbpSig;
+
+  // test debug
+  for (const auto &v : Cost) {
+    for (const auto &c : v) {
+      if (c < 0) {
+        std::cout << "Duplicate Cost: " << std::endl;
+        if (StartNode->op_node)
+          std::cout << "Start node is " << StartNode->op_node->op().op_name();
+        else
+          std::cout << "Start node is proxy ";
+        std::cout << std::endl << "End node is ";
+        if (EndNode->op_node)
+          std::cout << EndNode->op_node->op().op_name();
+        else
+          std::cout << "proxy";
+        std::cout << std::endl;
+      }
+    }
+  }
 }
 
 template<class SbpSignature>
