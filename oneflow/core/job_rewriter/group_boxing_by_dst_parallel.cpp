@@ -16,7 +16,7 @@ limitations under the License.
 #include "oneflow/core/job_rewriter/group_boxing_by_dst_parallel.h"
 #include "oneflow/core/job/job_desc.h"
 #include "oneflow/core/common/protobuf.h"
-#define COVER_BY_B_
+// #define COVER_BY_B_
 
 namespace oneflow {
 

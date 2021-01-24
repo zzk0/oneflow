@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-#define AUTO_PARALLEL_
+
 #define PLOT_SBP_
 #include "oneflow/core/graph/op_graph.h"
 #include "oneflow/core/job/job_builder.h"
@@ -642,7 +642,7 @@ Maybe<void> OpGraph::InferLogicalBlobDesc(const Job& job) const {
 #ifndef AUTO_PARALLEL_
     // SbpConstructor: Do not update to job because it will limit sbp_node to choose condidate
     UpdateJobParallelViewConf(*op_node, oba2sbp_identical_obas, &job_parallel_view_conf);
-#endif
+#endif // AUTO_PARALLEL_
     // Infer logical_blob_desc
     JUST(InferOpNodeLogicalBlobDesc(op_node));
     // Fill logical blob_desc signature.

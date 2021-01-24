@@ -17,6 +17,7 @@ limitations under the License.
 #include "oneflow/core/job/global_for.h"
 #include "oneflow/core/persistence/tee_persistent_log_stream.h"
 #include "oneflow/core/graph/op_graph.h"
+#include "oneflow/core/job_rewriter/job_completer.h"
 
 namespace oneflow {
 
@@ -64,6 +65,12 @@ void Compiler::GenNetTopo(Plan* plan) const {
 void Compiler::Compile(Job* job, Plan* plan, bool need_job_complete) const {
   std::cout << "job name: " << job->job_conf().job_name() << std::endl;
   const JobDesc& job_desc = GlobalJobDesc();
+#ifndef AUTO_PARALLEL_
+  if (need_job_complete) { 
+    JobCompleter().Complete(job); 
+    JobCompleter().InsertIdentity(job); 
+  }
+#endif // AUTO_PARALLEL_
   Global<OpGraph>::New(*job);
 
   if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {

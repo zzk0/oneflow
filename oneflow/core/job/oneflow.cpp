@@ -70,11 +70,13 @@ void DoJobComplete(Job* job) {
   JobCompleter().Complete(job);
   // auto-parallel
   // TODO: recode this
+#ifdef AUTO_PARALLEL_
   if (job->job_conf().job_name() == "TrainNet")
     job->mutable_job_parallel_view_conf()->clear_op_name2sbp_signature_conf();
   OpGraph op_graph(*job);
   SbpConstructor sbp_constructor;
   sbp_constructor.constructSbpGraph(op_graph, *job);
+#endif // AUTO_PARALLEL_
   JobCompleter().InsertIdentity(job);
 }
 
@@ -912,6 +914,7 @@ REGISTER_FUNCTION_CONFIG_DEF().Bool("__is_user_function__", true, "is user defin
 Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan) {
   std::vector<std::shared_ptr<Job>> jobs(conf_jobs.size());
   FOR_RANGE(int, i, 0, jobs.size()) { jobs.at(i).reset(new Job(conf_jobs.Get(i))); }
+#ifdef AUTO_PARALLEL_
   int job_complete_idx = 0;
   while (job_complete_idx < jobs.size()) {
     auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(job_complete_idx)->job_conf(),
@@ -919,6 +922,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
     DoJobComplete(jobs.at(job_complete_idx).get());
     job_complete_idx++;
   }
+#endif // AUTO_PARALLEL_
   if (jobs.size() > 1) { CheckNonDistributeOptimizerAvailable(jobs); }
   if (Global<MachineCtx>::Get()->IsThisMachineMaster()) {
     HashMap<std::string, ParallelBlobConf> var_op_name2parallel_blob_conf;
@@ -934,12 +938,14 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
     } else {
       MakeModelIoJobs(jobs, var_op_name2parallel_blob_conf, AppendJob);
     }
+#ifdef AUTO_PARALLEL_
     while (job_complete_idx < jobs.size()) {
       auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(job_complete_idx)->job_conf(),
                                                         job_complete_idx);
       DoJobComplete(jobs.at(job_complete_idx).get());
       job_complete_idx++;
     }
+#endif // AUTO_PARALLEL_
   }
   std::vector<std::shared_ptr<Job>> function_jobs;
   function_jobs.reserve(jobs.size());
@@ -966,12 +972,14 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
                   pull_job.get());
       jobs.emplace_back(pull_job);
     }
+#ifdef AUTO_PARALLEL_
     while (job_complete_idx < jobs.size()) {
       auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(job_complete_idx)->job_conf(),
                                                         job_complete_idx);
       DoJobComplete(jobs.at(job_complete_idx).get());
       job_complete_idx++;
     }
+#endif // AUTO_PARALLEL_
   }
   std::vector<Plan> sub_plans(jobs.size());
   FOR_RANGE(int64_t, i, 0, jobs.size()) {

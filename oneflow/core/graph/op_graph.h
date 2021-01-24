@@ -22,6 +22,7 @@ limitations under the License.
 #include "oneflow/core/job/mirrored_parallel.pb.h"
 #include "oneflow/core/operator/operator.h"
 #include "oneflow/core/common/balanced_splitter.h"
+// #define AUTO_PARALLEL_
 
 namespace oneflow {
 
