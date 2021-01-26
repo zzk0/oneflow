@@ -42,6 +42,7 @@ class BiasAddUserKernel final : public user_op::OpKernel {
     const int64_t bias_size = a_tensor->shape().At(bias_add_axis);
     const int64_t inner_size = a_tensor->shape().Count(bias_add_axis + 1);
     const auto n = a_tensor->shape().elem_cnt();
+
     if (IsKernelSafeInt32(n)) {
       BiasAddCalculation<device_type, T, int32_t>::Invoke(
           ctx->device_ctx(), outer_size, bias_size, inner_size, a_tensor->dptr<T>(),

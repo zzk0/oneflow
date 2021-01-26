@@ -15,6 +15,7 @@ limitations under the License.
 */
 #include "oneflow/core/kernel/util/host_blas_interface.h"
 #include "oneflow/core/register/blob.h"
+#include "oneflow/core/ndarray/ndarray_util.h"
 
 namespace oneflow {
 
@@ -66,6 +67,33 @@ void BatchedGemmImpl(DeviceCtx* ctx, const enum CBLAS_ORDER order,
   }
 }
 
+template<typename T>
+void MatmulBiasaddImpl(DeviceCtx* ctx, const enum CBLAS_ORDER order,
+                     const enum CBLAS_TRANSPOSE trans_a, const enum CBLAS_TRANSPOSE trans_b,
+                     int m, int n, int k, const T alpha, const T* a, const T* b, const T beta, 
+                     int64_t outer_size, int64_t bias_size, int64_t inner_size, const T* bias, T* c) {
+  const Shape in_out_shape({outer_size, bias_size, inner_size});
+  const Shape bias_shape({1, bias_size, 1});
+  Gemm<T>(ctx, CblasRowMajor, trans_a, trans_b, m, n, k, alpha, a, b, beta, c);
+  NdarrayUtil<DeviceType::kCPU, T>::BroadcastAdd(ctx, XpuVarNdarray<T>(in_out_shape, c),
+                                                 XpuVarNdarray<const T>(in_out_shape, c),
+                                                 XpuVarNdarray<const T>(bias_shape, bias));
+}
+
+template<typename T>
+void BatchedMatmulBiasaddImpl(DeviceCtx* ctx, const enum CBLAS_ORDER order, const enum CBLAS_TRANSPOSE trans_a,
+                              const enum CBLAS_TRANSPOSE trans_b, int batch_size, int m, int n, int k, const T alpha,
+                              const T* a, const T* b, const T beta, int64_t outer_size, int64_t bias_size,
+                              int64_t inner_size, const T* bias, T* c) {
+  const Shape in_out_shape({outer_size, bias_size, inner_size});
+  const Shape bias_shape({1, bias_size, 1});
+  BatchedGemmImpl<T>(ctx, CblasRowMajor, trans_a, trans_b, batch_size,
+                     m, n, k, alpha, a, b, beta, c, nullptr);
+  NdarrayUtil<DeviceType::kCPU, T>::BroadcastAdd(ctx, XpuVarNdarray<T>(in_out_shape, c),
+                                                 XpuVarNdarray<const T>(in_out_shape, c),
+                                                 XpuVarNdarray<const T>(bias_shape, bias));
+}
+
 }  // namespace
 
 void BlasIf<DeviceType::kCPU>::BlobGemm(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a,
@@ -110,6 +138,32 @@ void BlasIf<DeviceType::kCPU>::OFBatchedGemm(DeviceCtx* ctx, enum CBLAS_TRANSPOS
                                              const double beta, double* c, double** buf) {
   BatchedGemmImpl<double>(ctx, CblasRowMajor, trans_a, trans_b, batch_size, m, n, k, alpha, a, b,
                           beta, c, buf);
+}
+
+void BlasIf<DeviceType::kCPU>::OFMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a,
+                                               enum CBLAS_TRANSPOSE trans_b, const int m,const int n,
+                                               const int k, const float alpha, const float* a, const float* b,
+                                               const float beta, int64_t outer_size, int64_t bias_size,
+                                               int64_t inner_size, const float* bias, float* c) {
+  MatmulBiasaddImpl<float>(ctx, CblasRowMajor, trans_a, trans_b,  m, n, k, alpha, a, b,
+                           beta, outer_size, bias_size, inner_size, bias, c); 
+}
+
+void BlasIf<DeviceType::kCPU>::OFMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a,
+                                               enum CBLAS_TRANSPOSE trans_b, const int m,const int n,
+                                               const int k, const double alpha, const double* a, const double* b,
+                                               const double beta, int64_t outer_size, int64_t bias_size,
+                                               int64_t inner_size, const double* bias, double* c) {
+  MatmulBiasaddImpl<double>(ctx, CblasRowMajor, trans_a, trans_b,  m, n, k, alpha, a, b,
+                           beta, outer_size, bias_size, inner_size, bias, c); 
+}
+
+void BlasIf<DeviceType::kCPU>::OFBatchedMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a, enum CBLAS_TRANSPOSE trans_b,
+                                                      const int batch_size, const int m, const int n, const int k, const float alpha,
+                                                      const float* a, const float* b, const float beta, int64_t outer_size,
+                                                      int64_t bias_size, int64_t inner_size, const float* bias, float* c) {
+  BatchedMatmulBiasaddImpl<float>(ctx, CblasRowMajor, trans_a, trans_b, batch_size, m, n, k, alpha,
+                                  a, b, beta, outer_size, bias_size, inner_size, bias, c);
 }
 
 void BlasIf<DeviceType::kCPU>::Axpy(DeviceCtx* ctx, const int n, const float alpha, const float* x,
