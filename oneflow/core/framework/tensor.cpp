@@ -15,6 +15,10 @@ limitations under the License.
 */
 #include "oneflow/core/framework/tensor.h"
 #include "oneflow/core/register/blob.h"
+#include "oneflow/core/job/sbp_parallel.cfg.h"
+#include "oneflow/core/job/placement.cfg.h"
+#include "oneflow/core/common/maybe.h"
+#include "oneflow/core/register/logical_blob_id.cfg.h"
 
 namespace oneflow {
 
@@ -31,5 +35,45 @@ void Tensor::CheckDataType<half>() const {
 #endif  // WITH_CUDA
 
 }  // namespace user_op
+
+namespace one {
+
+ConsistentTensor::ConsistentTensor(const std::shared_ptr<Shape>& shape, DataType dtype,
+                                   const std::shared_ptr<compatible_py::Distribute>& distribute, const std::shared_ptr<cfg::ParallelConf>& parallel_conf){
+
+}
+
+ConsistentTensor::ConsistentTensor(const std::shared_ptr<cfg::LogicalBlobId>& lbi, const std::string& job_name,
+                                   const std::shared_ptr<compatible_py::Distribute>& distribute){
+  impl_ = std::make_shared<LazyConsistentTensorImpl>(lbi, job_name, distribute);
+}
+
+
+ConsistentTensor::ConsistentTensor(const std::shared_ptr<cfg::LogicalBlobId>& lbi,
+                      const std::shared_ptr<compatible_py::BlobObject>& blob_object,
+                      const std::shared_ptr<compatible_py::BlobRegister>& blob_register,
+                      const std::string& job_name, const std::shared_ptr<compatible_py::Distribute>& distribute){
+  impl_ = std::make_shared<EagerConsistentTensorImpl>(lbi, blob_object, blob_register, job_name, distribute);
+}
+
+MirroredTensor::MirroredTensor(const std::shared_ptr<Shape>& shape, DataType dtype, const std::shared_ptr<Device>& device) {
+
+}
+
+MirroredTensor::MirroredTensor(const std::shared_ptr<cfg::LogicalBlobId>& lbi, const std::string& job_name,
+                               const std::shared_ptr<compatible_py::Distribute>& distribute) {
+  impl_ = std::make_shared<LazyMirroredTensorImpl>(lbi, job_name, distribute);
+}
+
+
+MirroredTensor::MirroredTensor(const std::shared_ptr<cfg::LogicalBlobId>& lbi,
+                 const std::shared_ptr<compatible_py::BlobObject>& blob_object,
+                 const std::shared_ptr<compatible_py::BlobRegister>& blob_register, const std::string& job_name,
+                 const std::shared_ptr<compatible_py::Distribute>& distribute) {
+  impl_ = std::make_shared<EagerMirroredTensorImpl>(lbi, blob_object, blob_register, job_name, distribute);
+}
+
+
+}
 
 }  // namespace oneflow
