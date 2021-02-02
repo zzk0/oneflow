@@ -18,62 +18,69 @@ import numpy as np
 import oneflow as flow
 
 
-# def _test(test_case):
-#   flow.config.gpu_device_num(4)
-#   func_config = flow.FunctionConfig()
-#   func_config.default_data_type(flow.float32)
-#   @flow.global_function("predict", function_config=func_config)
-#   def test_fn(x: flow.typing.Numpy.Placeholder((1024, 1024)),) -> flow.typing.Numpy:
-#       x = flow.hierarchical_parallel_cast(
-#           x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"],
-#       )
-#       x = flow.math.relu(x)
-#       x = flow.hierarchical_parallel_cast(
-#           x, parallel_hierarchy=[4], parallel_distribution=["S(0)"]
-#       )
-#       return x
-#   x_arr = np.random.rand(1024, 1024).astype(np.float32)
-#   y_arr = test_fn(x_arr)
-#   print("y_arr", y_arr.flatten()[0:10])
-#   test_case.assertTrue(np.allclose(y_arr, x_arr))
+def _test(test_case):
+    flow.clear_default_session()
+    flow.config.gpu_device_num(4)
+    func_config = flow.FunctionConfig()
+    func_config.default_data_type(flow.float32)
+
+    @flow.global_function("predict", function_config=func_config)
+    def test_fn(x: flow.typing.Numpy.Placeholder((1024, 1024)),) -> flow.typing.Numpy:
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"],
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[4], parallel_distribution=["S(0)"]
+        )
+        return x
+
+    x_arr = np.random.rand(1024, 1024).astype(np.float32)
+    y_arr = test_fn(x_arr)
+    print("y_arr", y_arr.flatten()[0:10])
+    test_case.assertTrue(np.allclose(y_arr, x_arr))
 
 
 # axis 1
-#def _test(test_case):
-#    flow.config.gpu_device_num(4)
-#    func_config = flow.FunctionConfig()
-#    func_config.default_data_type(flow.float32)
-#
-#    @flow.global_function("predict", function_config=func_config)
-#    def test_fn(x: flow.typing.Numpy.Placeholder((512, 1024)),) -> flow.typing.Numpy:
-#        x = flow.hierarchical_parallel_cast(
-#            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"],
-#        )
-#        x = flow.math.relu(x)
-#        x = flow.hierarchical_parallel_cast(
-#            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(1)"],
-#        )
-#        x = flow.math.reduce_sum(x, axis=[1], keepdims=True)
-#        x = flow.hierarchical_parallel_cast(
-#            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"],
-#        )
-#        x = flow.math.relu(x)
-#        x = flow.hierarchical_parallel_cast(
-#            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
-#        )
-#        x = flow.math.relu(x)
-#        x = flow.hierarchical_parallel_cast(
-#            x, parallel_hierarchy=[4], parallel_distribution=["S(0)"]
-#        )
-#        return x
-#    x_arr = np.random.rand(512, 1024).astype(np.float32)
-#    y_arr = test_fn(x_arr)
-#    print("y_arr", y_arr.flatten()[0:10])
-#    print("x_arr", x_arr.sum(1).flatten()[0:10])
-#    test_case.assertTrue(np.allclose(y_arr.flatten(), x_arr.sum(1).flatten()))
+def _test0(test_case):
+    flow.clear_default_session()
+    flow.config.gpu_device_num(4)
+    func_config = flow.FunctionConfig()
+    func_config.default_data_type(flow.float32)
 
-#axis 0
-def _test(test_case):
+    @flow.global_function("predict", function_config=func_config)
+    def test_fn(x: flow.typing.Numpy.Placeholder((512, 1024)),) -> flow.typing.Numpy:
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"],
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(1)"],
+        )
+        x = flow.math.reduce_sum(x, axis=[1], keepdims=True)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"],
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[4], parallel_distribution=["S(0)"]
+        )
+        return x
+
+    x_arr = np.random.rand(512, 1024).astype(np.float32)
+    y_arr = test_fn(x_arr)
+    print("y_arr", y_arr.flatten()[0:10])
+    print("x_arr", x_arr.sum(1).flatten()[0:10])
+    test_case.assertTrue(np.allclose(y_arr.flatten(), x_arr.sum(1).flatten()))
+
+
+# axis 0
+def _test1(test_case):
+    flow.clear_default_session()
     flow.config.gpu_device_num(4)
     func_config = flow.FunctionConfig()
     func_config.default_data_type(flow.float32)
@@ -87,9 +94,91 @@ def _test(test_case):
         x = flow.hierarchical_parallel_cast(
             x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(0)"],
         )
-        #x = flow.math.reduce_sum(x, axis=[1], keepdims=True)
+        # x = flow.math.reduce_sum(x, axis=[1], keepdims=True)
         x = flow.hierarchical_parallel_cast(
             x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"],
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[4], parallel_distribution=["S(0)"]
+        )
+        return x
+
+    x_arr = np.random.rand(1024, 512).astype(np.float32)
+    y_arr = test_fn(x_arr)
+    print("y_arr", y_arr.flatten()[0:10])
+    print("y_arr sum", y_arr.sum())
+    print("x_arr", x_arr.flatten()[0:10])
+    print("x_arr sum", x_arr.sum())
+
+    test_case.assertTrue(np.allclose(y_arr.flatten().sum(), x_arr.sum()))
+
+
+# axis 01
+def _test01(test_case):
+    flow.clear_default_session()
+    flow.config.gpu_device_num(4)
+    func_config = flow.FunctionConfig()
+    func_config.default_data_type(flow.float32)
+
+    @flow.global_function("predict", function_config=func_config)
+    def test_fn(x: flow.typing.Numpy.Placeholder((1024, 512)),) -> flow.typing.Numpy:
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"],
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(0)"],
+        )
+        # x = flow.math.reduce_sum(x, axis=[1], keepdims=True)
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(1)"],
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[4], parallel_distribution=["S(0)"]
+        )
+        return x
+
+    x_arr = np.random.rand(1024, 512).astype(np.float32)
+    y_arr = test_fn(x_arr)
+    print("y_arr", y_arr.flatten()[0:10])
+    print("y_arr sum", y_arr.sum())
+    print("x_arr", x_arr.flatten()[0:10])
+    print("x_arr sum", x_arr.sum())
+
+    test_case.assertTrue(np.allclose(y_arr.flatten().sum(), x_arr.sum()))
+
+
+# axis 01
+def _test_hie(test_case):
+    flow.clear_default_session()
+    flow.config.gpu_device_num(4)
+    func_config = flow.FunctionConfig()
+    func_config.default_data_type(flow.float32)
+
+    @flow.global_function("predict", function_config=func_config)
+    def test_fn(x: flow.typing.Numpy.Placeholder((1024, 512)),) -> flow.typing.Numpy:
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"],
+        )
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[4], parallel_distribution=["S(1)"],
+        )
+        # x = flow.math.reduce_sum(x, axis=[1], keepdims=True)
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(1)"],
         )
         x = flow.math.relu(x)
         x = flow.hierarchical_parallel_cast(
@@ -115,6 +204,10 @@ def _test(test_case):
 class TestHierarchicalParallelCast(flow.unittest.TestCase):
     def test_hierarchy_parallel_cast(test_case):
         _test(test_case)
+        _test0(test_case)
+        _test1(test_case)
+        _test01(test_case)
+        _test_hie(test_case)
 
 
 if __name__ == "__main__":
