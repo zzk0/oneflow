@@ -65,6 +65,26 @@ struct BlasIf<DeviceType::kGPU> {
                                       const float16* a, const float16* b, const float beta,
                                       float16* c, float16** buf);
 
+  static void OFMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a, enum CBLAS_TRANSPOSE trans_b,
+                              const int m, const int n, const int k, const float alpha, const float* a,
+                              const float* b, const float beta, int64_t outer_size, int64_t bias_size,
+                              int64_t inner_size, const float* bias, float* c);
+
+  static void OFMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a, enum CBLAS_TRANSPOSE trans_b, 
+                              const int m,const int n, const int k, const double alpha, const double* a, 
+                              const double* b, const double beta, int64_t outer_size, int64_t bias_size,
+                              int64_t inner_size, const double* bias, double* c);
+
+  static void OFBatchedMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a, enum CBLAS_TRANSPOSE trans_b,
+                                     const int batch_size, const int m, const int n, const int k, const float alpha,
+                                     const float* a, const float* b, const float beta, int64_t outer_size,
+                                     int64_t bias_size, int64_t inner_size, const float* bias, float* c);
+
+  static void OFBatchedMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a, enum CBLAS_TRANSPOSE trans_b,
+                                   const int batch_size, const int m, const int n, const int k, const double alpha,
+                                   const double* a, const double* b, const double beta, int64_t outer_size,
+                                   int64_t bias_size, int64_t inner_size, const double* bias, double* c);
+
   static void Axpy(DeviceCtx* ctx, const int n, const float alpha, const float* x, const int incx,
                    float* y, const int incy);
   static void Axpy(DeviceCtx* ctx, const int n, const double alpha, const double* x, const int incx,

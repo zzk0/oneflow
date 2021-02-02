@@ -33,9 +33,9 @@ std::tuple<int32_t, int32_t, int32_t> CalcMNK(const ShapeView& a_shape, const Sh
 
 }  // namespace
 
-REGISTER_FUNCTION_CONFIG_DEF().Bool(
-    "enable_float_compute_for_half_gemm", false,
-    "true means that the type of intermedia value is float when compute half gemm");
+// REGISTER_FUNCTION_CONFIG_DEF().Bool(
+//     "enable_float_compute_for_half_gemm", false,
+//     "true means that the type of intermedia value is float when compute half gemm");
 
 template<DeviceType device_type, typename T>
 class MatmulBiasaddFloatingKernel final : public user_op::OpKernel {
@@ -97,10 +97,10 @@ class MatmulBiasaddFloatingKernel final : public user_op::OpKernel {
 
 REGISTER_MATMUL_BIASADD_KERNEL(DeviceType::kCPU, float);
 REGISTER_MATMUL_BIASADD_KERNEL(DeviceType::kCPU, double);
-// #ifdef WITH_CUDA
-// REGISTER_MATMUL_BIASADD_KERNEL(DeviceType::kGPU, float);
-// REGISTER_MATMUL_BIASADD_KERNEL(DeviceType::kGPU, double);
-// #endif
+#ifdef WITH_CUDA
+REGISTER_MATMUL_BIASADD_KERNEL(DeviceType::kGPU, float);
+REGISTER_MATMUL_BIASADD_KERNEL(DeviceType::kGPU, double);
+#endif
 
 // #ifdef WITH_CUDA
 // class MatmulBiasaddGpuHalfKernel final : public user_op::OpKernel {
@@ -153,72 +153,79 @@ REGISTER_MATMUL_BIASADD_KERNEL(DeviceType::kCPU, double);
 //     (user_op::HobDeviceTag() == "gpu") & (user_op::HobDataType("a", 0) == DataType::kFloat16));
 // #endif
 
-// template<DeviceType device_type, typename T>
-// class BatchMatmulFloatingKernel final : public user_op::OpKernel {
-//  public:
-//   BatchMatmulFloatingKernel() = default;
-//   ~BatchMatmulFloatingKernel() = default;
+template<DeviceType device_type, typename T>
+class BatchMatmulBiasaddFloatingKernel final : public user_op::OpKernel {
+ public:
+  BatchMatmulBiasaddFloatingKernel() = default;
+  ~BatchMatmulBiasaddFloatingKernel() = default;
 
-//   bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
+  bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
 
-//  private:
-//   void Compute(user_op::KernelComputeContext* ctx) const override {
-//     CBLAS_TRANSPOSE trans_a = ctx->Attr<bool>("transpose_a") ? CblasTrans : CblasNoTrans;
-//     CBLAS_TRANSPOSE trans_b = ctx->Attr<bool>("transpose_b") ? CblasTrans : CblasNoTrans;
-//     const user_op::Tensor* a = ctx->Tensor4ArgNameAndIndex("a", 0);
-//     const user_op::Tensor* b = ctx->Tensor4ArgNameAndIndex("b", 0);
-//     user_op::Tensor* tmp_buf = ctx->Tensor4ArgNameAndIndex("tmp_buffer", 0);
-//     user_op::Tensor* out = ctx->Tensor4ArgNameAndIndex("out", 0);
-//     int32_t num_axes = a->shape().NumAxes();
-//     CHECK_GT(num_axes, 2);
+ private:
+  void Compute(user_op::KernelComputeContext* ctx) const override {
+    CBLAS_TRANSPOSE trans_a = ctx->Attr<bool>("transpose_a") ? CblasTrans : CblasNoTrans;
+    CBLAS_TRANSPOSE trans_b = ctx->Attr<bool>("transpose_b") ? CblasTrans : CblasNoTrans;
+    const int32_t bias_add_axis = ctx->Attr<int32_t>("axis");
+    const user_op::Tensor* a = ctx->Tensor4ArgNameAndIndex("a", 0);
+    const user_op::Tensor* b = ctx->Tensor4ArgNameAndIndex("b", 0);
+    const user_op::Tensor* bias = ctx->Tensor4ArgNameAndIndex("bias", 0);
+    user_op::Tensor* tmp_buf = ctx->Tensor4ArgNameAndIndex("tmp_buffer", 0);
+    user_op::Tensor* out = ctx->Tensor4ArgNameAndIndex("out", 0);
+    const int64_t outer_size = out->shape().Count(0, bias_add_axis);
+    const int64_t bias_size = out->shape().At(bias_add_axis);
+    const int64_t inner_size = out->shape().Count(bias_add_axis + 1);
+    // const auto num = out->shape().elem_cnt();
+    int32_t num_axes = a->shape().NumAxes();
+    CHECK_GT(num_axes, 2);
 
-//     int32_t m = 0, n = 0, k = 0;
-//     std::tie(m, n, k) = CalcMNK(a->shape(), out->shape(), trans_a);
-//     T beta;
-//     if (ctx->user_op_conf().has_input("_add_to_output", 0)) {
-//       const user_op::Tensor* add_to_output = ctx->Tensor4ArgNameAndIndex("_add_to_output", 0);
-//       CHECK_EQ(add_to_output->data_type(), out->data_type());
-//       CHECK_EQ(add_to_output->shape(), out->shape());
-//       Memcpy<device_type>(
-//           ctx->device_ctx(), out->mut_dptr<void>(), add_to_output->dptr<void>(),
-//           add_to_output->shape().elem_cnt() * GetSizeOfDataType(add_to_output->data_type()));
-//       beta = GetOneVal<T>();
-//     } else {
-//       beta = GetZeroVal<T>();
-//     }
-//     size_t batch_size = a->shape().Count(0, num_axes - 2);
-//     T** buf_dptr = reinterpret_cast<T**>(tmp_buf->mut_dptr<void>());
-//     NewKernelUtil<device_type>::OFBatchedGemm(ctx->device_ctx(), trans_a, trans_b, batch_size, m, n,
-//                                               k, GetOneVal<T>(), a->dptr<T>(), b->dptr<T>(), beta,
-//                                               out->mut_dptr<T>(), buf_dptr);
-//   }
-// };
+    int32_t m = 0, n = 0, k = 0;
+    std::tie(m, n, k) = CalcMNK(a->shape(), out->shape(), trans_a);
+    T beta;
+    if (ctx->user_op_conf().has_input("_add_to_output", 0)) {
+      const user_op::Tensor* add_to_output = ctx->Tensor4ArgNameAndIndex("_add_to_output", 0);
+      CHECK_EQ(add_to_output->data_type(), out->data_type());
+      CHECK_EQ(add_to_output->shape(), out->shape());
+      Memcpy<device_type>(
+          ctx->device_ctx(), out->mut_dptr<void>(), add_to_output->dptr<void>(),
+          add_to_output->shape().elem_cnt() * GetSizeOfDataType(add_to_output->data_type()));
+      beta = GetOneVal<T>();
+    } else {
+      beta = GetZeroVal<T>();
+    }
+    size_t batch_size = a->shape().Count(0, num_axes - 2);
+    T** buf_dptr = reinterpret_cast<T**>(tmp_buf->mut_dptr<void>());
+    NewKernelUtil<device_type>::OFBatchedMatmulBiasadd(ctx->device_ctx(), trans_a, trans_b, batch_size,
+                                                       m, n, k, GetOneVal<T>(), a->dptr<T>(), b->dptr<T>(),
+                                                       beta, outer_size, bias_size, inner_size, bias->dptr<T>(),
+                                                       out->mut_dptr<T>());
+  }
+};
 
-// #define REGISTER_BATCH_MATMUL_KERNEL(device, dtype)                                             \
-//   REGISTER_USER_KERNEL("batch_matmul")                                                          \
-//       .SetCreateFn<BatchMatmulFloatingKernel<device, dtype>>()                                  \
-//       .SetIsMatchedHob((user_op::HobDeviceTag() == device)                                      \
-//                        & (user_op::HobDataType("a", 0) == GetDataType<dtype>::value))           \
-//       .SetInferTmpSizeFn([](user_op::InferContext* ctx) {                                       \
-//         user_op::TensorDesc* a = ctx->TensorDesc4ArgNameAndIndex("a", 0);                       \
-//         size_t num_axes = a->shape().NumAxes();                                                 \
-//         size_t batch_num = a->shape().Count(0, num_axes - 2);                                   \
-//         return sizeof(int64_t) * 3 * batch_num;                                                 \
-//       })                                                                                        \
-//       .SetInplaceProposalFn([](const user_op::InferContext& ctx,                                \
-//                                user_op::AddInplaceArgPair AddInplaceArgPairFn) -> Maybe<void> { \
-//         if (ctx.user_op_conf().has_input("_add_to_output", 0)) {                                \
-//           OF_RETURN_IF_ERROR(AddInplaceArgPairFn("out", 0, "_add_to_output", 0, true));         \
-//         }                                                                                       \
-//         return Maybe<void>::Ok();                                                               \
-//       });
+#define REGISTER_BATCH_MATMUL_BIASADD_KERNEL(device, dtype)                                     \
+  REGISTER_USER_KERNEL("batch_matmul_biasadd")                                                  \
+      .SetCreateFn<BatchMatmulBiasaddFloatingKernel<device, dtype>>()                           \
+      .SetIsMatchedHob((user_op::HobDeviceTag() == device)                                      \
+                       & (user_op::HobDataType("a", 0) == GetDataType<dtype>::value))           \
+      .SetInferTmpSizeFn([](user_op::InferContext* ctx) {                                       \
+        user_op::TensorDesc* a = ctx->TensorDesc4ArgNameAndIndex("a", 0);                       \
+        size_t num_axes = a->shape().NumAxes();                                                 \
+        size_t batch_num = a->shape().Count(0, num_axes - 2);                                   \
+        return sizeof(int64_t) * 3 * batch_num;                                                 \
+      })                                                                                        \
+      .SetInplaceProposalFn([](const user_op::InferContext& ctx,                                \
+                               user_op::AddInplaceArgPair AddInplaceArgPairFn) -> Maybe<void> { \
+        if (ctx.user_op_conf().has_input("_add_to_output", 0)) {                                \
+          OF_RETURN_IF_ERROR(AddInplaceArgPairFn("out", 0, "_add_to_output", 0, true));         \
+        }                                                                                       \
+        return Maybe<void>::Ok();                                                               \
+      });
 
-// REGISTER_BATCH_MATMUL_KERNEL(DeviceType::kCPU, float);
-// REGISTER_BATCH_MATMUL_KERNEL(DeviceType::kCPU, double);
-// #ifdef WITH_CUDA
-// REGISTER_BATCH_MATMUL_KERNEL(DeviceType::kGPU, float);
-// REGISTER_BATCH_MATMUL_KERNEL(DeviceType::kGPU, double);
-// #endif
+REGISTER_BATCH_MATMUL_BIASADD_KERNEL(DeviceType::kCPU, float);
+REGISTER_BATCH_MATMUL_BIASADD_KERNEL(DeviceType::kCPU, double);
+#ifdef WITH_CUDA
+REGISTER_BATCH_MATMUL_BIASADD_KERNEL(DeviceType::kGPU, float);
+REGISTER_BATCH_MATMUL_BIASADD_KERNEL(DeviceType::kGPU, double);
+#endif
 
 // #ifdef WITH_CUDA
 // class BatchMatmulGpuHalfKernel final : public user_op::OpKernel {

@@ -56,6 +56,15 @@ const cublasHandle_t* CudaStreamHandle::cublas_pmd_handle() {
   return cublas_pmd_handle_.get();
 }
 
+const cublasLtHandle_t* CudaStreamHandle::cublas_lt_handle() {
+  if (!cublas_lt_handle_) {
+    cublas_lt_handle_.reset(new cublasLtHandle_t);
+    OF_CUBLAS_CHECK(cublasLtCreate(cublas_lt_handle_.get()));
+    OF_CUBLAS_CHECK(cublasSetStream((cublasHandle_t)(*cublas_lt_handle_), *cuda_stream()));
+  }
+  return cublas_lt_handle_.get();
+}
+
 const cublasHandle_t* CudaStreamHandle::cublas_tensor_op_math_handle() {
   if (!cublas_tensor_op_math_handle_) {
     cublas_tensor_op_math_handle_.reset(new cublasHandle_t);

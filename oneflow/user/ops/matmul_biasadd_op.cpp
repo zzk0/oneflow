@@ -154,8 +154,8 @@ void GenBackwardOpConf4MatmulBiasadd(const std::string& op_type_name, const user
 REGISTER_USER_OP("matmul_biasadd")
     .Input("a")
     .Input("b")
-    .OptionalInput("_add_to_output")
     .Input("bias")
+    .OptionalInput("_add_to_output")
     .Output("out")
     .Attr<bool>("transpose_a", false)
     .Attr<bool>("transpose_b", false)
@@ -215,52 +215,52 @@ REGISTER_USER_OP("matmul_biasadd")
           ctx->NewBuilder()
           .Split(user_op::OpArg("a", 0), m_axis)
           .Broadcast(user_op::OpArg("b", 0))
-          .Split(out_and_add_to_output_args, 0)
           .Split(user_op::OpArg("bias", 0), axis)
+          .Split(out_and_add_to_output_args, 0)
           .Build();
           ctx->NewBuilder()
           .Broadcast(user_op::OpArg("a", 0))
           .Split(user_op::OpArg("b", 0), n_axis)
-          .Split(out_and_add_to_output_args, 1)
           .Broadcast(user_op::OpArg("bias", 0))
+          .Split(out_and_add_to_output_args, 1)
           .Build();
       } else {
           ctx->NewBuilder()
           .Split(user_op::OpArg("a", 0), m_axis)
           .Broadcast(user_op::OpArg("b", 0))
-          .Split(out_and_add_to_output_args, 0)
           .Broadcast(user_op::OpArg("bias", 0))
+          .Split(out_and_add_to_output_args, 0)
           .Build();
           ctx->NewBuilder()
           .Broadcast(user_op::OpArg("a", 0))
           .Split(user_op::OpArg("b", 0), n_axis)
-          .Split(out_and_add_to_output_args, 1)
           .Split(user_op::OpArg("bias", 0), axis)
+          .Split(out_and_add_to_output_args, 1)
           .Build();
       }
       ctx->NewBuilder()
           .Split(user_op::OpArg("a", 0), k_a_axis)
           .Split(user_op::OpArg("b", 0), k_b_axis)
-          .PartialSum(out_and_add_to_output_args)
           .PartialSum(user_op::OpArg("bias", 0))
+          .PartialSum(out_and_add_to_output_args)
           .Build();
       ctx->NewBuilder()
           .PartialSum(user_op::OpArg("a", 0))
           .Broadcast(user_op::OpArg("b", 0))
-          .PartialSum(out_and_add_to_output_args)
           .PartialSum(user_op::OpArg("bias", 0))
+          .PartialSum(out_and_add_to_output_args)
           .Build();
       ctx->NewBuilder()
           .Broadcast(user_op::OpArg("a", 0))
           .PartialSum(user_op::OpArg("b", 0))
-          .PartialSum(out_and_add_to_output_args)
           .PartialSum(user_op::OpArg("bias", 0))
+          .PartialSum(out_and_add_to_output_args)
           .Build();
     });
 
 REGISTER_USER_OP_GRAD("matmul_biasadd").SetGenBackwardOpConfFn([](const user_op::UserOpWrapper& op,
                                                           user_op::AddOpFn AddOp) {
-    return GenBackwardOpConf4MatmulBiasadd("matmul_biasadd", op, AddOp);
+    return GenBackwardOpConf4MatmulBiasadd("matmul", op, AddOp);
 });
 
 
@@ -300,22 +300,22 @@ REGISTER_USER_OP("batch_matmul_biasadd")
           ctx->NewBuilder()
           .Split(user_op::OpArg("a", 0), i)
           .Split(user_op::OpArg("b", 0), i)
-          .Split(out_and_add_to_output_args, i)
           .Split(user_op::OpArg("bias", 0), 0)
+          .Split(out_and_add_to_output_args, i)
           .Build();
           continue; 
         }
         ctx->NewBuilder()
         .Split(user_op::OpArg("a", 0), i)
         .Split(user_op::OpArg("b", 0), i)
-        .Split(out_and_add_to_output_args, i)
         .Broadcast(user_op::OpArg("bias", 0))
+        .Split(out_and_add_to_output_args, i)
         .Build();
       }
       return Maybe<void>::Ok();
     });
 
-REGISTER_USER_OP_GRAD("batch_matmul")
+REGISTER_USER_OP_GRAD("batch_matmul_biasadd")
     .SetGenBackwardOpConfFn([](const user_op::UserOpWrapper& op, user_op::AddOpFn AddOp) {
       return GenBackwardOpConf4MatmulBiasadd("batch_matmul", op, AddOp);
     });

@@ -42,6 +42,9 @@ class CudaDeviceCtx : public DeviceCtx {
   const cublasHandle_t& cublas_pmd_handle() const override {
     return *(cuda_handler_->cublas_pmd_handle());
   }
+  const cublasLtHandle_t& cublas_lt_handle() const override {
+    return *(cuda_handler_->cublas_lt_handle());
+  }
   const cudnnHandle_t& cudnn_handle() const override { return *(cuda_handler_->cudnn_handle()); }
 
   void SyncDevice() override { OF_CUDA_CHECK(cudaStreamSynchronize(cuda_stream())); }

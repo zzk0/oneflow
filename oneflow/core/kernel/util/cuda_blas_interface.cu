@@ -255,6 +255,84 @@ __global__ void AxpyHalfGpu(const int n, const half alpha, const half* x, const 
 #endif  // __CUDA_ARCH__ >= 530 || !defined(__CUDA_ARCH__)
 }
 
+inline void checkCublasStatus(cublasStatus_t status) {
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        printf("cuBLAS API failed with status %d\n", status);
+        throw std::logic_error("cuBLAS API failed");
+    }
+}
+
+template<typename T>
+void MatmulBiasaddImpl(DeviceCtx* ctx, const enum CBLAS_ORDER order,
+                     const enum CBLAS_TRANSPOSE trans_a, const enum CBLAS_TRANSPOSE trans_b,
+                     int batch_size, int m, int n, int k, const T alpha, const T* a, const T* b,
+                     const T beta, int64_t outer_size, int64_t bias_size, int64_t inner_size,
+                     const T* bias, T* c) {
+    cublasLtMatmulDesc_t operationDesc = NULL;
+    cublasLtMatrixLayout_t adesc = NULL, bdesc = NULL, cdesc = NULL;
+    cudaDataType_t cudaDtype;
+
+    if(strcmp(typeid(T).name(), "half")) {
+      cudaDtype = CUDA_R_16F;
+    } else if(strcmp(typeid(T).name(), "float")) {
+      cudaDtype = CUDA_R_32F;
+    } else if(strcmp(typeid(T).name(), "double")) {
+      cudaDtype = CUDA_R_64F;
+    }
+
+    int lda, ldb, ldc;
+    cublasOperation_t cublas_trans_a, cublas_trans_b;
+    std::tie(lda, ldb, ldc, cublas_trans_a, cublas_trans_b) =
+        PrepareToCallCublasGemm(trans_a, trans_b, m, n, k);
+    cublasLtEpilogue_t Epilogue = CUBLASLT_EPILOGUE_BIAS;
+
+    int64_t stridea, strideb, stridec;
+    stridea = m * k;
+    stridea = k * n;
+    stridec = m * n;
+
+    checkCublasStatus(cublasLtMatmulDescCreate(&operationDesc, CUBLAS_COMPUTE_32F, cudaDtype));
+    checkCublasStatus(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &trans_a, sizeof(trans_a)));    
+    checkCublasStatus(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &trans_b, sizeof(trans_b)));
+    checkCublasStatus(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_EPILOGUE, &Epilogue, sizeof(Epilogue)));
+    checkCublasStatus(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_BIAS_POINTER, bias, bias_size * sizeof(T)));
+    
+    checkCublasStatus(cublasLtMatrixLayoutCreate(&adesc, cudaDtype, trans_a == CUBLAS_OP_N ? m : k, trans_a == CUBLAS_OP_N ? k : m, lda));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(adesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch_size, sizeof(batch_size)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(adesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stridea, sizeof(stridea)));
+
+    checkCublasStatus(cublasLtMatrixLayoutCreate(&bdesc, cudaDtype, trans_b == CUBLAS_OP_N ? k : n, trans_b == CUBLAS_OP_N ? n : k, ldb));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(bdesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch_size, sizeof(batch_size)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(bdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideb, sizeof(strideb)));
+
+    checkCublasStatus(cublasLtMatrixLayoutCreate(&cdesc, cudaDtype, m, n, ldc));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(cdesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch_size, sizeof(batch_size)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(cdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stridec, sizeof(stridec)));
+
+    checkCublasStatus(cublasLtMatmul((cublasLtHandle_t)ctx->cublas_lt_handle(),
+                                     operationDesc,
+                                     &alpha,
+                                     a,
+                                     adesc,
+                                     b,
+                                     bdesc,
+                                     &beta,
+                                     b,
+                                     cdesc,
+                                     c,
+                                     cdesc,
+                                     NULL,
+                                     NULL,
+                                     0,
+                                     0));
+
+    if (cdesc) checkCublasStatus(cublasLtMatrixLayoutDestroy(cdesc));
+    if (bdesc) checkCublasStatus(cublasLtMatrixLayoutDestroy(bdesc));
+    if (adesc) checkCublasStatus(cublasLtMatrixLayoutDestroy(adesc));
+    if (operationDesc) checkCublasStatus(cublasLtMatmulDescDestroy(operationDesc));
+
+}
+
 }  // namespace
 
 void BlasIf<DeviceType::kGPU>::BlobGemm(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a,
@@ -347,6 +425,49 @@ void BlasIf<DeviceType::kGPU>::OFBatchedHGemmWithFloat(
   BatchedHGemmWithFloatImpl(ctx, CblasRowMajor, trans_a, trans_b, batch_size, m, n, k, &alpha,
                             reinterpret_cast<const half*>(a), reinterpret_cast<const half*>(b),
                             &beta, reinterpret_cast<half*>(c), reinterpret_cast<half**>(buf));
+}
+
+void BlasIf<DeviceType::kGPU>::OFMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a, 
+                                               enum CBLAS_TRANSPOSE trans_b, const int m, 
+                                               const int n, const int k, const float alpha, 
+                                               const float* a, const float* b, const float beta, 
+                                               int64_t outer_size, int64_t bias_size, 
+                                               int64_t inner_size, const float* bias, float* c) {
+    MatmulBiasaddImpl<float>(ctx, CblasRowMajor, trans_a, trans_b, 1, m, n, k, alpha,
+                             a, b, beta, outer_size, bias_size, inner_size, bias, c);
+}
+
+void BlasIf<DeviceType::kGPU>::OFMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a, 
+                                               enum CBLAS_TRANSPOSE trans_b, const int m,
+                                               const int n, const int k, const double alpha,
+                                               const double* a, const double* b, const double beta,
+                                               int64_t outer_size, int64_t bias_size, 
+                                               int64_t inner_size, const double* bias, double* c) {
+    MatmulBiasaddImpl<double>(ctx, CblasRowMajor, trans_a, trans_b, 1, m, n, k, alpha, 
+                              a, b, beta, outer_size, bias_size, inner_size, bias, c);
+
+}
+
+void BlasIf<DeviceType::kGPU>::OFBatchedMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a,
+                                                      enum CBLAS_TRANSPOSE trans_b, const int batch_size, 
+                                                      const int m, const int n, const int k, const float alpha,
+                                                      const float* a, const float* b, const float beta,
+                                                      int64_t outer_size, int64_t bias_size, int64_t inner_size,
+                                                      const float* bias, float* c) {
+    MatmulBiasaddImpl<float>(ctx, CblasRowMajor, trans_a, trans_b, batch_size, m, n, k,
+                             alpha, a, b, beta, outer_size, bias_size, inner_size, bias, c);
+
+}
+
+void BlasIf<DeviceType::kGPU>::OFBatchedMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a,
+                                                      enum CBLAS_TRANSPOSE trans_b, const int batch_size,
+                                                      const int m, const int n, const int k, const double alpha,
+                                                      const double* a, const double* b, const double beta,
+                                                      int64_t outer_size, int64_t bias_size, int64_t inner_size,
+                                                      const double* bias, double* c) {
+    MatmulBiasaddImpl<double>(ctx, CblasRowMajor, trans_a, trans_b, batch_size, m, n, k,
+                              alpha, a, b, beta, outer_size, bias_size, inner_size, bias, c);
+
 }
 
 void BlasIf<DeviceType::kGPU>::Axpy(DeviceCtx* ctx, const int n, const float alpha, const float* x,

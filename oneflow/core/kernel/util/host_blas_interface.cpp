@@ -166,6 +166,14 @@ void BlasIf<DeviceType::kCPU>::OFBatchedMatmulBiasadd(DeviceCtx* ctx, enum CBLAS
                                   a, b, beta, outer_size, bias_size, inner_size, bias, c);
 }
 
+void BlasIf<DeviceType::kCPU>::OFBatchedMatmulBiasadd(DeviceCtx* ctx, enum CBLAS_TRANSPOSE trans_a, enum CBLAS_TRANSPOSE trans_b,
+                                                      const int batch_size, const int m, const int n, const int k, const double alpha,
+                                                      const double* a, const double* b, const double beta, int64_t outer_size,
+                                                      int64_t bias_size, int64_t inner_size, const double* bias, double* c) {
+  BatchedMatmulBiasaddImpl<double>(ctx, CblasRowMajor, trans_a, trans_b, batch_size, m, n, k, alpha,
+                                  a, b, beta, outer_size, bias_size, inner_size, bias, c);
+}
+
 void BlasIf<DeviceType::kCPU>::Axpy(DeviceCtx* ctx, const int n, const float alpha, const float* x,
                                     const int incx, float* y, const int incy) {
   AxpyImpl<float>(ctx, n, alpha, x, incx, y, incy);
