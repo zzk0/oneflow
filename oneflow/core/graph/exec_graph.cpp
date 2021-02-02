@@ -69,12 +69,12 @@ void ExecNode::ToProto(const ParallelContext* parallel_ctx, ExecNodeProto* ret) 
 
 void ExecNode::InferBlobDescs(const ParallelContext* parallel_ctx) {
   auto GetBlobDesc4BnInOp = GetBlobDesc4BnInOpFunc();
-  const SbpSignature* sbp_signature = nullptr;
-  {
-    const OpNode* op_node = Global<OpGraph>::Get()->OpNode4OpName(op()->op_name());
-    if (op_node != nullptr) { sbp_signature = &op_node->sbp_signature(); }
-  }
-  CHECK_JUST(op_->InferBlobDescsIf(GetBlobDesc4BnInOp, parallel_ctx, sbp_signature,
+  // const SbpSignature* sbp_signature = nullptr;
+  //{
+  //  const OpNode* op_node = Global<OpGraph>::Get()->OpNode4OpName(op()->op_name());
+  //  if (op_node != nullptr) { sbp_signature = &op_node->sbp_signature(); }
+  //}
+  CHECK_JUST(op_->InferBlobDescsIf(GetBlobDesc4BnInOp, parallel_ctx, nullptr,
                                    [this](OpContext* op_ctx) { op_ctx_.reset(op_ctx); }));
   Global<OpGraph>::Get()->CheckBlobDescs(op_->op_name(), GetBlobDesc4BnInOp, parallel_ctx);
 }

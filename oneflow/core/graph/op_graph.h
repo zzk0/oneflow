@@ -160,6 +160,9 @@ class OpGraph final : public Graph<OpNode, OpEdge> {
   int64_t GetParallelNum(const std::string& op_name) const;
   int64_t GetSplitNum(const std::string& op_name, const LogicalBlobId& lbi) const;
   const SbpParallel& GetSbpParallel(const std::string& op_name, const LogicalBlobId& lbi) const;
+  const ParallelDistribution& GetParallelDistribution(const std::string& op_name,
+                                                      const LogicalBlobId& lbi) const;
+  const Shape* GetParallelHierarchy(const std::string& op_name) const;
   DataType GetBlobDataType(const LogicalBlobId& lbi) const;
   const BlobDesc& GetLogicalBlobDesc(const LogicalBlobId& lbi) const;
   void CheckBlobDescs(const std::string& op_name,

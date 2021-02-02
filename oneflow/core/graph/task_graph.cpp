@@ -35,6 +35,7 @@ limitations under the License.
 #include "oneflow/core/graph/boxing/one_to_one_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
 #include "oneflow/core/graph/boxing_identity_task_node.h"
+#include "oneflow/core/graph/boxing/hierarchical_sub_task_graph_builder.h"
 
 namespace oneflow {
 
@@ -543,20 +544,36 @@ DEFINE_BLD_SUB_TASK_GRAPH_METHOD(BldSubTskGphByBoxing) {
     std::vector<TaskNode*> dst_nodes;
     std::vector<std::vector<TaskNode*>> sorted_ctrl_tasks;
     sorted_ctrl_tasks.resize(sorted_dst_comp_tasks.size());
-    const SbpParallel& src_sbp_parallel =
-        Global<OpGraph>::Get()->GetSbpParallel(src_logical->SoleOp()->op_name(), lbi);
-    const SbpParallel& dst_sbp_parallel =
-        Global<OpGraph>::Get()->GetSbpParallel(dst_logical->SoleOp()->op_name(), lbi);
+    // const SbpParallel& src_sbp_parallel =
+    //    Global<OpGraph>::Get()->GetSbpParallel(src_logical->SoleOp()->op_name(), lbi);
+    // const SbpParallel& dst_sbp_parallel =
+    //    Global<OpGraph>::Get()->GetSbpParallel(dst_logical->SoleOp()->op_name(), lbi);
+    const ParallelDistribution& src_parallel_distribution =
+        Global<OpGraph>::Get()->GetParallelDistribution(src_logical->SoleOp()->op_name(), lbi);
+    const ParallelDistribution& dst_parallel_distribution =
+        Global<OpGraph>::Get()->GetParallelDistribution(dst_logical->SoleOp()->op_name(), lbi);
+    const Shape* src_parallel_hierarchy =
+        Global<OpGraph>::Get()->GetParallelHierarchy(src_logical->SoleOp()->op_name());
+    const Shape* dst_parallel_hierarchy =
+        Global<OpGraph>::Get()->GetParallelHierarchy(dst_logical->SoleOp()->op_name());
     const std::shared_ptr<const ParallelDesc>& src_parallel_desc = src_logical->parallel_desc();
     const std::shared_ptr<const ParallelDesc>& dst_parallel_desc = dst_logical->parallel_desc();
     const BlobDesc& blob_desc = Global<OpGraph>::Get()->GetLogicalBlobDesc(lbi);
-    auto status = CHECK_JUST(sub_tsk_gph_builder_->Build(
+
+    // auto status = CHECK_JUST(sub_tsk_gph_builder_->Build(
+    //    sub_tsk_gph_builder_ctx_.get(), src_nodes, &dst_nodes, &sorted_ctrl_tasks,
+    //    *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, src_sbp_parallel,
+    //    dst_sbp_parallel, *src_logical->out_blob_time_shape()));
+    HierarchicalSubTskGphBuilder hierarchical_builder;
+    auto status = CHECK_JUST(hierarchical_builder.Build(
         sub_tsk_gph_builder_ctx_.get(), src_nodes, &dst_nodes, &sorted_ctrl_tasks,
-        *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, src_sbp_parallel, dst_sbp_parallel,
+        *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, *src_parallel_hierarchy,
+        *dst_parallel_hierarchy, src_parallel_distribution, dst_parallel_distribution,
         *src_logical->out_blob_time_shape()));
     boxing_logger_->Log(*status, src_logical->SoleOp()->op_name(), dst_logical->SoleOp()->op_name(),
-                        *src_parallel_desc, *dst_parallel_desc, src_sbp_parallel, dst_sbp_parallel,
-                        lbi, blob_desc);
+                        *src_parallel_desc, *dst_parallel_desc,
+                        src_parallel_distribution.sbp_parallel(0),
+                        dst_parallel_distribution.sbp_parallel(0), lbi, blob_desc);
     sub_tsk_gph_builder_ctx_->ConnectAll121(dst_nodes, sorted_dst_comp_tasks);
     FOR_RANGE(size_t, i, 0, sorted_dst_comp_tasks.size()) {
       for (TaskNode* ctrl_in_node : sorted_ctrl_tasks.at(i)) {
