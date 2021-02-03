@@ -183,11 +183,15 @@ Maybe<OpArgBlobAttribute> GetOpArgBlobAttribute(const OpAttribute& op_attribute,
 Maybe<OpArgParallelAttribute> GetOpArgParallelAttribute(
     const std::shared_ptr<ParallelDesc>& parallel_desc_symbol, const OpAttribute& op_attribute,
     const std::string& bn_in_op) {
-  auto& sbp_signature_map = op_attribute.sbp_signature().bn_in_op2sbp_parallel();
+  const auto& parallel_distribution_signature =
+      op_attribute.parallel_distribution_signature().bn_in_op2parallel_distribution();
   auto& mirrored_signature_map = op_attribute.mirrored_signature().bn_in_op2opt_mirrored_parallel();
   std::shared_ptr<cfg::SbpParallel> sbp_parallel = std::make_shared<cfg::SbpParallel>();
-  if (sbp_signature_map.find(bn_in_op) != sbp_signature_map.end()) {
-    sbp_parallel.reset(new cfg::SbpParallel(sbp_signature_map.at(bn_in_op)));
+  auto it = parallel_distribution_signature.find(bn_in_op);
+  if (it != parallel_distribution_signature.end()) {
+    // TODO(liujuncheng): fully support
+    CHECK_EQ_OR_RETURN(it->second.sbp_parallel_size(), 1);
+    sbp_parallel.reset(new cfg::SbpParallel(it->second.sbp_parallel(0)));
   }
   std::shared_ptr<cfg::OptMirroredParallel> opt_mirrored_parallel =
       std::make_shared<cfg::OptMirroredParallel>();
