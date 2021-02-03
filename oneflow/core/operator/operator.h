@@ -199,11 +199,9 @@ class Operator {
   Maybe<const SbpSignature*> sbp_signature() const;
   SbpSignature* mut_sbp_signature() { return op_attribute_.mutable_sbp_signature(); }
   Maybe<const Shape*> parallel_hierarchy() const;
-  void SetParallelHierarchy(const Shape& parallel_hierarchy);
+  void SetParallelHierarchy(const Shape& hierarchy);
   Maybe<const ParallelDistributionSignature*> parallel_distribution_signature() const;
-  ParallelDistributionSignature* mut_parallel_distribution_signature() {
-    return op_attribute_.mutable_parallel_distribution_signature();
-  }
+  void SetParallelDistributionSignature(const ParallelDistributionSignature& signature);
   BlobLastUsedSignature* mut_blob_last_used_signature() {
     return op_attribute_.mutable_blob_last_used_signature();
   }
@@ -334,6 +332,7 @@ class Operator {
   const JobDesc* job_desc_;
   HashMap<LogicalBlobId, std::string> lbi2obn_;
   std::unique_ptr<Shape> parallel_hierarchy_;
+  std::unique_ptr<SbpSignature> sbp_signature_;
 };
 
 std::string GenRepeatedBn(const std::string& bn_prefix, int32_t idx);
@@ -435,11 +434,6 @@ inline std::string GenLogicalBlobName(const LogicalBlobId& lbi) {
 
 Maybe<bool> GetSbpParallelInLbnOrNothing(const std::string& lbn, SbpParallel* sbp);
 Maybe<bool> ParseDisableBoxingFlag(const std::string& lbn_with_hint, bool* disable_boxing);
-
-Maybe<void> InferOpSbpSignature(
-    Operator* op, const SbpSignature& sbp_sig_conf, const ParallelDesc& parallel_desc,
-    const HashMap<std::string, SbpInferHint>& ibn2sbp_infer_hint,
-    std::function<Maybe<const OptInt64*>(const std::string&)> BatchAxis4BnInOp);
 
 std::string GetInputLbnInOpCustomizedConf(const OperatorConf& op_conf,
                                           const std::string& fd_name_may_have_idx);
