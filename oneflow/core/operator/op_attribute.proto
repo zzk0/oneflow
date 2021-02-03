@@ -26,7 +26,6 @@ message OpAttribute {
   optional BlobBackwardUsedSignature blob_backward_used_signature = 103;
 
   // op node signature
-  optional SbpSignature sbp_signature = 104;
   optional MirroredSignature mirrored_signature = 105;
   optional BlobDescSignature logical_blob_desc_signature = 106;
   optional BatchAxisSignature batch_axis_signature = 107;

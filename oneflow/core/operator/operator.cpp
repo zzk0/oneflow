@@ -461,8 +461,8 @@ Maybe<void> Operator::InferParallelHierarchy(
 }
 
 Maybe<const SbpSignature*> Operator::sbp_signature() const {
-  CHECK_OR_RETURN(op_attribute_.has_sbp_signature()) << "sbp signature not infered";
-  return &op_attribute_.sbp_signature();
+  CHECK_OR_RETURN(sbp_signature_);
+  return Maybe<const SbpSignature*>(sbp_signature_.get());
 }
 
 Maybe<const Shape*> Operator::parallel_hierarchy() const {

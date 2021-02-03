@@ -197,7 +197,6 @@ class Operator {
   ParallelSignature* mut_parallel_signature() { return op_attribute_.mutable_parallel_signature(); }
 
   Maybe<const SbpSignature*> sbp_signature() const;
-  SbpSignature* mut_sbp_signature() { return op_attribute_.mutable_sbp_signature(); }
   Maybe<const Shape*> parallel_hierarchy() const;
   void SetParallelHierarchy(const Shape& hierarchy);
   Maybe<const ParallelDistributionSignature*> parallel_distribution_signature() const;
