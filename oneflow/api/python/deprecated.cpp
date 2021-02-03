@@ -45,7 +45,14 @@ Maybe<cfg::OpNodeSignature> MakeOpNodeSignatureFromSerializedOpAttribute(
   CHECK_OR_RETURN(TxtString2PbMessage(op_attribute_str, &op_attribute))
       << "op_attribute parse failed";
   auto op_node_signature = std::make_shared<cfg::OpNodeSignature>();
-  op_node_signature->mutable_sbp_signature()->InitFromProto(op_attribute.sbp_signature());
+  SbpSignature sbp_signature;
+  for (const auto& pair :
+       op_attribute.parallel_distribution_signature().bn_in_op2parallel_distribution()) {
+    // TODO(liujuncheng): fully support
+    CHECK_EQ_OR_RETURN(pair.second.sbp_parallel_size(), 1);
+    (*sbp_signature.mutable_bn_in_op2sbp_parallel())[pair.first] = pair.second.sbp_parallel(0);
+  }
+  op_node_signature->mutable_sbp_signature()->InitFromProto(sbp_signature);
   op_node_signature->mutable_mirrored_signature()->InitFromProto(op_attribute.mirrored_signature());
   op_node_signature->mutable_logical_blob_desc_signature()->InitFromProto(
       op_attribute.logical_blob_desc_signature());
