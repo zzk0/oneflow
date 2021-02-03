@@ -582,9 +582,9 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferOp(const OperatorConf& op_con
     CHECK_OR_RETURN(it != op_name2parallel_hierarchy_.end());
     return Maybe<const Shape*>(&it->second);
   };
-  op->InferParallelHierarchyIf(GetParallelHierarchy4Ibn, ParallelDesc(*parallel_conf),
-                               &parallel_hierarchy);
-  CHECK(op_name2parallel_hierarchy_.emplace(op->op_name(), parallel_hierarchy).second);
+  op->InferParallelHierarchyIf(GetParallelHierarchy4Ibn, ParallelDesc(*parallel_conf));
+  CHECK(op_name2parallel_hierarchy_.emplace(op->op_name(), *CHECK_JUST(op->parallel_hierarchy()))
+            .second);
   // infer batch_axis
   const auto& BatchAxis4Ibn = [&](const std::string& ibn) -> Maybe<const OptInt64*> {
     const LogicalBlobId& lbi = op->BnInOp2Lbi(ibn);
