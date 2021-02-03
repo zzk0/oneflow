@@ -225,8 +225,8 @@ class Session(object):
             self.inter_user_job_info_ = c_api_util.GetInterUserJobInfo()
             # Get latest op_attr and job_name after compiler.Compile
             self.UpdateInfo4InterfaceOp()
-            if not config_util.api_legacy_model_io_enabled():
-                check_point_v2.Init()
+            #if not config_util.api_legacy_model_io_enabled():
+            #    check_point_v2.Init()
         else:
             self.eager_config_proto_ctx_ = oneflow_api.LogicalConfigProtoContext(
                 str(self.config_proto)
