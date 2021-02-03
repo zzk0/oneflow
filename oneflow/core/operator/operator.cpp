@@ -250,7 +250,7 @@ Maybe<void> Operator::InferSbpSignatureIf(
     std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
     const ParallelDesc& parallel_desc) {
   if (parallel_desc.parallel_num() == 1) {
-    auto* bn2sbp = mut_sbp_signature()->mutable_bn_in_op2sbp_parallel();
+    auto* bn2sbp = sbp_signature->mutable_bn_in_op2sbp_parallel();
     for (const auto& ibn : input_bns()) { (*bn2sbp)[ibn].mutable_split_parallel()->set_axis(0); }
     for (const auto& obn : output_bns()) { (*bn2sbp)[obn].mutable_split_parallel()->set_axis(0); }
   } else if (parallel_desc.parallel_num() > 1) {
