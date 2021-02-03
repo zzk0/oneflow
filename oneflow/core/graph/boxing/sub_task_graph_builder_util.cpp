@@ -50,6 +50,46 @@ std::vector<TensorSliceView> SubTskGphBuilderUtil::GetTensorSliceView(
   return views;
 }
 
+std::vector<TensorSliceView> SubTskGphBuilderUtil::GetTensor2DSliceView(
+    const Shape& parallel_hierarchy, const ParallelDistribution& parallel_distribution,
+    const BlobDesc& blob_desc) {
+  std::vector<Range> ranges(blob_desc.shape().NumAxes());
+  FOR_RANGE(int64_t, i, 0, blob_desc.shape().NumAxes()) {
+    ranges[i].mut_begin() = 0;
+    ranges[i].mut_end() = blob_desc.shape().At(i);
+  }
+  std::vector<TensorSliceView> views;
+  SbpParallel sbp_parallel_0 = parallel_distribution.sbp_parallel(0);
+  SbpParallel sbp_parallel_1 = parallel_distribution.sbp_parallel(1);
+  if (sbp_parallel_0.has_split_parallel() && sbp_parallel_1.has_split_parallel()
+      && sbp_parallel_0.split_parallel().axis() == sbp_parallel_1.split_parallel().axis()) {
+    const int64_t parallel_num = parallel_hierarchy.At(0) * parallel_hierarchy.At(1);
+    const int64_t split_axis = sbp_parallel_0.split_parallel().axis();
+    const BalancedSplitter bs(blob_desc.shape().At(split_axis), parallel_num);
+    FOR_RANGE(int64_t, i, 0, parallel_num) {
+      ranges[split_axis] = bs.At(i);
+      views.emplace_back(ranges);
+    }
+  } else {
+    FOR_RANGE(int64_t, i, 0, parallel_hierarchy.At(0)) {
+      if (sbp_parallel_0.has_split_parallel()) {
+        const int64_t split_axis = sbp_parallel_0.split_parallel().axis();
+        const BalancedSplitter bs_0(blob_desc.shape().At(split_axis), parallel_hierarchy.At(0));
+        ranges[split_axis] = bs_0.At(i);
+      }
+      FOR_RANGE(int64_t, j, 0, parallel_hierarchy.At(1)) {
+        if (sbp_parallel_1.has_split_parallel()) {
+          const int64_t split_axis = sbp_parallel_1.split_parallel().axis();
+          const BalancedSplitter bs_1(blob_desc.shape().At(split_axis), parallel_hierarchy.At(1));
+          ranges[split_axis] = bs_1.At(j);
+        }
+        views.emplace_back(ranges);
+      }
+    }
+  }
+  return views;
+}
+
 TensorSliceView SubTskGphBuilderUtil::GetBroadcastTensorSliceView(const BlobDesc& blob_desc) {
   return TensorSliceView(blob_desc.shape());
 }
