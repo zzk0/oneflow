@@ -672,7 +672,11 @@ Maybe<void> OpGraph::InferOpNodeLogicalBlobDesc(OpNode* op_node) const {
     parallel_ctx.set_parallel_num(parallel_num);
     //    JUST(op_node->op().InferOutBlobDescsIf(BlobDesc4BnInOp, &parallel_ctx,
     //                                           &op_node->sbp_signature(), [](OpContext*) {}));
-    JUST(op_node->op().InferOutBlobDescsIf(BlobDesc4BnInOp, &parallel_ctx, nullptr,
+    const SbpSignature* sbp_signature = nullptr;
+    if (CHECK_JUST(op_node->op().parallel_hierarchy())->NumAxes() == 1) {
+      sbp_signature = CHECK_JUST(op_node->op().sbp_signature());
+    }
+    JUST(op_node->op().InferOutBlobDescsIf(BlobDesc4BnInOp, &parallel_ctx, sbp_signature,
                                            [](OpContext*) {}));
   }
   op_node->ConcatLogicalOutputBlobDesc();
