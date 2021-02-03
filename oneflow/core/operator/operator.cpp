@@ -831,7 +831,6 @@ Symbol<OperatorConf> Operator::GetOpConfWithoutOpNameAndLbn() const {
 
 std::shared_ptr<OpAttribute> Operator::GetOpAttributeWithoutOpNameAndLbn() const {
   auto op_attribute = std::make_shared<OpAttribute>(op_attribute_);
-  op_attribute->mutable_sbp_signature();
   *op_attribute->mutable_op_conf() = *GetOpConfWithoutOpNameAndLbn();
   return op_attribute;
 }
