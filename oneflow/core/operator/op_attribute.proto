@@ -10,6 +10,7 @@ import "oneflow/core/job/sbp_parallel.proto";
 import "oneflow/core/job/mirrored_parallel.proto";
 import "oneflow/core/job/blob_lifetime_signature.proto";
 import "oneflow/core/job/parallel_signature.proto";
+import "oneflow/core/common/shape.proto";
 
 message OpAttribute {
   repeated string input_bns = 1;
@@ -30,7 +31,8 @@ message OpAttribute {
   optional BlobDescSignature logical_blob_desc_signature = 106;
   optional BatchAxisSignature batch_axis_signature = 107;
   optional ParallelSignature parallel_signature = 108;
-  optional ParallelDistributionSignature parallel_distribution_signature = 109;
+  optional ShapeProto parallel_hierarchy = 109;
+  optional ParallelDistributionSignature parallel_distribution_signature = 110;
 }
 
 message OpAttributeList {

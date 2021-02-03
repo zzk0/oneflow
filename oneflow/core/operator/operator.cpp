@@ -379,8 +379,11 @@ Maybe<void> Operator::InferMirroredSignatureIf(
 
 Maybe<void> Operator::InferParallelHierarchyIf(
     std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-    const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) {
-  return InferParallelHierarchy(GetParallelHierarchy4Ibn, parallel_desc, parallel_hierarchy);
+    const ParallelDesc& parallel_desc) {
+  Shape parallel_hierarchy;
+  CHECK_JUST(InferParallelHierarchy(GetParallelHierarchy4Ibn, parallel_desc, &parallel_hierarchy));
+  SetParallelHierarchy(parallel_hierarchy);
+  return Maybe<void>::Ok();
 }
 
 std::string DebugString4MirroredHint(
@@ -459,6 +462,16 @@ Maybe<void> Operator::InferParallelHierarchy(
 Maybe<const SbpSignature*> Operator::sbp_signature() const {
   CHECK_OR_RETURN(op_attribute_.has_sbp_signature()) << "sbp signature not infered";
   return &op_attribute_.sbp_signature();
+}
+
+Maybe<const Shape*> Operator::parallel_hierarchy() const {
+  CHECK_OR_RETURN(parallel_hierarchy_);
+  return Maybe<const Shape*>(parallel_hierarchy_.get());
+}
+
+void Operator::SetParallelHierarchy(const Shape& parallel_hierarchy) {
+  parallel_hierarchy.ToProto(op_attribute_.mutable_parallel_hierarchy());
+  parallel_hierarchy_.reset(new Shape(parallel_hierarchy.dim_vec()));
 }
 
 Maybe<const ParallelDistributionSignature*> Operator::parallel_distribution_signature() const {

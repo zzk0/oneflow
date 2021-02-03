@@ -68,7 +68,6 @@ class OpNode final : public Node<OpNode, OpEdge> {
   Operator* mut_op() { return op_.get(); }
   ParallelDesc* mut_parallel_desc() { return &parallel_desc_; }
   Shape* mut_out_blob_time_shape();
-  Shape* mut_parallel_hierarchy();
   HashMap<std::string, std::vector<std::shared_ptr<BlobDesc>>>* mut_bn2parallel_id2blob_desc() {
     return &bn2parallel_id2blob_desc_;
   }
@@ -107,7 +106,6 @@ class OpNode final : public Node<OpNode, OpEdge> {
   std::unique_ptr<Shape> input_blob_fastest_time_shape_;
   HashMap<LogicalBlobId, SbpParallel> lbi2sbp_parallel_;
   HashMap<LogicalBlobId, ParallelDistribution> lbi2parallel_distribution_;
-  std::unique_ptr<Shape> parallel_hierarchy_;
 };
 
 class OpEdge final : public Edge<OpNode, OpEdge> {
