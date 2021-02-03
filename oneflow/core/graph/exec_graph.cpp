@@ -69,12 +69,27 @@ void ExecNode::ToProto(const ParallelContext* parallel_ctx, ExecNodeProto* ret) 
 
 void ExecNode::InferBlobDescs(const ParallelContext* parallel_ctx) {
   auto GetBlobDesc4BnInOp = GetBlobDesc4BnInOpFunc();
-  // const SbpSignature* sbp_signature = nullptr;
+  std::unique_ptr<SbpSignature> sbp_signature;
   //{
   //  const OpNode* op_node = Global<OpGraph>::Get()->OpNode4OpName(op()->op_name());
   //  if (op_node != nullptr) { sbp_signature = &op_node->sbp_signature(); }
   //}
-  CHECK_JUST(op_->InferBlobDescsIf(GetBlobDesc4BnInOp, parallel_ctx, nullptr,
+  {
+    const OpNode* op_node = Global<OpGraph>::Get()->OpNode4OpName(op()->op_name());
+    if (op_node != nullptr) {
+      if (op_node->parallel_hierarchy()->NumAxes() == 1) {
+        sbp_signature.reset(new SbpSignature());
+        for (const auto& pair : CHECK_JUST(op_node->op().parallel_distribution_signature())
+                                    ->bn_in_op2parallel_distribution()) {
+          (*sbp_signature->mutable_bn_in_op2sbp_parallel())[pair.first] =
+              pair.second.sbp_parallel(0);
+        }
+        LOG(ERROR) << "sbp_signature" << sbp_signature->DebugString();
+      }
+    }
+  }
+
+  CHECK_JUST(op_->InferBlobDescsIf(GetBlobDesc4BnInOp, parallel_ctx, sbp_signature.get(),
                                    [this](OpContext* op_ctx) { op_ctx_.reset(op_ctx); }));
   Global<OpGraph>::Get()->CheckBlobDescs(op_->op_name(), GetBlobDesc4BnInOp, parallel_ctx);
 }

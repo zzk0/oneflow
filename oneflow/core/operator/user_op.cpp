@@ -533,7 +533,7 @@ Maybe<void> UserOp::InferBlobDescs(std::function<BlobDesc*(const std::string&)> 
     return Maybe<void>::Ok();
   };
   JUST(kernel_reg_val->inplace_proposal_fn(infer_ctx, AddInplaceArgPairFn));
-  // op_ctx->sbp_sig = *sbp_signature;
+  if (sbp_signature != nullptr) { op_ctx->sbp_sig = *sbp_signature; }
   EnrollOpCtx(op_ctx);
   return Maybe<void>::Ok();
 }
