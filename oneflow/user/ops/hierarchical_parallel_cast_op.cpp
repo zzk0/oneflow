@@ -69,6 +69,16 @@ REGISTER_USER_OP("hierarchical_parallel_cast_like")
       *ctx->mut_parallel_hierarchy() = ctx->ParallelHierarchy4InputArgNameAndIndex("like", 0);
       return Maybe<void>::Ok();
     })
+    .SetInferParallelDistributionFn([](user_op::InferParallelDistributionFnContext* ctx)
+                                        -> Maybe<void> {
+      ParallelDistribution* in_distribution = ctx->ParallelDistribution4ArgNameAndIndex("in", 0);
+      ParallelDistribution* out_distribution = ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
+      const ParallelDistribution* like_distribution =
+          ctx->ParallelDistribution4ArgNameAndIndex("like", 0);
+      *in_distribution = *like_distribution;
+      *out_distribution = *like_distribution;
+      return Maybe<void>::Ok();
+    })
     .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetInferSbpSignatureFn([](user_op::InferSbpSignatureFnContext* ctx) -> Maybe<void> {
       return Maybe<void>::Ok();
@@ -105,7 +115,7 @@ REGISTER_USER_OP_GRAD("hierarchical_parallel_cast")
           ctx->DefineOp(grad_op_name, [&](user_op::BackwardOpBuilder& builder) {
             return builder.OpTypeName("hierarchical_parallel_cast_like")
                 .InputBind("in", ctx->FwOp().output_grad("out", 0))
-                .InputBind("like", ctx->FwOp().input("like", 0))
+                .InputBind("like", ctx->FwOp().input("in", 0))
                 .Output("out")
                 .Build();
           });
