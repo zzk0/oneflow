@@ -48,7 +48,12 @@ void AddKeepHeaderOnlyOp(const OpGraph& op_graph, JobBuilder* job_builder) {
                      << node->op().op_name();
         continue;
       }
-      if (src_node->SbpParallel4Lbi(lbi) != node->SbpParallel4BnInOp(ibn)) {
+      if (*src_node->parallel_hierarchy() != *node->parallel_hierarchy()) {
+        LOG(WARNING) << "can not enable KeepHeaderOnly for " << ibn << " of "
+                     << node->op().op_name();
+        continue;
+      }
+      if (src_node->ParallelDistribution4Lbi(lbi) != node->ParallelDistribution4Lbi(ibn)) {
         LOG(WARNING) << "can not enable KeepHeaderOnly for " << ibn << " of "
                      << node->op().op_name();
         continue;
