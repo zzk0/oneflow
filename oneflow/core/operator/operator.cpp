@@ -344,6 +344,9 @@ Maybe<void> Operator::InferParallelDistributionSignature(
       for (const auto& sbp_signature : list.sbp_signature()) {
         bool all_match = true;
         for (const auto& ibn : input_bns()) {
+          ParallelDistribution distribution =
+              JUST(ParallelDistributionInferHint4Ibn(ibn))->parallel_distribution();
+          CHECK_EQ_OR_RETURN(distribution.sbp_parallel_size(), parallel_hierarchy.NumAxes());
           if (sbp_signature.bn_in_op2sbp_parallel().at(ibn)
               != JUST(ParallelDistributionInferHint4Ibn(ibn))
                      ->parallel_distribution()

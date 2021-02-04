@@ -55,27 +55,27 @@ Maybe<void> VariableOp::InferBlobDescs(
   out_blob_desc->mut_shape() = Shape(variable_conf.shape());
   out_blob_desc->set_data_type(variable_conf.has_data_type() ? variable_conf.data_type()
                                                              : job_desc().DefaultDataType());
-  const auto& opt_split_axis = JUST(GetSplitAxis(variable_conf));
-  if (opt_split_axis->has_value()) {
-    int32_t model_split_axis = opt_split_axis->value();
-    int64_t split_dim_num = out_blob_desc->shape().At(model_split_axis);
-    BalancedSplitter bs(split_dim_num, parallel_ctx->parallel_num());
-    out_blob_desc->mut_shape().Set(model_split_axis, bs.At(parallel_ctx->parallel_id()).size());
-  }
+  if (parallel_ctx->parallel_num() == 1) { return Maybe<void>::Ok(); }
+  Shape hierarchy;
   if (variable_conf.has_parallel_hierarchy()) {
-    const Shape parallel_hierarchy(variable_conf.parallel_hierarchy());
-    for (int64_t i = 0; i < parallel_hierarchy.NumAxes(); ++i) {
-      SbpParallel sbp_parallel;
-      CHECK_OR_RETURN(
-          ParseSbpParallelFromString(variable_conf.parallel_distribution(i), &sbp_parallel));
-      if (sbp_parallel.has_split_parallel()) {
-        const int64_t split_axis = sbp_parallel.split_parallel().axis();
-        out_blob_desc->mut_shape().Set(
-            split_axis, out_blob_desc->shape().At(split_axis) / parallel_hierarchy.At(i));
-      }
+    hierarchy = Shape(variable_conf.parallel_hierarchy());
+  } else {
+    hierarchy = Shape({parallel_ctx->parallel_num()});
+  }
+  CHECK_EQ_OR_RETURN(variable_conf.parallel_distribution_size(), hierarchy.NumAxes());
+  for (int64_t i = 0; i < hierarchy.NumAxes(); ++i) {
+    SbpParallel sbp_parallel;
+    CHECK_OR_RETURN(
+        ParseSbpParallelFromString(variable_conf.parallel_distribution(i), &sbp_parallel));
+    if (sbp_parallel.has_split_parallel()) {
+      const int64_t split_axis = sbp_parallel.split_parallel().axis();
+      out_blob_desc->mut_shape().Set(split_axis,
+                                     out_blob_desc->shape().At(split_axis) / hierarchy.At(i));
     }
   }
-
+  // LOG(ERROR) << "conf shape: \n" << variable_conf.shape().DebugString();
+  // LOG(ERROR) << "blob shape" << parallel_ctx->parallel_num() << " " <<
+  // out_blob_desc->shape().ToString();
   return Maybe<void>::Ok();
 }
 

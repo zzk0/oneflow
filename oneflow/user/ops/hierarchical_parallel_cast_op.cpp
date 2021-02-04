@@ -73,10 +73,13 @@ REGISTER_USER_OP("hierarchical_parallel_cast_like")
                                         -> Maybe<void> {
       ParallelDistribution* in_distribution = ctx->ParallelDistribution4ArgNameAndIndex("in", 0);
       ParallelDistribution* out_distribution = ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
-      const ParallelDistribution* like_distribution =
+      ParallelDistribution* like_distribution =
           ctx->ParallelDistribution4ArgNameAndIndex("like", 0);
-      *in_distribution = *like_distribution;
-      *out_distribution = *like_distribution;
+      const ParallelDistribution& hint_distribution =
+          ctx->ParallelDistributionHint4InputArgNameAndIndex("like", 0);
+      *in_distribution = hint_distribution;
+      *out_distribution = hint_distribution;
+      *like_distribution = hint_distribution;
       return Maybe<void>::Ok();
     })
     .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)

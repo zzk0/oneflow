@@ -255,6 +255,45 @@ REGISTER_USER_OP("sgd_update")
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferSGDUpdateTensorDesc)
     .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
+    .SetInferParallelHierarchyFn([](user_op::InferParallelHierarchyFnContext* ctx) -> Maybe<void> {
+      const Shape& parallel_hierarchy = ctx->ParallelHierarchy4InputArgNameAndIndex("model", 0);
+      CHECK_EQ_OR_RETURN(parallel_hierarchy.elem_cnt(), ctx->parallel_num());
+      *ctx->mut_parallel_hierarchy() = parallel_hierarchy;
+      return Maybe<void>::Ok();
+    })
+    .SetInferParallelDistributionFn(
+        [](user_op::InferParallelDistributionFnContext* ctx) -> Maybe<void> {
+          const ParallelDistribution& model_hint_distribution =
+              ctx->ParallelDistributionHint4InputArgNameAndIndex("model", 0);
+          ParallelDistribution* model_distribution =
+              ctx->ParallelDistribution4ArgNameAndIndex("model", 0);
+          *model_distribution = model_hint_distribution;
+          ParallelDistribution* model_diff_distribution =
+              ctx->ParallelDistribution4ArgNameAndIndex("model_diff", 0);
+          *model_diff_distribution = model_hint_distribution;
+
+          ParallelDistribution broadcast_distribution;
+          const Shape& parallel_hierarchy = ctx->parallel_hierarchy();
+          for (int64_t i = 0; i < parallel_hierarchy.NumAxes(); ++i) {
+            broadcast_distribution.add_sbp_parallel()->mutable_broadcast_parallel();
+            LOG(INFO) << "broadcast_distribution: "
+                      << broadcast_distribution.sbp_parallel(i).has_broadcast_parallel();
+          }
+          ParallelDistribution* learning_rate_distribution =
+              ctx->ParallelDistribution4ArgNameAndIndex("learning_rate", 0);
+          *learning_rate_distribution = broadcast_distribution;
+          if (ctx->user_op_conf().has_input("scale_by_tensor", 0)) {
+            ParallelDistribution* scale_by_tensor_distribution =
+                ctx->ParallelDistribution4ArgNameAndIndex("scale_by_tensor", 0);
+            *scale_by_tensor_distribution = broadcast_distribution;
+          }
+          if (ctx->user_op_conf().has_input("skip_if", 0)) {
+            ParallelDistribution* skip_if_distribution =
+                ctx->ParallelDistribution4ArgNameAndIndex("skip_if", 0);
+            *skip_if_distribution = broadcast_distribution;
+          }
+          return Maybe<void>::Ok();
+        })
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc& model = ctx->LogicalTensorDesc4InputArgNameAndIndex("model", 0);
       FOR_RANGE(int64_t, axis, 0, model.shape().NumAxes()) {

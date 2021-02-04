@@ -996,6 +996,7 @@ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
   auto scope = std::make_unique<GlobalJobDescScope>(mut_job()->job_conf(), job_id());
   JobPassCtx job_pass_ctx(GlobalJobDesc());
   auto DoPass = [&](const std::string& pass_name) -> Maybe<void> {
+    LOG(ERROR) << "Do pass: " << pass_name;
     return JobPass4Name(pass_name)(mut_job(), &job_pass_ctx);
   };
   if (GlobalJobDesc().Bool("__is_user_function__")) {
