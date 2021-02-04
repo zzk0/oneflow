@@ -734,7 +734,7 @@ Maybe<void> AutoGrad(JobPassCtx* ctx, const OpGraph& op_graph, JobBuilder* job_b
   OpBlobArgPairs fw_bw_oba_pairs;
   CalcFwBwObaPairs(op_graph, in_oba2in_diff_lbi, out_oba2out_diff_lbi, out_oba2clone_bw_add_out_lbi,
                    *job_builder, &fw_bw_oba_pairs);
-  BindFwBwObaPairs(op_graph, fw_bw_oba_pairs, job_builder);
+  // BindFwBwObaPairs(op_graph, fw_bw_oba_pairs, job_builder);
   CalcOutLbi2OutDiffLbi(op_graph, out_oba2out_diff_lbi, out_lbi2out_diff_lbi);
   return Maybe<void>::Ok();
 }

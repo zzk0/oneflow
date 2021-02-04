@@ -90,7 +90,7 @@ void SetSbpSignatureHintByIdenticalSbpObaPairs(const OpGraph& op_graph, JobBuild
 void UpdateOpSbpSignatureHint(const OpGraph& op_graph, JobBuilder* job_builder) {
   op_graph.ForEachNode(
       [&](OpNode* op_node) { BindIdenticalSbpObaPairsBetweenIbns(*op_node, job_builder); });
-  SetSbpSignatureHintByIdenticalSbpObaPairs(op_graph, job_builder);
+  // SetSbpSignatureHintByIdenticalSbpObaPairs(op_graph, job_builder);
 }
 
 class GenerateBackwardAndOptimizerOpConfs final : public JobPass {
