@@ -936,14 +936,23 @@ void AddDiffParallelCast(const OpGraph& op_graph, JobBuilder* job_builder,
     LogicalBlobId& diff_lbi = pair.second;
     const OpNode* model_op_node = op_graph.OpNode4OpName(lbi.op_name());
     if (model_op_node->parallel_desc().parallel_num() <= 1) { continue; }
-    int64_t scope_symbol_id = model_op_node->op().op_conf().scope_symbol_id();
-    const SbpParallel& model_sbp = model_op_node->SbpParallel4Lbi(lbi);
+    const int64_t scope_symbol_id = model_op_node->op().op_conf().scope_symbol_id();
+    std::vector<std::string> parallel_distribution;
+    for (const auto& sbp_parallel :
+         model_op_node->ParallelDistribution4BnInOp("out").sbp_parallel()) {
+      parallel_distribution.push_back(SbpParallelToString(sbp_parallel));
+    }
     auto parallel_cast_op =
         user_op::UserOpConfWrapperBuilder("System-AutoGrad-ParallelCast-" + NewUniqueId())
-            .Op("parallel_cast")
+            .Op("hierarchical_parallel_cast")
             .Input("in", GenLogicalBlobName(diff_lbi))
             .Output("out")
-            .Attr("sbp_parallel", SbpParallelToString(model_sbp))
+            .Attr<Shape>("parallel_hierarchy", *model_op_node->parallel_hierarchy())
+            .Attr<std::vector<std::string>>("parallel_distribution", parallel_distribution)
+            .Attr<std::string>("grad_mode", "auto")
+            .Attr<Shape>("grad_parallel_hierarchy", Shape())
+            .Attr<std::vector<std::string>>("grad_parallel_distribution",
+                                            std::vector<std::string>())
             .ScopeSymbolId(scope_symbol_id)
             .Build();
     job_builder->AddOps(model_op_node->parallel_desc().parallel_conf(),

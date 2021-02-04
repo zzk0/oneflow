@@ -79,8 +79,6 @@ class OpNode final : public Node<OpNode, OpEdge> {
   //                                       const std::function<void(const BlobDesc&)>& Handler)
   //                                       const;
 
-  int64_t GetAxisParallelNum(
-      const std::function<void(bool*, int32_t*, int64_t*)>& GetAxisParallelInfo) const;
   //  void ConcatBlobDesc(const ParallelDesc& blob_parallel_desc,
   //                      const std::vector<std::shared_ptr<BlobDesc>>& blob_descs,
   //                      const SbpParallel& sbp_parallel, BlobDesc* concatenated_blob_desc) const;
@@ -150,12 +148,7 @@ class OpGraph final : public Graph<OpNode, OpEdge> {
 
   const OpNode* OpNode4OpName(const std::string& name) const;
 
-  std::function<const BlobDesc&(const LogicalBlobId&)> MakeGetterBlobDesc4ModelLbi() const;
-
-  int32_t GetModelSplitAxis(const std::string& op_name, const LogicalBlobId& lbi) const;
-  BalancedSplitter GetBalancedSplitter(const std::string& op_name, const LogicalBlobId& lbi) const;
   int64_t GetParallelNum(const std::string& op_name) const;
-  int64_t GetSplitNum(const std::string& op_name, const LogicalBlobId& lbi) const;
   const SbpParallel& GetSbpParallel(const std::string& op_name, const LogicalBlobId& lbi) const;
   const ParallelDistribution& GetParallelDistribution(const std::string& op_name,
                                                       const LogicalBlobId& lbi) const;
