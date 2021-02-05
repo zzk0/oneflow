@@ -603,12 +603,12 @@ void UserOp::VirtualGenKernelConf(
     std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, KernelConf* kernel_conf, const OpContext* op_ctx,
     std::function<const BlobDesc&(const std::string&)> LogicalBlobDesc4BnInOp,
-    const ParallelDesc* parallel_desc) const {
+    const ParallelDesc* parallel_desc, const SbpSignature* sbp_signature) const {
   const auto* user_op_ctx = dynamic_cast<const UserOpCtx*>(op_ctx);
   CHECK_NOTNULL(user_op_ctx);
   auto user_conf = kernel_conf->mutable_user_conf();
   *(user_conf->mutable_parallel_ctx()) = *parallel_ctx;
-  *(user_conf->mutable_sbp_sig()) = user_op_ctx->sbp_sig;
+  *(user_conf->mutable_sbp_sig()) = *sbp_signature;
 #define BLOB_DESCS_TO_PROTO(prefix, is_arg)                                                        \
   for (const auto& bn : prefix##_bns()) {                                                          \
     const BlobDesc* blob_desc = GetBlobDesc4BnInOp(bn);                                            \

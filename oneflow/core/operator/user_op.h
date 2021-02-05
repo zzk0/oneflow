@@ -58,7 +58,7 @@ class UserOp final : public Operator {
       std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
       const ParallelContext* parallel_ctx, KernelConf* kernel_conf, const OpContext* op_ctx,
       std::function<const BlobDesc&(const std::string&)> LogicalBlobDesc4BnInOp,
-      const ParallelDesc* parallel_desc) const override;
+      const ParallelDesc* parallel_desc, const SbpSignature* sbp_signature) const override;
 
   const user_op::OpRegistryResult* val_;
 };

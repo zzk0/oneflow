@@ -165,7 +165,7 @@ class Operator {
   void GenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                      const ParallelContext*, KernelConf*, const OpContext*,
                      std::function<const BlobDesc&(const std::string&)> LogicalBlobDesc4BnInOp,
-                     const ParallelDesc* parallel_desc) const;
+                     const ParallelDesc* parallel_desc, const SbpSignature* sbp_signature) const;
   const InputBlobModifier& InputBlobModifier4Ibn(const std::string& ibn) const;
   const OutputBlobModifier& OutputBlobModifier4Obn(const std::string& obn) const;
   Maybe<const SbpParallel*> SbpParallel4BnInOp(const std::string& bn_in_op) const;
@@ -226,6 +226,12 @@ class Operator {
     UNIMPLEMENTED();
     return nullptr;
   }
+
+  virtual void VirtualGenKernelConf(
+      std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp, const ParallelContext*,
+      KernelConf*, const OpContext*,
+      std::function<const BlobDesc&(const std::string&)> LogicalBlobDesc4BnInOp,
+      const ParallelDesc* parallel_desc, const SbpSignature* sbp_signature) const;
 
   virtual void VirtualGenKernelConf(
       std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp, const ParallelContext*,

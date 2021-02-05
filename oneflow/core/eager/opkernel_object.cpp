@@ -49,7 +49,7 @@ void OpKernelObject::NewPartialInitializedKernel(
     return CHECK_JUST(op_node_signature.LogicalBlobDesc4BnInOp(bn_in_op));
   };
   op.GenKernelConf(BlobDesc4BnInOp, parallel_ctx, &kernel_conf, op_ctx, LogicalBlobDesc4BnInOp,
-                   parallel_desc);
+                   parallel_desc, &op_node_signature.sbp_signature());
   kernel_.reset(new EagerKernel(job_desc_.get(), kernel_conf));
 }
 
@@ -83,7 +83,7 @@ void SystemOpKernelObject::ResetKernel(
     return CHECK_JUST(op_node_signature.LogicalBlobDesc4BnInOp(bn_in_op));
   };
   op.GenKernelConf(BlobDesc4BnInOp, parallel_ctx, &kernel_conf, op_ctx, LogicalBlobDesc4BnInOp,
-                   parallel_desc);
+                   parallel_desc, &op_node_signature.sbp_signature());
   kernel_ = ConstructKernel(job_desc_.get(), kernel_conf, nullptr);
 }
 
