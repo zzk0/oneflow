@@ -351,6 +351,12 @@ Maybe<void> Operator::InferParallelDistributionSignature(
               != JUST(ParallelDistributionInferHint4Ibn(ibn))
                      ->parallel_distribution()
                      .sbp_parallel(i)) {
+            LOG(INFO) << op_name() << "  " << ibn << " not match "
+                      << sbp_signature.bn_in_op2sbp_parallel().at(ibn).DebugString() << " "
+                      << JUST(ParallelDistributionInferHint4Ibn(ibn))
+                             ->parallel_distribution()
+                             .sbp_parallel(i)
+                             .DebugString();
             all_match = false;
             break;
           }
@@ -360,7 +366,7 @@ Maybe<void> Operator::InferParallelDistributionSignature(
           break;
         }
       }
-      CHECK_OR_RETURN(matched_sbp_signature != nullptr);
+      CHECK_OR_RETURN(matched_sbp_signature != nullptr) << " op_name " << op_name();
       for (const auto& bn : input_bns()) {
         *((*signature->mutable_bn_in_op2parallel_distribution())[bn].add_sbp_parallel()) =
             matched_sbp_signature->bn_in_op2sbp_parallel().at(bn);
@@ -454,7 +460,7 @@ Maybe<void> Operator::InferParallelHierarchy(
       if (op_parallel_hierarchy == nullptr) {
         op_parallel_hierarchy = parallel_hierarchy_hint;
       } else {
-        CHECK_EQ_OR_RETURN(*parallel_hierarchy_hint, *op_parallel_hierarchy);
+        CHECK_EQ_OR_RETURN(*parallel_hierarchy_hint, *op_parallel_hierarchy) << " op " << op_name();
       }
     }
     CHECK_EQ_OR_RETURN(op_parallel_hierarchy->elem_cnt(), parallel_desc.parallel_num());

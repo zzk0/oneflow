@@ -39,19 +39,63 @@ class UnsortedSegmentSumOpKernelState final : public user_op::OpKernelState {
 std::shared_ptr<user_op::OpKernelState> CreateUnsortedSegmentSumOpKernelState(
     user_op::KernelInitContext* ctx) {
   const auto axis = ctx->Attr<int64_t>("axis");
-  const SbpParallel& out_sbp = ctx->SbpParallel4ArgNameAndIndex("out", 0);
-  if (out_sbp.has_split_parallel() && out_sbp.split_parallel().axis() == axis
-      && ctx->parallel_ctx().parallel_num() > 1) {
-    CHECK(ctx->SbpParallel4ArgNameAndIndex("segment_ids", 0).has_broadcast_parallel());
-    CHECK(ctx->SbpParallel4ArgNameAndIndex("data", 0).has_broadcast_parallel());
-    const TensorDesc* out_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("out", 0);
-    const int64_t sum_dim_size = out_logical_desc->shape().At(axis);
-    BalancedSplitter bs(sum_dim_size, ctx->parallel_ctx().parallel_num());
-    return std::make_shared<UnsortedSegmentSumOpKernelState>(
-        bs.At(ctx->parallel_ctx().parallel_id()).begin(),
-        bs.At(ctx->parallel_ctx().parallel_id()).end());
+  const ParallelDistribution& segment_ids_parallel_distribution =
+      ctx->ParallelDistribution4ArgNameAndIndex("segment_ids", 0);
+  const ParallelDistribution& data_parallel_distribution =
+      ctx->ParallelDistribution4ArgNameAndIndex("data", 0);
+  const ParallelDistribution& out_parallel_distribution =
+      ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
+  const Shape& parallel_hierarchy = ctx->ParallelHierarchy();
+  const int64_t parallel_id = ctx->parallel_ctx().parallel_id();
+  const TensorDesc* out_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("out", 0);
+  const int64_t sum_dim_size = out_logical_desc->shape().At(axis);
+  if (parallel_hierarchy.NumAxes() == 1) {
+    const SbpParallel& out_sbp = out_parallel_distribution.sbp_parallel(0);
+    if (out_sbp.has_split_parallel() && out_sbp.split_parallel().axis() == axis) {
+      CHECK(segment_ids_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
+      CHECK(data_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
+      BalancedSplitter bs(sum_dim_size, ctx->parallel_ctx().parallel_num());
+      return std::make_shared<UnsortedSegmentSumOpKernelState>(bs.At(parallel_id).begin(),
+                                                               bs.At(parallel_id).end());
+    } else {
+      return std::shared_ptr<OpKernelState>(nullptr);
+    }
   } else {
-    return std::shared_ptr<OpKernelState>(nullptr);
+    CHECK_EQ(segment_ids_parallel_distribution.sbp_parallel_size(), 2);
+    CHECK_EQ(data_parallel_distribution.sbp_parallel_size(), 2);
+    CHECK_EQ(out_parallel_distribution.sbp_parallel_size(), 2);
+    const SbpParallel& out_0_sbp = out_parallel_distribution.sbp_parallel(0);
+    const SbpParallel& out_1_sbp = out_parallel_distribution.sbp_parallel(1);
+
+    const int64_t parallel_rank_0 = parallel_id / parallel_hierarchy.At(1);
+    const int64_t parallel_rank_1 = parallel_id % parallel_hierarchy.At(1);
+    const bool is_sbp_0_split_axis =
+        (out_0_sbp.has_split_parallel() && out_0_sbp.split_parallel().axis() == axis);
+    const bool is_sbp_1_split_axis =
+        (out_1_sbp.has_split_parallel() && out_1_sbp.split_parallel().axis() == axis);
+    if (is_sbp_0_split_axis) {
+      CHECK(segment_ids_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
+      CHECK(data_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
+    }
+    if (is_sbp_1_split_axis) {
+      CHECK(segment_ids_parallel_distribution.sbp_parallel(1).has_broadcast_parallel());
+      CHECK(data_parallel_distribution.sbp_parallel(1).has_broadcast_parallel());
+    }
+    if (is_sbp_0_split_axis && is_sbp_1_split_axis) {
+      BalancedSplitter bs(sum_dim_size, ctx->parallel_ctx().parallel_num());
+      return std::make_shared<UnsortedSegmentSumOpKernelState>(bs.At(parallel_id).begin(),
+                                                               bs.At(parallel_id).end());
+    } else if (is_sbp_0_split_axis && !is_sbp_1_split_axis) {
+      BalancedSplitter bs(sum_dim_size, parallel_hierarchy.At(0));
+      return std::make_shared<UnsortedSegmentSumOpKernelState>(bs.At(parallel_rank_0).begin(),
+                                                               bs.At(parallel_rank_0).end());
+    } else if (is_sbp_1_split_axis && !is_sbp_0_split_axis) {
+      BalancedSplitter bs(sum_dim_size, parallel_hierarchy.At(1));
+      return std::make_shared<UnsortedSegmentSumOpKernelState>(bs.At(parallel_rank_1).begin(),
+                                                               bs.At(parallel_rank_1).end());
+    } else {
+      return std::shared_ptr<OpKernelState>(nullptr);
+    }
   }
 }
 }  // namespace
