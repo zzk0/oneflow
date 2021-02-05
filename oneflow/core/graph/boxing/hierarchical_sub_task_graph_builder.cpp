@@ -313,7 +313,7 @@ Maybe<SubTskGphBuilderStatus> Build2DSliceBoxingSubTskGph(
     node->Init(lbi, slice, mode, machine_id, thrd_id);
     return node;
   };
-  LOG(ERROR) << "Build2DSliceBoxingSubTskGph";
+  LOG(INFO) << "Build2DSliceBoxingSubTskGph";
   const std::vector<TensorSliceView> in_slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
       in_parallel_hierarchy, in_parallel_distribution, logical_blob_desc);
   const std::vector<TensorSliceView> out_slices = SubTskGphBuilderUtil::GetTensor2DSliceView(

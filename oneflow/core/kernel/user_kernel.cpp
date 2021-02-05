@@ -118,7 +118,9 @@ class UserKernelInitContext final : public user_op::KernelInitContext {
         device_ctx_(device_ctx),
         base_ctx_(UserKernelBaseContext(kernel_conf, job_desc)),
         sbp_signature_(&(kernel_conf.user_conf().sbp_sig())),
-        parallel_desc_(kernel_conf.user_conf().parallel_conf()) {
+        parallel_desc_(kernel_conf.user_conf().parallel_conf()),
+        parallel_distribution_signature_(&(kernel_conf.user_conf().parallel_distribution_sig())),
+        parallel_hierarchy_(kernel_conf.user_conf().parallel_hierarchy()) {
     for (const auto& pair : kernel_conf.user_conf().bn_in_op2logical_blob_desc()) {
       arg2logical_tensor_desc_.emplace(GenUnRepeatedBn(pair.first),
                                        user_op::TensorDesc(pair.second));
@@ -151,6 +153,19 @@ class UserKernelInitContext final : public user_op::KernelInitContext {
     CHECK(it != bn2sbp.end());
     return it->second;
   }
+
+  const ParallelDistribution& ParallelDistribution4ArgNameAndIndex(const std::string& arg_name,
+                                                                   int32_t index) const override {
+    const auto& bn2parallel_distribution =
+        parallel_distribution_signature_->bn_in_op2parallel_distribution();
+    std::string bn = GenRepeatedBn(arg_name, index);
+    auto it = bn2parallel_distribution.find(bn);
+    CHECK(it != bn2parallel_distribution.end());
+    return it->second;
+  }
+
+  const Shape& ParallelHierarchy() const override { return parallel_hierarchy_; }
+
   const ArgVec& inputs() const override { return base_ctx_.inputs(); }
   const ArgVec& outputs() const override { return base_ctx_.outputs(); }
   const ParallelDesc& parallel_desc() const override { return parallel_desc_; }
@@ -161,6 +176,8 @@ class UserKernelInitContext final : public user_op::KernelInitContext {
   const SbpSignature* sbp_signature_;
   HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc> arg2logical_tensor_desc_;
   ParallelDesc parallel_desc_;
+  const ParallelDistributionSignature* parallel_distribution_signature_;
+  Shape parallel_hierarchy_;
 };
 
 class UserKernelOpInferContext : public user_op::InferContext {

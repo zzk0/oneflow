@@ -84,7 +84,7 @@ void ExecNode::InferBlobDescs(const ParallelContext* parallel_ctx) {
           (*sbp_signature->mutable_bn_in_op2sbp_parallel())[pair.first] =
               pair.second.sbp_parallel(0);
         }
-        LOG(ERROR) << "sbp_signature" << sbp_signature->DebugString();
+        LOG(INFO) << "sbp_signature" << sbp_signature->DebugString();
       }
     }
   }

@@ -25,6 +25,7 @@ limitations under the License.
 #include "oneflow/core/framework/infer_output_blob_time_shape_fn_context.h"
 #include "oneflow/core/framework/infer_parallel_hierarchy_fn_context.h"
 #include "oneflow/core/framework/infer_parallel_distribution_fn_context.h"
+#include "oneflow/core/graph/op_graph.h"
 
 namespace oneflow {
 
@@ -729,7 +730,10 @@ void UserOp::VirtualGenKernelConf(
       LogicalBlobDesc4BnInOp(bn).ToProto(&(*user_conf->mutable_bn_in_op2logical_blob_desc())[bn]); \
     }                                                                                              \
   }
-
+  const OpNode* op_node = Global<OpGraph>::Get()->OpNode4OpName(op_conf().name());
+  *(user_conf->mutable_parallel_distribution_sig()) =
+      *CHECK_JUST(op_node->op().parallel_distribution_signature());
+  op_node->parallel_hierarchy()->ToProto(user_conf->mutable_parallel_hierarchy());
   BLOB_DESCS_TO_PROTO(input, true)
   BLOB_DESCS_TO_PROTO(output, true)
   BLOB_DESCS_TO_PROTO(tmp, false)
