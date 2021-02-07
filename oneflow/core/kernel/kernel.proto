@@ -41,7 +41,7 @@ message ModelIoV2KernelConf {
 message UserKernelConf {
   map<string, BlobDescProto> bn_in_op2blob_desc = 1;
   required ParallelContext parallel_ctx = 2;
-  required SbpSignature sbp_sig = 3;
+  optional SbpSignature sbp_sig = 3;
   map<string, BlobDescProto> bn_in_op2logical_blob_desc = 4;
   required ParallelConf parallel_conf = 5;
   required ParallelDistributionSignature parallel_distribution_sig = 6;

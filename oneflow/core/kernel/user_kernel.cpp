@@ -117,7 +117,7 @@ class UserKernelInitContext final : public user_op::KernelInitContext {
             user_op::UserOpConfWrapper(kernel_conf.op_attribute().op_conf())),
         device_ctx_(device_ctx),
         base_ctx_(UserKernelBaseContext(kernel_conf, job_desc)),
-        sbp_signature_(&(kernel_conf.user_conf().sbp_sig())),
+        //sbp_signature_(&(kernel_conf.user_conf().sbp_sig())),
         parallel_desc_(kernel_conf.user_conf().parallel_conf()),
         parallel_distribution_signature_(&(kernel_conf.user_conf().parallel_distribution_sig())),
         parallel_hierarchy_(kernel_conf.user_conf().parallel_hierarchy()) {

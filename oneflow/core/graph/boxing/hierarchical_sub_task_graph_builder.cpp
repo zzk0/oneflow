@@ -177,18 +177,14 @@ Maybe<SubTskGphBuilderStatus> BuildFirstAxisParallelDistributionChangeSubGph(
 
     status.push_back(*CHECK_JUST(boxing_builder_status));
 
+    sorted_out_tasks->resize(out_parallel_desc.parallel_num());
     CHECK_EQ_OR_RETURN(out_tasks.size(), in_parallel_hierarchy.At(0));
     FOR_RANGE(int64_t, j, 0, in_parallel_hierarchy.At(0)) {
       const int64_t parallel_id = j * out_parallel_hierarchy.At(1) + i;
-      out_nodes.at(j).push_back(out_tasks.at(j));
+      sorted_out_tasks->at(parallel_id) = out_tasks.at(j);
       for (TaskNode* ctrl_node : ctrl_tasks.at(j)) {
         sorted_ctrl_tasks->at(parallel_id).push_back(ctrl_node);
       }
-    }
-  }
-  FOR_RANGE(int64_t, i, 0, in_parallel_hierarchy.At(0)) {
-    FOR_RANGE(int64_t, j, 0, in_parallel_hierarchy.At(1)) {
-      sorted_out_tasks->push_back(out_nodes.at(i).at(j));
     }
   }
   Maybe<SubTskGphBuilderStatus> composed_status = MakeComposedSubTskGphBuilderStatus(status);
