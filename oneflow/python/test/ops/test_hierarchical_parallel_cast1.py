@@ -91,11 +91,115 @@ def _test_train(test_case):
     test_case.assertTrue(np.allclose(y_arr.flatten(), x_arr.flatten()))
 
 
+def _test_gather(test_case, condition):
+    flow.clear_default_session()
+    flow.config.gpu_device_num(4)
+    func_config = flow.FunctionConfig()
+    func_config.default_data_type(flow.float32)
+
+    @flow.global_function("predict", function_config=func_config)
+    def test_fn(
+        x: flow.typing.Numpy.Placeholder((1024, 1024)),
+        indices: flow.typing.Numpy.Placeholder(shape=(64,), dtype=flow.int32),
+    ) -> flow.typing.Numpy:
+        if condition == 0:  # (S0, P)->(S0, B)
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
+            )
+            indices = flow.hierarchical_parallel_cast(
+                indices, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
+            )
+            x = flow.gather(x, indices)
+            x = flow.hierarchical_parallel_cast(
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["S(0)", "B"],
+                name="gather_cast",
+            )
+        elif condition == 1:  # (P, S1)->(B, S1)
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(1)"]
+            )
+            indices = flow.hierarchical_parallel_cast(
+                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+            )
+            x = flow.gather(x, indices)
+            x = flow.hierarchical_parallel_cast(
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["B", "S(1)"],
+                name="gather_cast",
+            )
+        elif condition == 2:  # (P, S0)->(B, S0)
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
+            )
+            indices = flow.hierarchical_parallel_cast(
+                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
+            )
+            x = flow.gather(x, indices)
+            x = flow.hierarchical_parallel_cast(
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["B", "S(0)"],
+                name="gather_cast",
+            )
+        elif condition == 3:  # (S1, P)->(S1, B)
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(0)"]
+            )
+            indices = flow.hierarchical_parallel_cast(
+                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+            )
+            x = flow.gather(x, indices)
+            x = flow.hierarchical_parallel_cast(
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["S(1)", "B"],
+                name="gather_cast",
+            )
+        elif condition == 4:  # (P, B)->(B, B)
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
+            )
+            indices = flow.hierarchical_parallel_cast(
+                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+            )
+            x = flow.gather(x, indices)
+            x = flow.hierarchical_parallel_cast(
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["B", "B"],
+                name="gather_cast",
+            )
+        else:
+            pass
+
+        x = flow.math.relu(x)
+        x = flow.hierarchical_parallel_cast(
+            x, parallel_hierarchy=[4], parallel_distribution=["B"]
+        )
+        return x
+
+    x_arr = np.random.rand(1024, 1024).astype(np.float32)
+    indices = np.random.randint(low=0, high=1024, size=(64,))
+    y_arr = test_fn(x_arr, indices)
+    gather_out = x_arr[indices]
+    print("y_arr", y_arr.shape, y_arr.flatten()[0:10])
+    print("gather_out", gather_out.shape, gather_out.flatten()[0:10])
+    test_case.assertTrue(np.allclose(y_arr.flatten(), gather_out.flatten()))
+
+
 @flow.unittest.skip_unless_1n4d()
 class TestHierarchicalParallelCast(flow.unittest.TestCase):
     def test_hierarchy_parallel_cast(test_case):
-        _test(test_case)
-        #_test_train(test_case)
+        # _test(test_case)
+        # _test_train(test_case)
+        _test_gather(test_case, 0)  # (S0, P)->(S0, B)
+        _test_gather(test_case, 1)  # (P, S1)->(B, S1)
+        _test_gather(test_case, 2)  # (P, S0)->(B, S0)
+        _test_gather(test_case, 3)  # (S1, P)->(S1, B)
+        _test_gather(test_case, 4)  # (P, B)->(B, B)
 
 
 if __name__ == "__main__":

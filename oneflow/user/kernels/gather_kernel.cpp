@@ -57,7 +57,7 @@ class GatherKernel final : public user_op::OpKernel {
         ctx->ParallelDistribution4ArgNameAndIndex("indices", 0);
     const ParallelDistribution& out_parallel_distribution =
         ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
-    LOG(ERROR) << "in_parallel_distribution:\n " << in_parallel_distribution.DebugString();
+    LOG(INFO) << "in_parallel_distribution:\n " << in_parallel_distribution.DebugString();
     const Shape& in_parallel_hierarchy = ctx->ParallelHierarchy();
     const int64_t parallel_id = ctx->parallel_ctx().parallel_id();
     const TensorDesc* in_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("in", 0);
@@ -129,8 +129,8 @@ class GatherKernel final : public user_op::OpKernel {
       CHECK_NOTNULL(gather_state);
       CHECK_EQ(in->shape().At(axis), gather_state->upper() - gather_state->lower());
       offset = gather_state->lower();
-      LOG(ERROR) << "id: " << ctx->parallel_ctx().parallel_id()
-                 << "lower: " << gather_state->lower() << "upper" << gather_state->upper();
+      LOG(INFO) << "id: " << ctx->parallel_ctx().parallel_id() << "lower: " << gather_state->lower()
+                << "upper" << gather_state->upper();
     }
 
     GatherKernelUtilImpl<device_type, T, K>::Forward(
