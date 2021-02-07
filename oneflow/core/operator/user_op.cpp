@@ -726,7 +726,7 @@ void UserOp::VirtualGenKernelConf(
   auto user_conf = kernel_conf->mutable_user_conf();
   *(user_conf->mutable_parallel_ctx()) = *parallel_ctx;
   //*(user_conf->mutable_sbp_sig()) = *sbp_signature;
-  LOG(ERROR)<<"not pass sbp_sig to kernel conf";
+  LOG(ERROR) << "not pass sbp_sig to kernel conf";
 #define BLOB_DESCS_TO_PROTO(prefix, is_arg)                                                        \
   for (const auto& bn : prefix##_bns()) {                                                          \
     const BlobDesc* blob_desc = GetBlobDesc4BnInOp(bn);                                            \
@@ -739,7 +739,7 @@ void UserOp::VirtualGenKernelConf(
   *(user_conf->mutable_parallel_distribution_sig()) =
       *CHECK_JUST(op_node->op().parallel_distribution_signature());
   op_node->parallel_hierarchy()->ToProto(user_conf->mutable_parallel_hierarchy());
- 
+
   BLOB_DESCS_TO_PROTO(input, true)
   BLOB_DESCS_TO_PROTO(output, true)
   BLOB_DESCS_TO_PROTO(tmp, false)
