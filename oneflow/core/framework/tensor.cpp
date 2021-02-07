@@ -16,6 +16,7 @@ limitations under the License.
 #include "oneflow/core/framework/tensor.h"
 #include "oneflow/core/register/blob.h"
 #include "oneflow/core/job/job_build_and_infer_ctx_mgr.h"
+#include "oneflow/core/common/to_string.h"
 
 namespace oneflow {
 
@@ -34,6 +35,32 @@ void Tensor::CheckDataType<half>() const {
 }  // namespace user_op
 
 namespace one {
+
+Device::Device(DeviceType device_type, int64_t device_id)
+    : device_id_(device_id), device_type_(device_type) {
+  CHECK(legal());
+}
+
+bool Device::legal() const {
+  if (device_type() == DeviceType::kCPU && device_id() != 0) { return false; }
+  return true;
+}
+
+std::string Device::device_type_str() const {
+  std::string device_type_str = CHECK_JUST(DeviceTag4DeviceType(device_type()));
+  if (device_type_str == "gpu") { device_type_str = "cuda"; }
+  return device_type_str;
+}
+
+std::string Device::ToString() const {
+  std::stringstream ss;
+  ss << "device(type=";
+  ss << device_type_str();
+  ss << ", index=";
+  ss << device_index_str();
+  ss << ")";
+  return ss.str();
+}
 
 bool Tensor::is_lazy() const { return !EagerExecutionEnabled(); }
 

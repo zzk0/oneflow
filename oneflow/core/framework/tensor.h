@@ -51,12 +51,15 @@ namespace one {
 
 class Device {
  public:
-  Device(DeviceType device_type, int64_t device_id)
-      : device_id_(device_id), device_type_(device_type) {}
+  Device(DeviceType device_type, int64_t device_id);
   DeviceType device_type() const { return device_type_; }
   int64_t device_id() const { return device_id_; }
+  std::string ToString() const;
+  std::string device_type_str() const;
+  std::string device_index_str() const { return std::to_string(device_id()); }
 
  private:
+  bool legal() const;
   int64_t device_id_;
   DeviceType device_type_;
 };

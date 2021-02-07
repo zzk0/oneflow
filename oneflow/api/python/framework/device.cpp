@@ -26,13 +26,15 @@ namespace one {
 
 ONEFLOW_API_PYBIND11_MODULE("", m) {
   py::class_<Device, std::shared_ptr<Device>>(m, "device")
-      .def(py::init([](py::str py_device_str, int device_index) {
-        std::string device_str = py_device_str.cast<std::string>();
-        DeviceType device_type = CHECK_JUST(DeviceType4DeviceTag(device_str));
+      .def(py::init([](int py_device_type, int device_index) {
+        DeviceType device_type = static_cast<DeviceType>(py_device_type);
         return std::make_shared<Device>(device_type, device_index);
-      }));
+      }))
+      .def_property_readonly("type", &Device::device_type_str)
+      .def_property_readonly("index", &Device::device_index_str)
+      .def("__str__", &Device::ToString)
+      .def("__repr__", &Device::ToString);
 }
 
 }  // namespace one
 }  // namespace oneflow
-
