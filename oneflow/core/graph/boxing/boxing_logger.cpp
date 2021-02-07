@@ -20,9 +20,10 @@ namespace oneflow {
 
 namespace {
 
-#define OF_BOXING_LOGGER_CSV_COLNUM_NAME_FIELD                   \
-  "src_op_name,dst_op_name,src_parallel_conf,dst_parallel_conf," \
-  "src_sbp_conf,dst_sbp_conf,lbi,dtype,shape,builder,comment\n"
+#define OF_BOXING_LOGGER_CSV_COLNUM_NAME_FIELD                                               \
+  "src_op_name,dst_op_name,src_parallel_conf,dst_parallel_conf,"                             \
+  "src_parallel_hierarchy_conf,dst_parallel_hierarchy_conf,src_parallel_distribution_conf, " \
+  "dst_parallel_distribution_conf,lbi,dtype,shape,builder,comment\n"
 
 std::string ParallelDescToString(const ParallelDesc& parallel_desc) {
   std::string serialized_parallel_desc;
@@ -62,16 +63,30 @@ std::string MakeBoxingLoggerCsvRow(const SubTskGphBuilderStatus& status,
                                    const std::string& src_op_name, const std::string& dst_op_name,
                                    const ParallelDesc& src_parallel_desc,
                                    const ParallelDesc& dst_parallel_desc,
-                                   const SbpParallel& src_sbp_parallel,
-                                   const SbpParallel& dst_sbp_parallel, const LogicalBlobId& lbi,
-                                   const BlobDesc& logical_blob_desc) {
+                                   const Shape& src_parallel_hierarchy,
+                                   const Shape& dst_parallel_hierarchy,
+                                   const ParallelDistribution& src_parallel_distribution,
+                                   const ParallelDistribution& dst_parallel_distribution,
+                                   const LogicalBlobId& lbi, const BlobDesc& logical_blob_desc) {
   std::string serialized_status;
   serialized_status += src_op_name + ",";
   serialized_status += dst_op_name + ",";
   serialized_status += ParallelDescToString(src_parallel_desc) + ",";
   serialized_status += ParallelDescToString(dst_parallel_desc) + ",";
-  serialized_status += SbpParallelToString(src_sbp_parallel) + ",";
-  serialized_status += SbpParallelToString(dst_sbp_parallel) + ",";
+  serialized_status += ShapeToString(src_parallel_hierarchy) + ",";
+  serialized_status += ShapeToString(dst_parallel_hierarchy) + ",";
+  for (int64_t i = 0; i < src_parallel_hierarchy.NumAxes() - 1; ++i) {
+    serialized_status += SbpParallelToString(src_parallel_distribution.sbp_parallel(i)) + "-";
+  }
+  serialized_status += SbpParallelToString(src_parallel_distribution.sbp_parallel(
+                           src_parallel_hierarchy.NumAxes() - 1))
+                       + ",";
+  for (int64_t i = 0; i < dst_parallel_hierarchy.NumAxes() - 1; ++i) {
+    serialized_status += SbpParallelToString(dst_parallel_distribution.sbp_parallel(i)) + "-";
+  }
+  serialized_status += SbpParallelToString(dst_parallel_distribution.sbp_parallel(
+                           dst_parallel_hierarchy.NumAxes() - 1))
+                       + ",";
   serialized_status += GenLogicalBlobName(lbi) + ",";
   serialized_status += DataType_Name(logical_blob_desc.data_type()) + ",";
   serialized_status += ShapeToString(logical_blob_desc.shape()) + ",";
@@ -97,11 +112,14 @@ CsvBoxingLogger::~CsvBoxingLogger() { log_stream_->Flush(); }
 void CsvBoxingLogger::Log(const SubTskGphBuilderStatus& status, const std::string& src_op_name,
                           const std::string& dst_op_name, const ParallelDesc& src_parallel_desc,
                           const ParallelDesc& dst_parallel_desc,
-                          const SbpParallel& src_sbp_parallel, const SbpParallel& dst_sbp_parallel,
+                          const Shape& src_parallel_hierarchy, const Shape& dst_parallel_hierarchy,
+                          const ParallelDistribution& src_parallel_distribution,
+                          const ParallelDistribution& dst_parallel_distribution,
                           const LogicalBlobId& lbi, const BlobDesc& logical_blob_desc) {
   log_stream_ << MakeBoxingLoggerCsvRow(status, src_op_name, dst_op_name, src_parallel_desc,
-                                        dst_parallel_desc, src_sbp_parallel, dst_sbp_parallel, lbi,
-                                        logical_blob_desc);
+                                        dst_parallel_desc, src_parallel_hierarchy,
+                                        dst_parallel_hierarchy, src_parallel_distribution,
+                                        dst_parallel_distribution, lbi, logical_blob_desc);
 }
 
 }  // namespace oneflow

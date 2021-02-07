@@ -573,9 +573,9 @@ DEFINE_BLD_SUB_TASK_GRAPH_METHOD(BldSubTskGphByBoxing) {
         *dst_parallel_hierarchy, src_parallel_distribution, dst_parallel_distribution,
         *src_logical->out_blob_time_shape()));
     boxing_logger_->Log(*status, src_logical->SoleOp()->op_name(), dst_logical->SoleOp()->op_name(),
-                        *src_parallel_desc, *dst_parallel_desc,
-                        src_parallel_distribution.sbp_parallel(0),
-                        dst_parallel_distribution.sbp_parallel(0), lbi, blob_desc);
+                        *src_parallel_desc, *dst_parallel_desc, *src_parallel_hierarchy,
+                        *dst_parallel_hierarchy, src_parallel_distribution,
+                        dst_parallel_distribution, lbi, blob_desc);
     sub_tsk_gph_builder_ctx_->ConnectAll121(out_nodes, sorted_dst_comp_tasks);
     if (!sorted_ctrl_tasks.empty()) {
       CHECK_EQ(sorted_ctrl_tasks.size(), sorted_dst_comp_tasks.size());
