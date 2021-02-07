@@ -20,7 +20,6 @@ limitations under the License.
 #include "oneflow/core/framework/to_string.h"
 #include "oneflow/core/operator/user_op.h"
 #include <utility>
-#include "oneflow/core/operator/user_op_util.h"
 #include "oneflow/core/framework/infer_output_blob_time_shape_fn_context.h"
 #include "oneflow/core/framework/infer_parallel_hierarchy_fn_context.h"
 #include "oneflow/core/framework/infer_parallel_distribution_fn_context.h"

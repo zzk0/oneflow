@@ -1253,7 +1253,7 @@ std::string oneflow::JobBuildAndInferCtx::GetJobStructureGraphJson(
 Maybe<void> JobBuildAndInferCtx::Rebuild() {
   // clear old state
   lbi2logical_blob_desc_.clear();
-  lbi2sbp_parallel_from_producer_view_.clear();
+  lbi2parallel_distribution_from_producer_view_.clear();
   lbi2parallel_desc_from_producer_view_.clear();
   lbi2disable_boxing_.clear();
   op_name2op_.clear();
@@ -1263,6 +1263,7 @@ Maybe<void> JobBuildAndInferCtx::Rebuild() {
   mirrored_lbi2sub_lbis_.clear();
   mirrored_lbi2parallel_desc_.clear();
   mirrored_lbi2sbp_parallel_.clear();
+  op_name2parallel_hierarchy_.clear();
   op_name2ancestors_need_no_grad_.clear();
   // record op mirror view
   HashMap<std::string, bool> op_name2is_mirrored;
