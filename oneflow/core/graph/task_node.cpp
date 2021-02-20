@@ -68,7 +68,7 @@ std::shared_ptr<RegstDesc> TaskNode::GetSoleConsumedRegst(const std::string& nam
 }
 
 DeviceType TaskNode::device_type() const {
-  return Global<IDMgr>::Get()->GetDeviceTypeFromThrdId(thrd_id_);
+  return StreamId{static_cast<uint32_t>(thrd_id_)}.device_type();
 }
 
 void TaskNode::set_machine_id(int64_t val) {
@@ -320,8 +320,9 @@ void TaskNode::InitProducedRegstMemCase(MemoryCase* mem_case) {
   if (device_type() == DeviceType::kCPU) {
     mem_case->mutable_host_mem();
   } else if (device_type() == DeviceType::kGPU) {
-    mem_case->mutable_device_cuda_mem()->set_device_id(
-        Global<IDMgr>::Get()->GetGpuPhyIdFromThrdId(thrd_id_));
+    StreamId stream_id{static_cast<uint32_t>(thrd_id_)};
+    CHECK_EQ(stream_id.device_type(), DeviceType::kGPU);
+    mem_case->mutable_device_cuda_mem()->set_device_id(stream_id.device_index());
   } else {
     UNIMPLEMENTED();
   }
@@ -392,7 +393,13 @@ void TaskNode::UpdateTaskId() {
 
 int64_t TaskNode::GlobalWorkStreamId() const {
   CHECK_NE(task_id_, -1);
-  return Global<IDMgr>::Get()->GlobalWorkStreamId4TaskId(task_id_);
+  return TaskId{static_cast<uint64_t>(task_id_)}.global_stream_index();
+}
+
+int64_t TaskNode::GpuPhyId() const {
+  StreamId stream_id{static_cast<uint32_t>(thrd_id_)};
+  CHECK_EQ(stream_id.device_type(), DeviceType::kGPU);
+  return stream_id.device_index();
 }
 
 void TaskNode::EraseConsumedRegstsByName(const std::string& name) {
