@@ -24,6 +24,7 @@ from typing import Dict
 import os
 import random
 
+
 def _test_gather(test_case, src, dst):
     flow.clear_default_session()
     flow.config.gpu_device_num(4)
@@ -35,12 +36,14 @@ def _test_gather(test_case, src, dst):
         x: flow.typing.Numpy.Placeholder((1024, 1024)),
         indices: flow.typing.Numpy.Placeholder(shape=(64,), dtype=flow.int32),
     ) -> flow.typing.Numpy:
-        if src == "(S0, S0)": 
+        if src == "(S0, S0)":
             x = flow.hierarchical_parallel_cast(
                 x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
             )
             indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
+                indices,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["S(0)", "S(0)"],
             )
             x = flow.gather(x, indices)
         elif src == "(S0, S1)":
@@ -67,7 +70,7 @@ def _test_gather(test_case, src, dst):
                 indices, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
             )
             x = flow.gather(x, indices)
-        elif src == "(S1, S0)": 
+        elif src == "(S1, S0)":
             x = flow.hierarchical_parallel_cast(
                 x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "B"]
             )
@@ -99,7 +102,7 @@ def _test_gather(test_case, src, dst):
                 indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
             )
             x = flow.gather(x, indices)
-        elif src == "(P, S0)": 
+        elif src == "(P, S0)":
             x = flow.hierarchical_parallel_cast(
                 x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
             )
@@ -131,7 +134,7 @@ def _test_gather(test_case, src, dst):
                 indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
             )
             x = flow.gather(x, indices)
-        elif src == "(B, S0)": 
+        elif src == "(B, S0)":
             x = flow.hierarchical_parallel_cast(
                 x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
             )
@@ -165,7 +168,7 @@ def _test_gather(test_case, src, dst):
             x = flow.gather(x, indices)
         else:
             raise NotImplementedError
-        
+
         if len(dst) == 2:
             x = flow.hierarchical_parallel_cast(
                 x,
@@ -179,9 +182,9 @@ def _test_gather(test_case, src, dst):
                 parallel_hierarchy=[4],
                 parallel_distribution=dst,
                 name="gather_cast",
-            )  
+            )
         else:
-            raise NotImplementedError         
+            raise NotImplementedError
         x = flow.math.relu(x)
         x = flow.hierarchical_parallel_cast(
             x, parallel_hierarchy=[4], parallel_distribution=["B"]
@@ -201,8 +204,38 @@ def _test_gather(test_case, src, dst):
 class TestHierarchicalParallelCast(flow.unittest.TestCase):
     def test_hierarchy_parallel_cast(test_case):
         arg_dict = OrderedDict()
-        arg_dict["src"] = ["(S0, S0)", "(S0, S1)", "(S0, P)", "(S0, B)", "(S1, S0)", "(S1, S1)", "(S1, P)", "(S1, B)", "(P, S0)", "(P, S1)", "(P, P)", "(P, B)", "(B, S0)", "(B, S1)", "(B, P)", "(B, B)"]
-        arg_dict["dst"] = [["S(0)", "S(0)"], ["S(0)", "S(1)"], ["S(0)", "B"], ["S(1)", "S(0)"], ["S(1)", "S(1)"], ["S(1)", "B"], ["B", "S(0)"], ["B", "S(1)"], ["B", "B"], ["S(0)"], ["S(1)"], ["B"]]
+        arg_dict["src"] = [
+            "(S0, S0)",
+            "(S0, S1)",
+            "(S0, P)",
+            "(S0, B)",
+            "(S1, S0)",
+            "(S1, S1)",
+            "(S1, P)",
+            "(S1, B)",
+            "(P, S0)",
+            "(P, S1)",
+            "(P, P)",
+            "(P, B)",
+            "(B, S0)",
+            "(B, S1)",
+            "(B, P)",
+            "(B, B)",
+        ]
+        arg_dict["dst"] = [
+            ["S(0)", "S(0)"],
+            ["S(0)", "S(1)"],
+            ["S(0)", "B"],
+            ["S(1)", "S(0)"],
+            ["S(1)", "S(1)"],
+            ["S(1)", "B"],
+            ["B", "S(0)"],
+            ["B", "S(1)"],
+            ["B", "B"],
+            ["S(0)"],
+            ["S(1)"],
+            ["B"],
+        ]
         for arg in GenArgList(arg_dict):
             print(*arg)
             _test_gather(test_case, *arg)
