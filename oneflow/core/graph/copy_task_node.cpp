@@ -60,9 +60,11 @@ void CopyHdTaskNode::Init(CopyHdOpConf::Type copy_type, int64_t machine_id, int6
   copy_type_ = copy_type;
   set_machine_id(machine_id);
   if (copy_type == CopyHdOpConf::H2D) {
-    set_thrd_id(Global<IDMgr>::Get()->GetGpuH2DThrdId(dev_phy_id));
+    set_thrd_id(IdUtil::GetStreamId(StreamType::kCuda, static_cast<uint32_t>(dev_phy_id),
+                                    StreamIndex::Cuda::kH2D));
   } else if (copy_type == CopyHdOpConf::D2H) {
-    set_thrd_id(Global<IDMgr>::Get()->GetGpuD2HThrdId(dev_phy_id));
+    set_thrd_id(IdUtil::GetStreamId(StreamType::kCuda, static_cast<uint32_t>(dev_phy_id),
+                                    StreamIndex::Cuda::kD2H));
   } else {
     UNIMPLEMENTED();
   }
