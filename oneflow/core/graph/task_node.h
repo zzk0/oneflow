@@ -57,7 +57,7 @@ class TaskNode : public Node<TaskNode, TaskEdge> {
   DeviceType device_type() const;
   virtual const ParallelContext* parallel_ctx() const { return nullptr; }
   int64_t GlobalWorkStreamId() const;
-  int64_t GpuPhyId() const { return Global<IDMgr>::Get()->GetGpuPhyIdFromThrdId(thrd_id_); }
+  int64_t GpuPhyId() const;
   virtual int64_t AreaId4ChainMerge() const { return area_id(); }
 
   // Setters
