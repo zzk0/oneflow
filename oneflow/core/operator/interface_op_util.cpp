@@ -59,11 +59,41 @@ Maybe<void> InterfaceOpUtil::InferOutBlobDesc(const InterfaceBlobConf& blob_conf
   out_blob_desc->set_data_type(blob_conf.data_type());
   out_blob_desc->set_is_dynamic(blob_conf.is_dynamic());
   out_blob_desc->set_is_tensor_list(blob_conf.is_tensor_list());
-  if (blob_conf.split_axis().has_value()) {
-    int64_t split_axis = blob_conf.split_axis().value();
-    BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_ctx->parallel_num());
-    out_blob_desc->mut_shape().Set(split_axis, bs.At(parallel_ctx->parallel_id()).size());
+  // if (blob_conf.split_axis().has_value()) {
+  //  int64_t split_axis = blob_conf.split_axis().value();
+  //  BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_ctx->parallel_num());
+  //  out_blob_desc->mut_shape().Set(split_axis, bs.At(parallel_ctx->parallel_id()).size());
+  //}
+  if (blob_conf.has_parallel_hierarchy()) {
+    const Shape& parallel_hierarchy = Shape(blob_conf.parallel_hierarchy());
+    if (parallel_hierarchy.NumAxes() == 1
+        || (blob_conf.parallel_distribution().sbp_parallel(0)
+            == blob_conf.parallel_distribution().sbp_parallel(1))) {
+      if (blob_conf.parallel_distribution().sbp_parallel(0).has_split_parallel()) {
+        int64_t split_axis =
+            blob_conf.parallel_distribution().sbp_parallel(0).split_parallel().axis();
+        BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_ctx->parallel_num());
+        out_blob_desc->mut_shape().Set(split_axis, bs.At(parallel_ctx->parallel_id()).size());
+      }
+    } else {
+      CHECK_EQ_OR_RETURN(parallel_hierarchy.NumAxes(), 2);
+      int64_t rank_id_0 = parallel_ctx->parallel_id() / parallel_hierarchy.At(1);
+      int64_t rank_id_1 = parallel_ctx->parallel_id() % parallel_hierarchy.At(1);
+      if (blob_conf.parallel_distribution().sbp_parallel(0).has_split_parallel()) {
+        int64_t split_axis =
+            blob_conf.parallel_distribution().sbp_parallel(0).split_parallel().axis();
+        BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_hierarchy.At(0));
+        out_blob_desc->mut_shape().Set(split_axis, bs.At(rank_id_0).size());
+      }
+      if (blob_conf.parallel_distribution().sbp_parallel(1).has_split_parallel()) {
+        int64_t split_axis =
+            blob_conf.parallel_distribution().sbp_parallel(1).split_parallel().axis();
+        BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_hierarchy.At(1));
+        out_blob_desc->mut_shape().Set(split_axis, bs.At(rank_id_1).size());
+      }
+    }
   }
+  LOG(INFO) << "out_blob_desc " << out_blob_desc->shape().ToString();
   return Maybe<void>::Ok();
 }
 
@@ -91,13 +121,14 @@ Maybe<void> InterfaceOpUtil::GetOutputLikeOpSbpSignature(const InterfaceBlobConf
 
 Maybe<void> InterfaceOpUtil::InitBlobConf(InterfaceBlobConf* blob_conf,
                                           const ParallelBlobConf& parallel_blob_conf) {
+  LOG(INFO) << "parallel_blob_conf " << parallel_blob_conf.DebugString();
   BlobDesc blob_desc(parallel_blob_conf.logical_blob_desc_conf());
   blob_desc.shape().ToProto(blob_conf->mutable_shape());
   blob_conf->set_data_type(blob_desc.data_type());
   blob_conf->set_is_dynamic(blob_desc.is_dynamic());
   blob_conf->set_is_tensor_list(blob_desc.is_tensor_list());
   // TODO(liujuncheng): fully support
-  CHECK_EQ_OR_RETURN(parallel_blob_conf.parallel_distribution().sbp_parallel_size(), 1);
+  // CHECK_EQ_OR_RETURN(parallel_blob_conf.parallel_distribution().sbp_parallel_size(), 1);
   const SbpParallel& sbp_parallel = parallel_blob_conf.parallel_distribution().sbp_parallel(0);
   if (sbp_parallel.has_split_parallel()) {
     int64_t axis = sbp_parallel.split_parallel().axis();
@@ -108,6 +139,8 @@ Maybe<void> InterfaceOpUtil::InitBlobConf(InterfaceBlobConf* blob_conf,
     OF_UNIMPLEMENTED();
   }
   *blob_conf->mutable_batch_axis() = parallel_blob_conf.batch_axis();
+  *blob_conf->mutable_parallel_distribution() = parallel_blob_conf.parallel_distribution();
+  *blob_conf->mutable_parallel_hierarchy() = parallel_blob_conf.parallel_hierarchy();
   return Maybe<void>::Ok();
 }
 

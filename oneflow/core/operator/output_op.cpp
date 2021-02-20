@@ -35,6 +35,8 @@ Maybe<void> OutputOp::InferOutBlobDescs(
   } else {
     InterfaceOpUtil::InferOutBlobDesc(op_conf().output_conf().blob_conf(), out_blob_desc,
                                       parallel_ctx);
+    LOG(INFO) << "output op in_blob_desc" << in_blob_desc->shape().DebugStr();
+    LOG(INFO) << "output op out_blob_desc" << out_blob_desc->shape().DebugStr();
     CHECK_OR_RETURN(*out_blob_desc == *in_blob_desc);
   }
   return Maybe<void>::Ok();
@@ -55,6 +57,36 @@ Maybe<void> OutputOp::InferSbpSignature(
     const ParallelDesc& parallel_desc) const {
   InterfaceOpUtil::GetOutputLikeOpSbpSignature(op_conf().output_conf().blob_conf(), input_bns(),
                                                output_bns(), sbp_signature);
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> OutputOp::InferParallelHierarchy(
+    std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
+    const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const {
+  const InterfaceBlobConf& blob_conf = op_conf().output_conf().blob_conf();
+  *parallel_hierarchy = Shape(blob_conf.parallel_hierarchy());
+  LOG(INFO) << "OutputOp op InferParallelHierarchy" << parallel_hierarchy->DebugStr();
+
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> OutputOp::InferParallelDistributionSignature(
+    ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
+    const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+    std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
+        ParallelDistributionInferHint4Ibn,
+    std::function<Maybe<const OptInt64*>(const std::string&)> BatchAxis4BnInOp) {
+  const InterfaceBlobConf& blob_conf = op_conf().output_conf().blob_conf();
+  ParallelDistribution& in_parallel_distribution =
+      (*signature->mutable_bn_in_op2parallel_distribution())["in"];
+  ParallelDistribution& out_parallel_distribution =
+      (*signature->mutable_bn_in_op2parallel_distribution())["out"];
+  in_parallel_distribution = blob_conf.parallel_distribution();
+  out_parallel_distribution = blob_conf.parallel_distribution();
+  LOG(INFO) << "OutputOp op InferParallelDistributionSignature in:\n"
+            << in_parallel_distribution.DebugString() << "\nout:\n"
+            << out_parallel_distribution.DebugString();
+
   return Maybe<void>::Ok();
 }
 

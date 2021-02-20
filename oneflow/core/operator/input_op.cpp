@@ -60,6 +60,47 @@ Maybe<void> InputOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
   return Maybe<void>::Ok();
 }
 
+Maybe<void> InputOp::InferParallelHierarchy(
+    std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
+    const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const {
+  const InterfaceBlobConf& blob_conf = op_conf().input_conf().blob_conf();
+  if (blob_conf.has_parallel_hierarchy()) {
+    *parallel_hierarchy = Shape(blob_conf.parallel_hierarchy());
+  } else {
+    *parallel_hierarchy = Shape({parallel_desc.parallel_num()});
+  }
+  LOG(INFO) << "input op InferParallelHierarchy" << parallel_hierarchy->DebugStr();
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> InputOp::InferParallelDistributionSignature(
+    ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
+    const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+    std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
+        ParallelDistributionInferHint4Ibn,
+    std::function<Maybe<const OptInt64*>(const std::string&)> BatchAxis4BnInOp) {
+  const InterfaceBlobConf& blob_conf = op_conf().input_conf().blob_conf();
+  LOG(INFO) << "InputOp blob_conf" << blob_conf.DebugString();
+  ParallelDistribution& in_parallel_distribution =
+      (*signature->mutable_bn_in_op2parallel_distribution())["tick"];
+  ParallelDistribution& out_parallel_distribution =
+      (*signature->mutable_bn_in_op2parallel_distribution())["out"];
+  if (blob_conf.has_parallel_distribution()) {
+    out_parallel_distribution = blob_conf.parallel_distribution();
+  } else {
+    FOR_RANGE(int64_t, i, 0, parallel_hierarchy.NumAxes()) {
+      out_parallel_distribution.mutable_sbp_parallel()->Add()->mutable_broadcast_parallel();
+    }
+  }
+  FOR_RANGE(int64_t, i, 0, parallel_hierarchy.NumAxes()) {
+    in_parallel_distribution.mutable_sbp_parallel()->Add()->mutable_broadcast_parallel();
+  }
+  LOG(INFO) << "input op InferParallelDistributionSignature in:\n"
+            << in_parallel_distribution.DebugString() << "\nout:\n"
+            << out_parallel_distribution.DebugString();
+  return Maybe<void>::Ok();
+}
+
 Symbol<OperatorConf> InputOp::GetOpConfWithoutOpNameAndLbn() const {
   return SymbolOf(this->op_conf());
 }
