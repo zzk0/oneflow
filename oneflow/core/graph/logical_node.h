@@ -32,6 +32,7 @@ limitations under the License.
 #include "oneflow/core/graph/case_compute_task_node.h"
 #include "oneflow/core/graph/esac_compute_task_node.h"
 #include "oneflow/core/graph/decode_h2d_compute_task_node.h"
+#include "oneflow/core/common/id_util.h"
 
 namespace oneflow {
 
@@ -91,12 +92,12 @@ class LogicalNode : public Node<LogicalNode, LogicalEdge> {
   std::unique_ptr<const Shape> out_blob_time_shape_;
 };
 
-#define BLD_SUB_TSK_GPH_MTHD_ARGS()                                                       \
-  (const LogicalNode* src_logical, const LogicalNode* dst_logical,                        \
-   const std::vector<CompTaskNode*>& sorted_src_comp_tasks,                               \
-   const std::vector<CompTaskNode*>& sorted_dst_comp_tasks,                               \
-   std::function<TaskNode**(CompTaskNode * src, int64_t machine_id, int32_t mem_zone_id)> \
-       MutBufTask,                                                                        \
+using MutBufTaskFn = std::function<TaskNode**(CompTaskNode*, ProcessId, MemZoneId)>;
+
+#define BLD_SUB_TSK_GPH_MTHD_ARGS()                                                  \
+  (const LogicalNode* src_logical, const LogicalNode* dst_logical,                   \
+   const std::vector<CompTaskNode*>& sorted_src_comp_tasks,                          \
+   const std::vector<CompTaskNode*>& sorted_dst_comp_tasks, MutBufTaskFn MutBufTask, \
    std::function<int64_t(const TaskNode*)> AllocateCpuThrdIdEvenly)
 
 class TaskGraph;

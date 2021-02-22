@@ -60,18 +60,13 @@ class TaskGraph final : public Graph<TaskNode, TaskEdge> {
  private:
   void AcyclicTopoForEachNode(std::function<bool(TaskNode* node)> IsAllowedStartNode,
                               const std::function<void(TaskNode* node)>& Handler) const;
+  void BuildTaskPath(CompTaskNode* src, CompTaskNode* dst, MutBufTaskFn MutBufTask,
+                     bool use_buf_task_node);
 
-  void BuildTaskPath(
-      CompTaskNode* src, CompTaskNode* dst,
-      std::function<TaskNode**(CompTaskNode* src, int64_t machine_id, int32_t mem_zone_id)>
-          MutBufTask,
-      bool use_buf_task_node);
-  TaskNode* BuildTaskStep(
-      TaskNode* cur_node, TaskNode* dst,
-      const std::function<TaskNode*(int64_t machine_id, int32_t mem_zone_id)>& GetBufTask,
-      const std::function<TaskNode*(int64_t machine_id, int32_t mem_zone_id, TaskNode*)>&
-          SetBufTask,
-      bool use_buf_task_node);
+  using GetBufTaskFn = std::function<TaskNode*(ProcessId, MemZoneId)>;
+  using SetBufTaskFn = std::function<TaskNode*(ProcessId, MemZoneId, TaskNode*)>;
+  TaskNode* BuildTaskStep(TaskNode* src, TaskNode* dst, const GetBufTaskFn& GetBufTask,
+                          const SetBufTaskFn& SetBufTask, bool use_buf_task_node);
   TaskNode* TryAddCopyH2DTaskTo(TaskNode*);
   TaskNode* AddCopyD2HTaskFrom(TaskNode*);
   TaskNode* AddCopyCommNetTaskBetween(TaskNode* src, TaskNode* dst);

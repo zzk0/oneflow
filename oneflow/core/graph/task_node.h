@@ -21,6 +21,7 @@ limitations under the License.
 #include "oneflow/core/job/task.pb.h"
 #include "oneflow/core/operator/operator.h"
 #include "oneflow/core/common/auto_registration_factory.h"
+#include "oneflow/core/common/id_util.h"
 
 namespace oneflow {
 
@@ -90,7 +91,7 @@ class TaskNode : public Node<TaskNode, TaskEdge> {
   virtual void ToProto(TaskProto*);
   virtual bool IsIndependent() const { return false; }
   void BindEdgeWithProducedRegst(TaskEdge*, const std::string& name);
-  virtual int64_t MemZoneId121() const;
+  virtual MemZoneId MemZoneId121() const;
   void BuildCtrlRegstDescIfNeed(TaskNode* dst_node);
   RegstDesc* BuildCtrlRegstDesc(TaskNode* dst_node);
   RegstDesc* BuildCtrlRegstDesc(TaskNode* dst_node, std::string* name);
@@ -193,16 +194,5 @@ struct TickTockTaskType final {};
                          ([] { return new TickTockTaskType; }))
 
 }  // namespace oneflow
-
-namespace std {
-
-template<>
-struct hash<oneflow::TaskType> {
-  std::size_t operator()(const oneflow::TaskType& task_type) const {
-    return std::hash<uint32_t>{}(static_cast<uint32_t>(task_type));
-  }
-};
-
-}  // namespace std
 
 #endif  // ONEFLOW_CORE_GRAPH_TASK_NODE_H_
