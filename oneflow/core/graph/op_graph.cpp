@@ -99,19 +99,19 @@ Maybe<void> ConcatBlobDesc(const ParallelDesc& blob_parallel_desc, const Shape& 
       FOR_RANGE(int64_t, i, 1, same_blob_descs.size()) {
         CHECK_OR_RETURN(*same_blob_descs.at(i) == *same_blob_descs.at(0));
       }
-      concatenated_blob_desc->CopyAllFrom(*same_blob_descs.at(0));
+      concatenated_blob_desc->CopyFrom(*same_blob_descs.at(0));
     } else {
       FOR_RANGE(int64_t, i, 1, blob_descs.size()) {
         CHECK_OR_RETURN(*blob_descs.at(i) == *blob_descs.at(0));
       }
       // select first BlobDesc
-      concatenated_blob_desc->CopyAllFrom(*blob_descs.at(0));
+      concatenated_blob_desc->CopyFrom(*blob_descs.at(0));
     }
   } else {
     for (int64_t i = 1; i < blob_descs.size(); ++i) {
       CHECK_OR_RETURN(*blob_descs.at(i) == *blob_descs.front());
     }
-    concatenated_blob_desc->CopyAllFrom(*blob_descs.front());
+    concatenated_blob_desc->CopyFrom(*blob_descs.front());
     for (int64_t i = 0; i < parallel_distribution.sbp_parallel_size(); ++i) {
       const SbpParallel& sbp_parallel = parallel_distribution.sbp_parallel(i);
       if (sbp_parallel.has_split_parallel()) {
@@ -294,7 +294,7 @@ const Shape* OpNode::GetInputOutputFastestTimeShape() const {
   return in->elem_cnt() > out->elem_cnt() ? in : out;
 }
 
-//void OpNode::ForEachSplitOrBroadcastBlobDesc(
+// void OpNode::ForEachSplitOrBroadcastBlobDesc(
 //    const BlobDesc& blob_desc, const SbpParallel& sbp_parallel,
 //    const std::function<void(const BlobDesc&)>& Handler) const {
 //  if (sbp_parallel.has_split_parallel()) {
@@ -312,11 +312,12 @@ const Shape* OpNode::GetInputOutputFastestTimeShape() const {
 //  } else {
 //    CHECK(sbp_parallel.has_broadcast_parallel() || sbp_parallel.has_partial_sum_parallel());
 //    // broadcast BlobDesc
-//    FOR_RANGE(int64_t, axis_parallel_id, 0, parallel_desc().parallel_num()) { Handler(blob_desc); }
+//    FOR_RANGE(int64_t, axis_parallel_id, 0, parallel_desc().parallel_num()) { Handler(blob_desc);
+//    }
 //  }
 //}
 //
-//void OpNode::ConcatBlobDesc(const ParallelDesc& blob_parallel_desc,
+// void OpNode::ConcatBlobDesc(const ParallelDesc& blob_parallel_desc,
 //                            const std::vector<std::shared_ptr<BlobDesc>>& blob_descs,
 //                            const SbpParallel& sbp_parallel,
 //                            BlobDesc* concatenated_blob_desc) const {
@@ -349,7 +350,7 @@ const Shape* OpNode::GetInputOutputFastestTimeShape() const {
 //  }
 //}
 
-void OpNode::SplitLogicalInputBlobDesc() {
+Maybe<void> OpNode::SplitLogicalInputBlobDesc() {
   for (const std::string& bn : op().input_bns()) {
     const LogicalBlobId& lbi = op().BnInOp2Lbi(bn);
     const BlobDesc& logical_blob_desc = SrcNode4Ibn(bn).LogicalBlobDesc4Lbi(lbi);
