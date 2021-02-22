@@ -96,7 +96,7 @@ void SetCtrlInOpName4VariableOp(const OpGraph& op_graph, JobBuilder* job_builder
 void JobCompleter::Complete(Job* job) const {
   JobPassCtx job_pass_ctx(GlobalJobDesc());
   JobPass4Name("DumpTimeShapeAndBlobParallelConfPass")(job, &job_pass_ctx);
-  //WithOpGraphAndMutJobBuilder(job, &GroupBoxingByDstParallel);
+  // WithOpGraphAndMutJobBuilder(job, &GroupBoxingByDstParallel);
   WithOpGraphAndMutJobBuilder(job, &SetCtrlInOpName4VariableOp);
   // complete tick ops
   WithOpGraphAndMutJobBuilder(job, &AutoPrependTick);
