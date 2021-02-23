@@ -47,16 +47,8 @@ class ClientCall final {
 
 }  // namespace
 
-RpcClient::~RpcClient() {
-  {
-    std::unique_lock<std::mutex> lck(need_heartbeat_thread_stop_mtx_);
-    need_heartbeat_thread_stop_ = true;
-  }
-  heartbeat_thread_.join();
-}
-
 void RpcClient::Barrier(const std::string& barrier_name) {
-  // TODO(hanbinbin): depend world_size of Global<CtrlConf>
+  // TODO(hanbinbin): depend world_size of Global<ProcessCtx>
   Barrier(barrier_name, Global<EnvDesc>::Get()->TotalMachineNum());
 }
 
@@ -210,12 +202,12 @@ void RpcClient::LoadServer(const std::string& server_addr, CtrlService::Stub* st
 }
 
 CtrlService::Stub* RpcClient::GetThisStub() {
-  // TODO(hanbinbin): depend rank_id of Global<CtrlConf>
+  // TODO(hanbinbin): depend rank_id of Global<ProcessCtx>
   return stubs_[Global<MachineCtx>::Get()->this_machine_id()].get();
 }
 
 CtrlService::Stub* RpcClient::GetResponsibleStub(const std::string& key) {
-  // TODO(hanbinbin): depend world_size of Global<CtrlConf>
+  // TODO(hanbinbin): depend world_size of Global<ProcessCtx>
   int64_t machine_id = (std::hash<std::string>{}(key)) % Global<EnvDesc>::Get()->TotalMachineNum();
   return stubs_[machine_id].get();
 }
