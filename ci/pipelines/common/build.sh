@@ -21,7 +21,7 @@ cd ${tmp_dir}
 docker run --rm -v $PWD:/p -w $PWD:/p busybox rm -rf /p/wheelhouse
 python3 ${src_dir}/docker/package/manylinux/build_wheel.py \
     --cuda_version=${cuda_version} \
-    --python_version=3.5,3.6,3.7,3.8 \
+    --python_version=3.6 \
     --use_tuna --use_system_proxy --use_aliyun_mirror \
     --wheel_house_dir=${wheelhouse_dir} \
     --oneflow_src_dir=${src_dir} $extr_args
