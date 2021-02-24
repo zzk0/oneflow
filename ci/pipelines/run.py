@@ -59,26 +59,27 @@ if __name__ == "__main__":
     cmd = "export hello=ci && echo hello-${hello} && sleep 2 && date"
     thid_dir = pathlib.Path(__file__).parent.absolute()
 
-    cuda = pipe(
+    cuda_build = pipe(
         [
             (
                 "cuda:build",
                 f"export ONEFLOW_PKG_TYPE=cuda && bash {thid_dir}/common/build.sh",
             ),
             ("cuda:upload", cmd),
-            ("cuda:test", cmd),
         ],
         args.dry,
     )
-    xla_build = run_command("xla:build", "ls", args.dry)
-    stage1 = asyncio.gather(cuda, xla_build)
+    check_result(loop.run_until_complete(cuda_build))
+
+    cuda_test = run_command("cuda:test", cmd, args.dry)
+    xla_build = run_command("xla:build", f"export ONEFLOW_PKG_TYPE=xla && bash {thid_dir}/common/build.sh", args.dry)
+    check_result(loop.run_until_complete(asyncio.gather(cuda_test, xla_build)))
+
     xla_test = pipe([("xla:test", cmd),])
-    cpu = pipe([("cpu:build", cmd), ("cpu:test", cmd),])
+    cpu_build = run_command("cpu:build", "ls", args.dry)
 
-    result = loop.run_until_complete(stage1)
-    check_result(result)
+    check_result(loop.run_until_complete(asyncio.gather(xla_test, cpu_build)))
 
-    stage2 = asyncio.gather(xla_test, cpu)
-    result = loop.run_until_complete(stage2)
-    check_result(result)
+    cpu_test = pipe([("cpu:test", cmd),])
+    check_result(loop.run_until_complete(cpu_test))
     loop.close()

@@ -5,13 +5,13 @@ export wheelhouse_dir=$ci_tmp_dir/wheelhouse
 export src_dir=${ONEFLOW_SRC_DIR:-"$PWD"}
 
 cuda_version=10.2
-extr_args="-DFOR_CI=ON"
-if [[ ${ONEFLOW_PKG_TYPE} -eq xla ]]
+extr_args="--extra_oneflow_cmake_args \"-DFOR_CI=ON\""
+if [ ${pkg_type} == "xla" ]
 then
     extr_args="${extr_args} --xla"
     cuda_version="10.1"
 fi
-if [[ ${ONEFLOW_PKG_TYPE} -eq cpu ]]
+if [ ${pkg_type} == "cpu" ]
 then
     extr_args="${extr_args} --cpu"
 fi

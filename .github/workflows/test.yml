@@ -45,22 +45,10 @@ jobs:
     runs-on: [self-hosted, linux, gpu]
     if: github.event.pull_request.draft == false && github.base_ref == 'master' && contains(github.event.pull_request.requested_reviewers.*.login, 'oneflow-ci-bot')
     steps:
-
-# CUDA
-    - name: (CUDA) Set environment variables
-      run: |
-        echo "ci_tmp_dir=$HOME/ci-tmp" >> $GITHUB_ENV
-        echo "wheelhouse_dir=$HOME/ci-tmp/wheelhouse" >> $GITHUB_ENV
-        echo "bin_dir=$HOME/ci-tmp/manylinux2014-build-cache/10.2/build-oneflow/bin" >> $GITHUB_ENV
     - name: Fix permissions
       run: |
         docker run --rm -v $PWD:/p -w /p busybox chmod -R o+w .
     - uses: actions/checkout@v2
-    - name: (CUDA) Build OneFlow
-      uses: ./.github/actions/whl
-      with:
-        tmp_dir: ${ci_tmp_dir}
-        extra_flags: --extra_oneflow_cmake_args \"-DFOR_CI=ON\"
     - name: Upload wheel
       uses: ./.github/actions/upload_oss
       with:
