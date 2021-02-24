@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 
 
 def split_and_print(prefix, text):
@@ -19,7 +20,10 @@ async def handle_stream(stream, cb):
             break
 
 
-async def run_command(cmd=None, name=None):
+async def run_command(cmd=None, name=None, dry=False):
+    if dry:
+        print(f"[dry] {cmd}")
+        return
     process = await asyncio.create_subprocess_shell(
         cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )
@@ -31,8 +35,15 @@ async def run_command(cmd=None, name=None):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry", action="store_true", required=False, default=False)
+    args = parser.parse_args()
     loop = asyncio.get_event_loop()
     cmd = " ".join(["echo hello && sleep 2 && date",])
-    tasks = [run_command(cmd, "A"), run_command(cmd, "B"), run_command(cmd, "C")]
+    tasks = [
+        run_command(cmd, "A", args.dry),
+        run_command(cmd, "B", args.dry),
+        run_command(cmd, "C", args.dry),
+    ]
     loop.run_until_complete(asyncio.gather(*tasks))
     loop.close()
