@@ -17,6 +17,7 @@ then
 fi
 mkdir -p ${tmp_dir}
 cd ${tmp_dir}
+
 docker run --rm -v $PWD:/p -w $PWD:/p busybox rm -rf /p/wheelhouse
 python3 ${src_dir}/docker/package/manylinux/build_wheel.py \
     --cuda_version=${cuda_version} \
