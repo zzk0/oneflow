@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+import pathlib
 
 
 def split_and_print(prefix, text):
@@ -39,11 +40,17 @@ if __name__ == "__main__":
     parser.add_argument("--dry", action="store_true", required=False, default=False)
     args = parser.parse_args()
     loop = asyncio.get_event_loop()
-    cmd = " ".join(["echo hello && sleep 2 && date",])
-    tasks = [
-        run_command(cmd, "A", args.dry),
-        run_command(cmd, "B", args.dry),
-        run_command(cmd, "C", args.dry),
+    cmd = "export hello=he && echo 1${hello} && sleep 2 && date"
+    thid_dir = pathlib.Path(__file__).parent.absolute()
+
+    def run(name, cmd):
+        return run_command(cmd, name, args.dry)
+
+    stage1 = [
+        run("A", f"export ONEFLOW_PKG_TYPE=cuda && bash {thid_dir}/common/build.sh"),
+        run("B", cmd),
+        run("C", cmd),
     ]
-    loop.run_until_complete(asyncio.gather(*tasks))
+    result = loop.run_until_complete(asyncio.gather(*stage1))
+    assert sum(result) == 0, "some tasks failed, please examine the log"
     loop.close()
