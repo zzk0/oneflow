@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "oneflow/core/job_rewriter/job_pass.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 
@@ -35,8 +36,11 @@ bool HasJobPass(const std::string& pass_name) {
 }
 
 const JobPass& JobPass4Name(const std::string& pass_name) {
+  OF_PROFILER_RANGE_PUSH(pass_name);
   const auto& iter = PassName2JobPass()->find(pass_name);
   CHECK(iter != PassName2JobPass()->end());
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_NAME_CATEGORY(9527, pass_name);
   return *iter->second;
 }
 

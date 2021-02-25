@@ -30,7 +30,7 @@ void RangePush(const std::string& name);
 
 void RangePop();
 
-class RangeGuardCtx;
+void NameCategory(const int category_id, const std::string& name);
 
 class RangeGuard final {
  public:
@@ -39,7 +39,8 @@ class RangeGuard final {
   ~RangeGuard();
 
  private:
-  std::shared_ptr<RangeGuardCtx> ctx_;
+   struct Impl;
+   std::unique_ptr<Impl> impl_;
 };
 
 #ifdef OF_ENABLE_PROFILER
@@ -47,6 +48,7 @@ class RangeGuard final {
 #define OF_PROFILER_ONLY_CODE(...) __VA_ARGS__
 #define OF_PROFILER_RANGE_PUSH(name) ::oneflow::profiler::RangePush(name)
 #define OF_PROFILER_RANGE_POP() ::oneflow::profiler::RangePop()
+#define OF_PROFILER_NAME_CATEGORY(id, name) ::oneflow::profiler::NameCategory(id, name)
 #define OF_PROFILER_RANGE_GUARD(name) \
   ::oneflow::profiler::RangeGuard OF_PP_CAT(_of_profiler_range_guard_, __COUNTER__)(name)
 #else
@@ -54,6 +56,7 @@ class RangeGuard final {
 #define OF_PROFILER_RANGE_PUSH(name)
 #define OF_PROFILER_RANGE_POP()
 #define OF_PROFILER_RANGE_GUARD(name)
+#define OF_PROFILER_NAME_CATEGORY(id, name)
 #define OF_PROFILER_NAME_THIS_HOST_THREAD(name)
 #endif
 
