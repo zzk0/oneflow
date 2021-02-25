@@ -45,8 +45,7 @@ class OutputOp final : public Operator {
       ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
       const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-          ParallelDistributionInferHint4Ibn,
-      std::function<Maybe<const OptInt64*>(const std::string&)> BatchAxis4BnInOp) override;
+          ParallelDistributionInferHint4Ibn) override;
 };
 
 }  // namespace oneflow

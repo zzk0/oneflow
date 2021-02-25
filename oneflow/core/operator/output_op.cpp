@@ -66,8 +66,7 @@ Maybe<void> OutputOp::InferParallelDistributionSignature(
     ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
     const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-        ParallelDistributionInferHint4Ibn,
-    std::function<Maybe<const OptInt64*>(const std::string&)> BatchAxis4BnInOp) {
+        ParallelDistributionInferHint4Ibn) {
   const InterfaceBlobConf& blob_conf = op_conf().output_conf().blob_conf();
   ParallelDistribution& in_parallel_distribution =
       (*signature->mutable_bn_in_op2parallel_distribution())["in"];
