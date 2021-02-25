@@ -144,7 +144,8 @@ message QatConfig {
   optional bool per_channel_weight_quantization = 1 [default = false];
   optional bool symmetric = 2 [default = true];
   optional float moving_min_max_momentum = 3 [default = 0.95];
-  optional float moving_min_max_stop_update_after_iters = 4;
+  optional int64 moving_min_max_stop_update_after_iters = 4;
+  optional string target_backend = 5 [default = ""];
 }
 
 message IndexedSlicesOptimizerConf {
@@ -157,7 +158,6 @@ message ParallelBlobConf {
   required ParallelConf parallel_conf = 2;
   required ShapeProto parallel_hierarchy = 3;
   required ParallelDistribution parallel_distribution = 4;
-  required OptInt64 batch_axis = 5;
 }
 
 message JobInputDef {

@@ -26,12 +26,10 @@ class ParallelDistributionInferHint final {
  public:
   ParallelDistributionInferHint(const ParallelDesc* parallel_desc,
                                 const BlobDesc* logical_blob_desc,
-                                const ParallelDistribution* parallel_distribution,
-                                const OptInt64* batch_axis)
+                                const ParallelDistribution* parallel_distribution)
       : parallel_desc_(parallel_desc),
         logical_blob_desc_(logical_blob_desc),
-        parallel_distribution_(parallel_distribution),
-        batch_axis_(batch_axis) {}
+        parallel_distribution_(parallel_distribution) {}
   ParallelDistributionInferHint(const ParallelDistributionInferHint&) = default;
   ~ParallelDistributionInferHint() = default;
 
@@ -39,13 +37,11 @@ class ParallelDistributionInferHint final {
   const ParallelDesc& parallel_desc() const { return *parallel_desc_; }
   const BlobDesc& logical_blob_desc() const { return *logical_blob_desc_; }
   const ParallelDistribution& parallel_distribution() const { return *parallel_distribution_; }
-  const OptInt64& batch_axis() const { return *batch_axis_; }
 
  private:
   const ParallelDesc* parallel_desc_;
   const BlobDesc* logical_blob_desc_;
   const ParallelDistribution* parallel_distribution_;
-  const OptInt64* batch_axis_;
 };
 
 }  // namespace oneflow

@@ -254,7 +254,6 @@ REGISTER_USER_OP("sgd_update")
     .Attr<float>("l2", 0.0)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferSGDUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetInferParallelHierarchyFn([](user_op::InferParallelHierarchyFnContext* ctx) -> Maybe<void> {
       const Shape& parallel_hierarchy = ctx->ParallelHierarchy4InputArgNameAndIndex("model", 0);
       CHECK_EQ_OR_RETURN(parallel_hierarchy.elem_cnt(), ctx->parallel_num());
@@ -317,7 +316,6 @@ REGISTER_USER_OP("indexed_slices_sgd_update")
     .Input("learning_rate")
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferIndexedSlicesSGDUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc& model = ctx->LogicalTensorDesc4InputArgNameAndIndex("model", 0);
       const user_op::TensorDesc& model_diff_indices =
@@ -357,7 +355,6 @@ REGISTER_USER_OP("momentum_update")
     .Attr<float>("beta", 0.9)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferMomentumUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc& model = ctx->LogicalTensorDesc4InputArgNameAndIndex("model", 0);
       FOR_RANGE(int64_t, axis, 0, model.shape().NumAxes()) {
@@ -385,7 +382,6 @@ REGISTER_USER_OP("indexed_slices_momentum_update")
     .Attr<float>("beta", 0.9)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferIndexedSlicesMomentumUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc& model = ctx->LogicalTensorDesc4InputArgNameAndIndex("model", 0);
       const user_op::TensorDesc& model_diff_indices =
@@ -431,7 +427,6 @@ REGISTER_USER_OP("adam_update")
     .Attr<float>("epsilon", 1e-8)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferAdamUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc& model = ctx->LogicalTensorDesc4InputArgNameAndIndex("model", 0);
       FOR_RANGE(int64_t, axis, 0, model.shape().NumAxes()) {
@@ -459,7 +454,6 @@ REGISTER_USER_OP("indexed_slices_adam_update")
     .Attr<float>("epsilon", 1e-8)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferIndexedSlicesAdamUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc& model = ctx->LogicalTensorDesc4InputArgNameAndIndex("model", 0);
       const user_op::TensorDesc& model_diff_indices =
@@ -506,7 +500,6 @@ REGISTER_USER_OP("lamb_update")
     .Attr<float>("l2", 0.0)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferLambUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     // every bn has sbp broadcast signature
     .SetInputArgModifyFn(LambInputArgModifyFn);
 
@@ -520,11 +513,8 @@ REGISTER_USER_OP("adam_bias_correction_learning_rate")
       *ctx->TensorDesc4ArgNameAndIndex("out", 0) =
           *ctx->TensorDesc4ArgNameAndIndex("learning_rate", 0);
       return Maybe<void>::Ok();
-    })
-    .SetBatchAxisInferFn([](user_op::BatchAxisContext* ctx) -> Maybe<void> {
-      ctx->BatchAxis4ArgNameAndIndex("out", 0)->clear_value();
-      return Maybe<void>::Ok();
     });
+
 // every bn has sbp broadcast signature
 
 REGISTER_USER_OP("rmsprop_update")
@@ -543,7 +533,6 @@ REGISTER_USER_OP("rmsprop_update")
     .Attr<float>("decay_rate", 0.99)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferRmsPropUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc& model = ctx->LogicalTensorDesc4InputArgNameAndIndex("model", 0);
       bool centered = ctx->Attr<bool>("centered");
@@ -592,7 +581,6 @@ REGISTER_USER_OP("lars_update")
     .Attr<float>("lars_coefficient", 1e-4)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferLarsUpdateTensorDesc)
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetGetSbpFn([](user_op::SbpContext* ctx) -> Maybe<void> {
       const user_op::TensorDesc& model = ctx->LogicalTensorDesc4InputArgNameAndIndex("model", 0);
       FOR_RANGE(int64_t, axis, 0, model.shape().NumAxes()) {

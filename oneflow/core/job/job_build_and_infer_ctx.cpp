@@ -220,9 +220,6 @@ Maybe<void> JobBuildAndInferCtx::InferMirroredSignature(Operator* op,
 Maybe<void> JobBuildAndInferCtx::InferOpOutParallelDistribution(Operator* op,
                                                                 const SbpSignature& sbp_sig_conf,
                                                                 const ParallelDesc& parallel_desc) {
-  const auto& BatchAxis4BnInOp = [&](const std::string& bn_in_op) -> Maybe<const OptInt64*> {
-    return op->BatchAxis4BnInOp(bn_in_op);
-  };
   HashMap<std::string, ParallelDistributionInferHint> ibn2parallel_distribution_infer_hint;
   for (const std::string& ibn : op->input_bns()) {
     const LogicalBlobId& lbi = op->BnInOp2Lbi(ibn);
@@ -239,10 +236,8 @@ Maybe<void> JobBuildAndInferCtx::InferOpOutParallelDistribution(Operator* op,
         << " consumed op_name: " << lbi.op_name() << " blob_name: " << lbi.blob_name()
         << " not infer parallel distribution";
     const ParallelDistribution* parallel_distribution = &parallel_distribution_it->second;
-    const OptInt64* batch_axis = JUST(BatchAxis4BnInOp(ibn));
     ibn2parallel_distribution_infer_hint.emplace(
-        ibn,
-        ParallelDistributionInferHint(pd, logical_blob_desc, parallel_distribution, batch_axis));
+        ibn, ParallelDistributionInferHint(pd, logical_blob_desc, parallel_distribution));
   }
 
   const auto ParallelDistributionInferHint4Ibn =
@@ -250,9 +245,9 @@ Maybe<void> JobBuildAndInferCtx::InferOpOutParallelDistribution(Operator* op,
     return &ibn2parallel_distribution_infer_hint.at(bn);
   };
 
-  JUST(op->InferParallelDistributionSignatureIf(
-      sbp_sig_conf, parallel_desc, op_name2parallel_hierarchy_.at(op->op_name()),
-      ParallelDistributionInferHint4Ibn, BatchAxis4BnInOp));
+  JUST(op->InferParallelDistributionSignatureIf(sbp_sig_conf, parallel_desc,
+                                                op_name2parallel_hierarchy_.at(op->op_name()),
+                                                ParallelDistributionInferHint4Ibn));
 
   const auto& bn2parallel_distribution =
       JUST(op->parallel_distribution_signature())->bn_in_op2parallel_distribution();
@@ -587,12 +582,6 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferOp(const OperatorConf& op_con
   op->InferParallelHierarchyIf(GetParallelHierarchy4Ibn, ParallelDesc(*parallel_conf));
   CHECK(op_name2parallel_hierarchy_.emplace(op->op_name(), *CHECK_JUST(op->parallel_hierarchy()))
             .second);
-  // infer batch_axis
-  const auto& BatchAxis4Ibn = [&](const std::string& ibn) -> Maybe<const OptInt64> {
-    const LogicalBlobId& lbi = op->BnInOp2Lbi(ibn);
-    const auto& producer_op = *JUST(Op4OpName(lbi.op_name()));
-    return producer_op.GetBatchAxis4Obn(*JUST(producer_op.obn4lbi(lbi)));
-  };
   auto GetBlobDesc4BnInOp = [&](const std::string& bn) -> BlobDesc* {
     const LogicalBlobId& lbi = op->BnInOp2Lbi(bn);
     if (lbi2logical_blob_desc_.find(lbi) != lbi2logical_blob_desc_.end()) {
@@ -601,8 +590,6 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferOp(const OperatorConf& op_con
     return nullptr;
   };
   JUST(op->FillLogicalInBlobDesc(GetBlobDesc4BnInOp));
-  JUST(op->FillInBatchAxis(BatchAxis4Ibn));
-  JUST(op->InferBatchAxisIf());
 
   // infer mirrored signature
   JUST(InferMirroredSignature(op, is_mirrored_parallel_view, parallel_desc));
@@ -683,13 +670,6 @@ Maybe<bool> JobBuildAndInferCtx::DisableBoxing(const std::string& lbn) const {
   const auto& iter = lbi2disable_boxing_.find(lbi);
   CHECK_OR_RETURN(iter != lbi2disable_boxing_.end());
   return iter->second;
-}
-
-Maybe<OptInt64> JobBuildAndInferCtx::GetBatchAxis(const std::string& lbn) const {
-  JUST(CheckLbnValidAndExist(lbn));
-  const auto& lbi = GenLogicalBlobId(lbn);
-  const auto& op = *JUST(Op4OpName(lbi.op_name()));
-  return *JUST(op.BatchAxis4BnInOp(*JUST(op.obn4lbi(lbi))));
 }
 
 Maybe<Operator*> JobBuildAndInferCtx::Op4OpName(const std::string& op_name) const {
@@ -777,14 +757,6 @@ Maybe<bool> JobBuildAndInferCtx::MirroredBlobIsDynamic(const std::string& lbn_wi
 Maybe<bool> JobBuildAndInferCtx::MirroredBlobIsTensorList(const std::string& lbn_with_hint) const {
   const auto& lbi = *JUST(MirroredBlobGetSubLbi(lbn_with_hint, 0));
   return lbi2logical_blob_desc_.at(lbi)->is_tensor_list();
-}
-
-Maybe<OptInt64> JobBuildAndInferCtx::MirroredBlobGetBatchAxis(
-    const std::string& lbn_with_hint) const {
-  CHECK_OR_RETURN(IsMirroredBlob(lbn_with_hint));
-  auto ret = std::make_shared<OptInt64>();
-  ret->set_value(0);
-  return ret;
 }
 
 Maybe<OptInt64> JobBuildAndInferCtx::MirroredBlobGetSplitAxisFromProducerView(
@@ -1302,7 +1274,6 @@ Maybe<void> JobBuildAndInferCtx::Rebuild() {
   });
   // updata job_helper
   op_graph.DumpOpTimeShape(job_);
-  op_graph.DumpBatchAxisLbi(job_);
   op_graph.DumpLogicalBlobDesc(job_);
   op_graph.DumpSbpSignature(job_);
   return Maybe<void>::Ok();
