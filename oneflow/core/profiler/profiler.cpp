@@ -63,12 +63,6 @@ void RangePop() {
 #endif  // OF_ENABLE_PROFILER
 }
 
-void NameCategory(const int category_id, const std::string& name){
-#ifdef OF_ENABLE_PROFILER
-  nvtxNameCategory(category_id, name.c_str());
-#endif  // OF_ENABLE_PROFILER
-}
-
 #ifdef OF_ENABLE_PROFILER
 struct RangeGuard::Impl {
   nvtxRangeId_t range_id;

@@ -40,7 +40,6 @@ const JobPass& JobPass4Name(const std::string& pass_name) {
   const auto& iter = PassName2JobPass()->find(pass_name);
   CHECK(iter != PassName2JobPass()->end());
   OF_PROFILER_RANGE_POP();
-  OF_PROFILER_NAME_CATEGORY(9527, pass_name);
   return *iter->second;
 }
 
