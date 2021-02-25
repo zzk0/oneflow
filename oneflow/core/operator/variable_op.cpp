@@ -65,12 +65,6 @@ Maybe<void> VariableOp::InferOutBlobDescs(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> VariableOp::InferBatchAxis(
-    std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const {
-  BatchAxis4BnInOp("out")->clear_value();
-  return Maybe<void>::Ok();
-}
-
 Maybe<void> VariableOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
   const auto& opt_split_axis = JUST(GetSplitAxis(op_conf().variable_conf()));
   SbpSignatureBuilder sbp_sig_builder;
@@ -116,8 +110,7 @@ Maybe<void> VariableOp::InferParallelDistributionSignature(
     ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
     const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-        ParallelDistributionInferHint4Ibn,
-    std::function<Maybe<const OptInt64*>(const std::string&)> BatchAxis4BnInOp) {
+        ParallelDistributionInferHint4Ibn) {
   const VariableOpConf& conf = this->op_conf().variable_conf();
   CHECK_EQ_OR_RETURN(conf.parallel_distribution_size(), parallel_hierarchy.NumAxes());
   ParallelDistribution& out_parallel_distribution =

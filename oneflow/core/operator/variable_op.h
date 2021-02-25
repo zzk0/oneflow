@@ -37,8 +37,6 @@ class VariableOp final : public Operator {
       const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
       std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
       const ParallelDesc& parallel_desc) const override;
-  Maybe<void> InferBatchAxis(
-      std::function<OptInt64*(const std::string&)> BatchAxis4BnInOp) const override;
   Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override;
   Symbol<OperatorConf> GetOpConfWithoutOpNameAndLbn() const override;
   Maybe<void> InferParallelHierarchy(
@@ -48,8 +46,7 @@ class VariableOp final : public Operator {
       ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
       const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-          ParallelDistributionInferHint4Ibn,
-      std::function<Maybe<const OptInt64*>(const std::string&)> BatchAxis4BnInOp) override;
+          ParallelDistributionInferHint4Ibn) override;
 };
 
 }  // namespace oneflow

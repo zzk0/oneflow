@@ -30,7 +30,6 @@ REGISTER_USER_OP("hierarchical_parallel_cast")
       *ctx->TensorDesc4ArgNameAndIndex("out", 0) = *ctx->TensorDesc4ArgNameAndIndex("in", 0);
       return Maybe<void>::Ok();
     })
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetInferParallelHierarchyFn([](user_op::InferParallelHierarchyFnContext* ctx) -> Maybe<void> {
       const Shape parallel_hierarchy = ctx->user_op_conf().attr<Shape>("parallel_hierarchy");
       CHECK_EQ_OR_RETURN(parallel_hierarchy.elem_cnt(), ctx->parallel_num());
@@ -69,7 +68,6 @@ REGISTER_USER_OP("hierarchical_parallel_cast_like")
       *ctx->mut_parallel_hierarchy() = ctx->ParallelHierarchy4InputArgNameAndIndex("like", 0);
       return Maybe<void>::Ok();
     })
-    .SetBatchAxisInferFn(user_op::BatchAxisInferFnUtil::NaiveInferBatchAxis)
     .SetInferSbpSignatureFn([](user_op::InferSbpSignatureFnContext* ctx) -> Maybe<void> {
       return Maybe<void>::Ok();
     });
