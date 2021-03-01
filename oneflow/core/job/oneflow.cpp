@@ -319,6 +319,7 @@ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
 }
 
 Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_complete) {
+  OF_PROFILER_RANGE_PUSH("CompileCurJobOnMaster " + job->job_conf().job_name());
   const JobDesc& job_desc = GlobalJobDesc();
   Plan naive_plan;
   Plan complete_plan;
@@ -358,6 +359,7 @@ Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_c
   }
   GenCollectiveBoxingPlan(job, improved_plan);
   LOG(INFO) << "compile and improve time: " << GetCurTime() - start;
+  OF_PROFILER_RANGE_POP("CompileCurJobOnMaster " + job->job_conf().job_name());
   return Maybe<void>::Ok();
 }
 
@@ -1030,8 +1032,12 @@ REGISTER_FUNCTION_CONFIG_DEF().Bool("__is_user_function__", true, "is user defin
 
 Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan) {
   std::vector<std::shared_ptr<Job>> jobs(conf_jobs.size());
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster job reset");
   FOR_RANGE(int, i, 0, jobs.size()) { jobs.at(i).reset(new Job(conf_jobs.Get(i))); }
+  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster job reset");
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster job CheckNonDistributeOptimizerAvailable");
   if (jobs.size() > 1) { CheckNonDistributeOptimizerAvailable(jobs); }
+  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster job CheckNonDistributeOptimizerAvailable");
   if (Global<MachineCtx>::Get()->IsThisMachineMaster()) {
     HashMap<std::string, ParallelBlobConf> var_op_name2parallel_blob_conf;
     FilterOpName2ParallelBlobConf({OperatorConf::kVariableConf}, jobs,
@@ -1051,10 +1057,13 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
   }
   std::vector<std::shared_ptr<Job>> function_jobs;
   function_jobs.reserve(jobs.size());
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster job desc __is_user_function__");
   FOR_RANGE(int, i, 0, jobs.size()) {
     JobDesc job_desc(jobs.at(i)->job_conf(), i);
     if (job_desc.Bool("__is_user_function__")) { function_jobs.push_back(jobs.at(i)); }
   }
+  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster job desc __is_user_function__");
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster make push pull job");
   if (Global<MachineCtx>::Get()->IsThisMachineMaster()) {
     HashMap<std::string, ParallelBlobConf> push_op_name2parallel_blob_conf;
     FilterOpName2ParallelBlobConf({OperatorConf::kInputConf}, function_jobs,
@@ -1075,12 +1084,16 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       jobs.emplace_back(pull_job);
     }
   }
+  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster make push pull job");
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster CompileCurJobOnMaster");
   std::vector<Plan> sub_plans(jobs.size());
   FOR_RANGE(int64_t, i, 0, jobs.size()) {
     AddJobName2JobId(jobs.at(i)->job_conf().job_name(), i);
     auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(i)->job_conf(), i);
     JUST(CompileCurJobOnMaster(jobs.at(i).get(), &sub_plans.at(i), true));
   }
+  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster CompileCurJobOnMaster");
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster merged_plan");
   if (Global<MachineCtx>::Get()->IsThisMachineMaster()) {
     MergeSubPlanWithoutGenNetTopo(plan, sub_plans);
     InterJobMemSharingUtil::MergeMemReusedChunkBetweenUserJobs(function_jobs, plan);
@@ -1109,6 +1122,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       TeePersistentLogStream::Create("merged_plan")->Write(*plan);
     }
   }
+  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster merged_plan");
   OF_SESSION_BARRIER();
   return Maybe<void>::Ok();
 }
@@ -1120,13 +1134,13 @@ Maybe<void> Oneflow::Init(const oneflow::JobSet& job_set) {
   // Runtime
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster");
   JUST(CompileAndMergePlanOnMaster(job_set.job(), &plan_));
-  OF_PROFILER_RANGE_POP();  // CompileAndMergePlanOnMaster
+  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster");  // CompileAndMergePlanOnMaster
   if (Global<MachineCtx>::Get()->IsThisMachineMaster()) {
     runtime_buffers_scope_.reset(new RuntimeBuffersScope(plan_));
   }
-  OF_PROFILER_RANGE_PUSH("new Runtime");
+  OF_PROFILER_RANGE_PUSH("new_Runtime");
   runtime_.reset(new Runtime(plan_, GetMaxVal<size_t>(), false));
-  OF_PROFILER_RANGE_POP();  // new Runtime
+  OF_PROFILER_RANGE_POP("new_Runtime");  // new Runtime
   return Maybe<void>::Ok();
 }
 
