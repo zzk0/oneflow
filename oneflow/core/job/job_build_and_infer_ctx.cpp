@@ -24,6 +24,7 @@ limitations under the License.
 #include "oneflow/core/job_rewriter/autograd.h"
 #include "oneflow/core/job_rewriter/job_pass.h"
 #include "oneflow/user/summary/summary_converter.h"
+#include "oneflow/core/profiler/profiler.h"
 
 #include <google/protobuf/text_format.h>
 #include <json.hpp>
@@ -905,6 +906,7 @@ Maybe<LogicalBlobId> EagerJobBuildAndInferCtx::FindOrCreateMirroredLbiFromCompat
 }
 
 Maybe<void> LazyJobBuildAndInferCtx::Complete() {
+  OF_PROFILER_RANGE_PUSH("LazyJobBuildAndInferCtx::Complete");
   CHECK_NOTNULL(Global<JobDesc>::Get());
   Global<JobDesc>::Delete();
   if (job().job_conf().has_train_conf()) {
@@ -914,7 +916,10 @@ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
   auto scope = std::make_unique<GlobalJobDescScope>(mut_job()->job_conf(), job_id());
   JobPassCtx job_pass_ctx(GlobalJobDesc());
   auto DoPass = [&](const std::string& pass_name) -> Maybe<void> {
-    return JobPass4Name(pass_name)(mut_job(), &job_pass_ctx);
+    OF_PROFILER_RANGE_PUSH(pass_name);
+    auto ret = JobPass4Name(pass_name)(mut_job(), &job_pass_ctx);
+    OF_PROFILER_RANGE_POP(pass_name);
+    return ret;
   };
   if (GlobalJobDesc().Bool("__is_user_function__")) {
     JUST(DoPass("CompleteOfrecordDecoder"));
@@ -944,6 +949,7 @@ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
     JUST(DoPass("DumpVariableInfoPass"));
   }
   JUST(DoPass("DumpTimeShapeAndBlobParallelConfPass"));
+  OF_PROFILER_RANGE_POP("LazyJobBuildAndInferCtx::Complete");
   return Maybe<void>::Ok();
 }
 
