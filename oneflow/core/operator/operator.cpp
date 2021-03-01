@@ -676,7 +676,7 @@ Maybe<const ParallelDistributionSignature*> Operator::parallel_distribution_sign
 void Operator::SetParallelDistributionSignature(const ParallelDistributionSignature& signature) {
   *op_attribute_.mutable_parallel_distribution_signature() = signature;
   if (CHECK_JUST(parallel_hierarchy())->NumAxes() == 1) {
-    //sbp_signature_.reset(new SbpSignature());
+    // sbp_signature_.reset(new SbpSignature());
     SbpSignature sbp_signature;
     for (const auto& pair : signature.bn_in_op2parallel_distribution()) {
       (*sbp_signature.mutable_bn_in_op2sbp_parallel())[pair.first] = pair.second.sbp_parallel(0);
