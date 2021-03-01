@@ -53,13 +53,22 @@ void NameThisHostThread(const std::string& name) {
 
 void RangePush(const std::string& name) {
 #ifdef OF_ENABLE_PROFILER
+  LOG(INFO) << "RangePush " << name;
   nvtxRangePushA(name.c_str());
+#endif  // OF_ENABLE_PROFILER
+}
+
+void RangePop(const std::string& name) {
+#ifdef OF_ENABLE_PROFILER
+  nvtxRangePop();
+  LOG(INFO) << "RangePop " << name;
 #endif  // OF_ENABLE_PROFILER
 }
 
 void RangePop() {
 #ifdef OF_ENABLE_PROFILER
   nvtxRangePop();
+  LOG(INFO) << "RangePop ";
 #endif  // OF_ENABLE_PROFILER
 }
 

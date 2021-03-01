@@ -28,6 +28,8 @@ void NameThisHostThread(const std::string& name);
 
 void RangePush(const std::string& name);
 
+void RangePop(const std::string& name);
+
 void RangePop();
 
 class RangeGuard final {
@@ -45,13 +47,13 @@ class RangeGuard final {
 #define OF_PROFILER_NAME_THIS_HOST_THREAD(name) ::oneflow::profiler::NameThisHostThread(name)
 #define OF_PROFILER_ONLY_CODE(...) __VA_ARGS__
 #define OF_PROFILER_RANGE_PUSH(name) ::oneflow::profiler::RangePush(name)
-#define OF_PROFILER_RANGE_POP() ::oneflow::profiler::RangePop()
+#define OF_PROFILER_RANGE_POP(name) ::oneflow::profiler::RangePop(name)
 #define OF_PROFILER_RANGE_GUARD(name) \
   ::oneflow::profiler::RangeGuard OF_PP_CAT(_of_profiler_range_guard_, __COUNTER__)(name)
 #else
 #define OF_PROFILER_ONLY_CODE(...)
 #define OF_PROFILER_RANGE_PUSH(name)
-#define OF_PROFILER_RANGE_POP()
+#define OF_PROFILER_RANGE_POP(name)
 #define OF_PROFILER_RANGE_GUARD(name)
 #define OF_PROFILER_NAME_THIS_HOST_THREAD(name)
 #endif
