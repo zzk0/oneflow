@@ -99,19 +99,14 @@ def _CompileJob(session, function_desc):
         raise NotImplementedError(
             "All parameters of global function should be annotated"
         )
-    print('_CompileJob _RecursiveMakeInputBlobs', time.time())
     inputs = _RecursiveMakeInputBlobs(func.__oneflow_input_blob_defs__)
-    print('_CompileJob _RecursiveMakeInputBlobs', time.time())
     ret = func(*inputs)
     return_annotation = func.__oneflow_function_signature__.return_annotation
-    print('_CompileJob _RecursiveMakeInputBlobs', time.time())
     oft_util.CheckReturnByAnnotation(func.__name__, ret, return_annotation)
     func.__oneflow_output_remote_blobs__ = _RecursiveMakeRetRemoteBlobs(
         ret, allow_cpu_return_op=function_desc.function_attribute.allow_cpu_return_op
     )
-    print('_CompileJob _RecursiveMakeInputBlobs', time.time())
     session.StashJob(func.__name__)
-    print('_CompileJob _RecursiveMakeInputBlobs', time.time())
 
 
 def _InterpretGlobalFunction(function_desc, args):
