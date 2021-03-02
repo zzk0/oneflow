@@ -69,6 +69,7 @@ void Compiler::Compile(Job* job, Plan* plan, bool need_job_complete) const {
   OF_PROFILER_RANGE_PUSH("Compiler::Compile JobCompleter");
   if (need_job_complete) { JobCompleter().Complete(job); }
   OF_PROFILER_RANGE_POP("Compiler::Compile JobCompleter");
+  OF_PROFILER_RANGE_PUSH("Compiler::Compile TaskGraph");
   Global<OpGraph>::New(*job);
   if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
     TeePersistentLogStream::Create(StrCat("optimized_job", job_desc.job_id()))->Write(*job);
@@ -99,6 +100,7 @@ void Compiler::Compile(Job* job, Plan* plan, bool need_job_complete) const {
     (*job_id2job_conf)[GlobalJobDesc().job_id()] = GlobalJobDesc().job_conf();
   }
   Global<OpGraph>::Delete();
+  OF_PROFILER_RANGE_POP("Compiler::Compile TaskGraph");
   OF_PROFILER_RANGE_POP("Compiler::Compile " + job->job_conf().job_name());
 }
 
