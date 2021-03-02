@@ -39,7 +39,6 @@ import typing
 import oneflow
 import oneflow_api
 import inspect
-import time
 
 def Compile(session, function_desc, config_proto):
     with InterpretScope(session, function_desc, config_proto):
