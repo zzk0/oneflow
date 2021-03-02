@@ -687,19 +687,21 @@ void Operator::SetParallelHierarchy(const Shape& parallel_hierarchy) {
 Maybe<const ParallelDistributionSignature*> Operator::parallel_distribution_signature() const {
   CHECK_OR_RETURN(op_attribute_.has_parallel_distribution_signature())
       << "parallel distribution signature not infered";
-  return &op_attribute_.parallel_distribution_signature();
+  return parallel_distribution_signature_.get();
 }
 
-void Operator::SetParallelDistributionSignature(const ParallelDistributionSignature& signature) {
+Maybe<void> Operator::FillParallelDistributionSignature(
+    const ParallelDistributionSignature& signature) {
+  parallel_distribution_signature_.reset(new ParallelDistributionSignature(signature));
   *op_attribute_.mutable_parallel_distribution_signature() = signature;
-  if (CHECK_JUST(parallel_hierarchy())->NumAxes() == 1) {
-    // sbp_signature_.reset(new SbpSignature());
+  if (JUST(parallel_hierarchy())->NumAxes() == 1) {
     SbpSignature sbp_signature;
     for (const auto& pair : signature.bn_in_op2parallel_distribution()) {
       (*sbp_signature.mutable_bn_in_op2sbp_parallel())[pair.first] = pair.second.sbp_parallel(0);
     }
     sbp_signature_.reset(new SbpSignature(sbp_signature));
   }
+  return Maybe<void>::Ok();
 }
 
 Maybe<const SbpParallel*> Operator::SbpParallel4BnInOp(const std::string& bn_in_op) const {
@@ -712,12 +714,11 @@ Maybe<const SbpParallel*> Operator::SbpParallel4BnInOp(const std::string& bn_in_
 Maybe<const ParallelDistribution*> Operator::ParallelDistribution4BnInOp(
     const std::string& bn_in_op) const {
   CHECK_OR_RETURN(op_attribute_.has_parallel_distribution_signature())
-      << "parallel distribution signature not infered";
-  const auto& map =
-      op_attribute_.parallel_distribution_signature().bn_in_op2parallel_distribution();
+        << "parallel distribution signature not infered";
+  const auto& map = parallel_distribution_signature_->bn_in_op2parallel_distribution();
   const auto& iter = map.find(bn_in_op);
   CHECK_OR_RETURN(iter != map.end())
-      << "blob_name " << bn_in_op << " not found in parallel distribution";
+        << "blob_name " << bn_in_op << " not found in parallel distribution";
   return &iter->second;
 }
 Maybe<const OptMirroredParallel*> Operator::OptMirroredParallel4BnInOp(

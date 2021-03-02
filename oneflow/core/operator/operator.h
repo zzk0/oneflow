@@ -171,7 +171,7 @@ class Operator {
   Maybe<const Shape*> parallel_hierarchy() const;
   void SetParallelHierarchy(const Shape& hierarchy);
   Maybe<const ParallelDistributionSignature*> parallel_distribution_signature() const;
-  void SetParallelDistributionSignature(const ParallelDistributionSignature& signature);
+  Maybe<void> FillParallelDistributionSignature(const ParallelDistributionSignature& signature);
   BlobLastUsedSignature* mut_blob_last_used_signature() {
     return op_attribute_.mutable_blob_last_used_signature();
   }
@@ -292,6 +292,7 @@ class Operator {
   std::unique_ptr<HashMap<std::string, std::shared_ptr<const BlobDesc>>> ibn2logical_blob_desc_;
   std::unique_ptr<HashMap<std::string, std::shared_ptr<const BlobDesc>>> obn2logical_blob_desc_;
   std::shared_ptr<const SbpSignature> sbp_signature_;
+  std::shared_ptr<const ParallelDistributionSignature> parallel_distribution_signature_;
   PbRpf<std::string> input_bns_;
   PbRpf<std::string> output_bns_;
   PbRpf<std::string> tmp_bns_;
