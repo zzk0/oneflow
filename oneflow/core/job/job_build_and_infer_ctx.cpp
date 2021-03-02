@@ -916,7 +916,7 @@ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
   auto DoPass = [&](const std::string& pass_name) -> Maybe<void> {
     OF_PROFILER_RANGE_PUSH(pass_name);
     auto ret = JobPass4Name(pass_name)(mut_job(), &job_pass_ctx);
-    OF_PROFILER_RANGE_POP(pass_name);
+    OF_PROFILER_RANGE_POP();
     return ret;
   };
   if (GlobalJobDesc().Bool("__is_user_function__")) {
@@ -946,7 +946,7 @@ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
     JUST(DoPass("DumpVariableInfoPass"));
   }
   JUST(DoPass("DumpTimeShapeAndBlobParallelConfPass"));
-  OF_PROFILER_RANGE_POP("LazyJobBuildAndInferCtx::Complete");
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 

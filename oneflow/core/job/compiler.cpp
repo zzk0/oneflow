@@ -68,7 +68,7 @@ void Compiler::Compile(Job* job, Plan* plan, bool need_job_complete) const {
   const JobDesc& job_desc = GlobalJobDesc();
   OF_PROFILER_RANGE_PUSH("Compiler::Compile JobCompleter");
   if (need_job_complete) { JobCompleter().Complete(job); }
-  OF_PROFILER_RANGE_POP("Compiler::Compile JobCompleter");
+  OF_PROFILER_RANGE_POP();
   OF_PROFILER_RANGE_PUSH("Compiler::Compile TaskGraph");
   Global<OpGraph>::New(*job);
   if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
@@ -100,8 +100,8 @@ void Compiler::Compile(Job* job, Plan* plan, bool need_job_complete) const {
     (*job_id2job_conf)[GlobalJobDesc().job_id()] = GlobalJobDesc().job_conf();
   }
   Global<OpGraph>::Delete();
-  OF_PROFILER_RANGE_POP("Compiler::Compile TaskGraph");
-  OF_PROFILER_RANGE_POP("Compiler::Compile " + job->job_conf().job_name());
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
 }
 
 }  // namespace oneflow

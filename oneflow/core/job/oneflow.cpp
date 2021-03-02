@@ -359,7 +359,7 @@ Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_c
   }
   GenCollectiveBoxingPlan(job, improved_plan);
   LOG(INFO) << "compile and improve time: " << GetCurTime() - start;
-  OF_PROFILER_RANGE_POP("CompileCurJobOnMaster " + job->job_conf().job_name());
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
@@ -1040,10 +1040,10 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
   std::vector<std::shared_ptr<Job>> jobs(conf_jobs.size());
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster job reset");
   FOR_RANGE(int, i, 0, jobs.size()) { jobs.at(i).reset(new Job(conf_jobs.Get(i))); }
-  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster job reset");
+  OF_PROFILER_RANGE_POP();
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster job CheckNonDistributeOptimizerAvailable");
   if (jobs.size() > 1) { CheckNonDistributeOptimizerAvailable(jobs); }
-  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster job CheckNonDistributeOptimizerAvailable");
+  OF_PROFILER_RANGE_POP();
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     HashMap<std::string, ParallelBlobConf> var_op_name2parallel_blob_conf;
     FilterOpName2ParallelBlobConf({OperatorConf::kVariableConf}, jobs,
@@ -1068,7 +1068,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
     JobDesc job_desc(jobs.at(i)->job_conf(), i);
     if (job_desc.Bool("__is_user_function__")) { function_jobs.push_back(jobs.at(i)); }
   }
-  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster job desc __is_user_function__");
+  OF_PROFILER_RANGE_POP();
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster make push pull job");
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     HashMap<std::string, ParallelBlobConf> push_op_name2parallel_blob_conf;
@@ -1090,7 +1090,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       jobs.emplace_back(pull_job);
     }
   }
-  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster make push pull job");
+  OF_PROFILER_RANGE_POP();
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster CompileCurJobOnMaster");
   std::vector<Plan> sub_plans(jobs.size());
   FOR_RANGE(int64_t, i, 0, jobs.size()) {
@@ -1098,7 +1098,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
     auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(i)->job_conf(), i);
     JUST(CompileCurJobOnMaster(jobs.at(i).get(), &sub_plans.at(i), true));
   }
-  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster CompileCurJobOnMaster");
+  OF_PROFILER_RANGE_POP();
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster merged_plan");
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     MergeSubPlanWithoutGenNetTopo(plan, sub_plans);
@@ -1128,7 +1128,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       TeePersistentLogStream::Create("merged_plan")->Write(*plan);
     }
   }
-  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster merged_plan");
+  OF_PROFILER_RANGE_POP();
   OF_SESSION_BARRIER();
   return Maybe<void>::Ok();
 }
@@ -1140,14 +1140,14 @@ Maybe<void> Oneflow::Init(const oneflow::JobSet& job_set) {
   // Runtime
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster");
   JUST(CompileAndMergePlanOnMaster(job_set.job(), &plan_));
-  OF_PROFILER_RANGE_POP("CompileAndMergePlanOnMaster");  // CompileAndMergePlanOnMaster
+  OF_PROFILER_RANGE_POP();  // CompileAndMergePlanOnMaster
   OF_PROFILER_RANGE_POP();  // CompileAndMergePlanOnMaster
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     runtime_buffers_scope_.reset(new RuntimeBuffersScope(plan_));
   }
-  OF_PROFILER_RANGE_PUSH("new_Runtime");
+  OF_PROFILER_RANGE_PUSH("new Runtime");
   runtime_.reset(new Runtime(plan_, GetMaxVal<size_t>(), false));
-  OF_PROFILER_RANGE_POP("new_Runtime");  // new Runtime
+  OF_PROFILER_RANGE_POP();  // new Runtime
   return Maybe<void>::Ok();
 }
 

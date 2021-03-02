@@ -97,7 +97,7 @@ inline Maybe<std::string> CheckAndCompleteUserOpConf(const std::string& op_conf_
   OperatorConf op_conf;
   CHECK_OR_RETURN(TxtString2PbMessage(op_conf_str, &op_conf)) << "operator conf parse failed";
   auto rtn = PbMessage2TxtString(*JUST(CheckAndCompleteUserOpConfImpl(op_conf)));
-  OF_PROFILER_RANGE_POP("CheckAndCompleteUserOpConf");
+  OF_PROFILER_RANGE_POP();
   return rtn;
 }
 
