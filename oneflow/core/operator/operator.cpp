@@ -519,7 +519,7 @@ Maybe<void> Operator::InferParallelDistributionSignature(
     SbpSignature sbp_signature;
     CHECK_JUST(
         InferOpSbpSignature(&sbp_signature, this, sbp_sig_conf, parallel_desc, ibn2sbp_infer_hint));
-    for (const auto& pair : sbp_signature.bn_in_op2sbp_parallel()) {
+    for (const auto& pair : sbp_signature_->bn_in_op2sbp_parallel()) {
       *((*signature->mutable_bn_in_op2parallel_distribution())[pair.first].add_sbp_parallel()) =
           pair.second;
     }
@@ -681,7 +681,7 @@ void Operator::SetParallelDistributionSignature(const ParallelDistributionSignat
     for (const auto& pair : signature.bn_in_op2parallel_distribution()) {
       (*sbp_signature.mutable_bn_in_op2sbp_parallel())[pair.first] = pair.second.sbp_parallel(0);
     }
-    sbp_signature_.reset(&sbp_signature);
+    sbp_signature_.reset(new SbpSignature(sbp_signature));
   }
 }
 
