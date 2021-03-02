@@ -43,9 +43,7 @@ import time
 
 def Compile(session, function_desc, config_proto):
     with InterpretScope(session, function_desc, config_proto):
-        print('Compile', time.time())
         _CompileJob(session, function_desc)
-        print('Compile', time.time())
         oneflow_api.CurJobBuildAndInferCtx_Complete()
 
 
