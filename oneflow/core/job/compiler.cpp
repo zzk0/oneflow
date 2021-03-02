@@ -64,12 +64,12 @@ void Compiler::GenNetTopo(Plan* plan) const {
 }
 
 void Compiler::Compile(Job* job, Plan* plan, bool need_job_complete) const {
-  OF_PROFILER_RANGE_PUSH("Compiler::Compile " + job->job_conf().job_name());
+  OF_PROFILER_RANGE_PUSH("Compiler::Compile:" + job->job_conf().job_name());
   const JobDesc& job_desc = GlobalJobDesc();
-  OF_PROFILER_RANGE_PUSH("Compiler::Compile JobCompleter");
+  OF_PROFILER_RANGE_PUSH("Compiler::Compile_JobCompleter");
   if (need_job_complete) { JobCompleter().Complete(job); }
   OF_PROFILER_RANGE_POP();
-  OF_PROFILER_RANGE_PUSH("Compiler::Compile TaskGraph");
+  OF_PROFILER_RANGE_PUSH("Compiler::Compile:TaskGraph");
   Global<OpGraph>::New(*job);
   if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
     TeePersistentLogStream::Create(StrCat("optimized_job", job_desc.job_id()))->Write(*job);
