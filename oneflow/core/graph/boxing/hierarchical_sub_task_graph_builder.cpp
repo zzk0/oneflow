@@ -26,6 +26,12 @@ limitations under the License.
 #include "oneflow/core/graph/boxing/one_to_one_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
 #include "oneflow/core/graph/slice_boxing_task_node.h"
+#include "oneflow/core/common/id_util.h"
+#include "oneflow/core/graph/id_serialization.h"
+#include "oneflow/core/device/cpu_stream_index.h"
+#ifdef WITH_CUDA
+#include "oneflow/core/device/cuda_stream_index.h"
+#endif
 
 namespace oneflow {
 namespace {
@@ -128,18 +134,30 @@ Maybe<SubTskGphBuilderStatus> Build2DSliceBoxingSubTskGph(
   // CHECK_OR_RETURN(out_parallel_distribution.sbp_parallel(0).has_split_parallel());
   // CHECK_OR_RETURN(out_parallel_distribution.sbp_parallel(1).has_split_parallel());
 
-  const auto GetBoxingGpuThrdId = [](const int64_t dev_id, CudaWorkType work_type) -> int64_t {
+  const auto GetBoxingGpuThrdId = [](int64_t machine_id, int64_t dev_id,
+                                     CudaWorkType work_type) -> int64_t {
+    int64_t thrd_id = -1;
 #ifdef WITH_CUDA
+    DeviceId device_id{static_cast<DeviceId::rank_t>(machine_id), DeviceType::kGPU,
+                       static_cast<DeviceId::device_index_t>(dev_id)};
+    auto* generator = dynamic_cast<CudaStreamIndexGenerator*>(
+        Global<IDMgr>::Get()->GetStreamIndexGeneratorManager()->GetGenerator(device_id));
+    CHECK_NOTNULL(generator);
+    StreamId::stream_index_t stream_index = 0;
     if (work_type == CudaWorkType::kCopyH2D) {
-      return Global<IDMgr>::Get()->GetGpuH2DThrdId(dev_id);
+      stream_index = generator->GenerateH2DStreamIndex();
     } else if (work_type == CudaWorkType::kCopyD2H) {
-      return Global<IDMgr>::Get()->GetGpuD2HThrdId(dev_id);
+      stream_index = generator->GenerateD2HStreamIndex();
+    } else if (work_type == CudaWorkType::kMix) {
+      stream_index = generator->GenerateMixStreamIndex();
     } else {
-      return Global<IDMgr>::Get()->GetGpuMixThrdId(dev_id);
+      UNIMPLEMENTED();
     }
+    thrd_id = SerializeStreamIdToInt64(StreamId{device_id, stream_index});
 #else
     UNIMPLEMENTED();
 #endif
+    return thrd_id;
   };
   const auto NewEdge = [&ctx]() -> TaskEdge* { return ctx->task_graph()->NewEdge(); };
   const auto CreateBoxingNode121 = [&ctx, &lbi, &GetBoxingGpuThrdId](
@@ -153,8 +171,8 @@ Maybe<SubTskGphBuilderStatus> Build2DSliceBoxingSubTskGph(
       thrd_id = Global<IDMgr>::Get()->PickCpuThrdIdEvenly(machine_id);
     } else if (pd.device_type() == DeviceType::kGPU) {
 #ifdef WITH_CUDA
-      thrd_id = GetBoxingGpuThrdId(CHECK_JUST(pd.DeviceId4ParallelId(parallel_id)),
-                                   CudaWorkType::kCopyH2D);
+      int64_t dev_id = CHECK_JUST(pd.DeviceId4ParallelId(parallel_id));
+      thrd_id = GetBoxingGpuThrdId(machine_id, dev_id, CudaWorkType::kCopyH2D);
 #else
       UNIMPLEMENTED();
 #endif
@@ -204,18 +222,30 @@ Maybe<SubTskGphBuilderStatus> BuildSliceBoxingAddSubTskGph(
     const Shape& out_parallel_hierarchy, const ParallelDistribution& in_parallel_distribution,
     const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) {
   CHECK_OR_RETURN(in_parallel_distribution.sbp_parallel(0).has_partial_sum_parallel());
-  const auto GetBoxingGpuThrdId = [](const int64_t dev_id, CudaWorkType work_type) -> int64_t {
+    const auto GetBoxingGpuThrdId = [](int64_t machine_id, int64_t dev_id,
+                                     CudaWorkType work_type) -> int64_t {
+    int64_t thrd_id = -1;
 #ifdef WITH_CUDA
+    DeviceId device_id{static_cast<DeviceId::rank_t>(machine_id), DeviceType::kGPU,
+                       static_cast<DeviceId::device_index_t>(dev_id)};
+    auto* generator = dynamic_cast<CudaStreamIndexGenerator*>(
+        Global<IDMgr>::Get()->GetStreamIndexGeneratorManager()->GetGenerator(device_id));
+    CHECK_NOTNULL(generator);
+    StreamId::stream_index_t stream_index = 0;
     if (work_type == CudaWorkType::kCopyH2D) {
-      return Global<IDMgr>::Get()->GetGpuH2DThrdId(dev_id);
+      stream_index = generator->GenerateH2DStreamIndex();
     } else if (work_type == CudaWorkType::kCopyD2H) {
-      return Global<IDMgr>::Get()->GetGpuD2HThrdId(dev_id);
+      stream_index = generator->GenerateD2HStreamIndex();
+    } else if (work_type == CudaWorkType::kMix) {
+      stream_index = generator->GenerateMixStreamIndex();
     } else {
-      return Global<IDMgr>::Get()->GetGpuMixThrdId(dev_id);
+      UNIMPLEMENTED();
     }
+    thrd_id = SerializeStreamIdToInt64(StreamId{device_id, stream_index});
 #else
     UNIMPLEMENTED();
 #endif
+    return thrd_id;
   };
   const auto NewEdge = [&ctx]() -> TaskEdge* { return ctx->task_graph()->NewEdge(); };
   const auto CreateBoxingNode121 = [&ctx, &lbi, &GetBoxingGpuThrdId](
@@ -229,8 +259,8 @@ Maybe<SubTskGphBuilderStatus> BuildSliceBoxingAddSubTskGph(
       thrd_id = Global<IDMgr>::Get()->PickCpuThrdIdEvenly(machine_id);
     } else if (pd.device_type() == DeviceType::kGPU) {
 #ifdef WITH_CUDA
-      thrd_id = GetBoxingGpuThrdId(CHECK_JUST(pd.DeviceId4ParallelId(parallel_id)),
-                                   CudaWorkType::kCopyH2D);
+      int64_t dev_id = CHECK_JUST(pd.DeviceId4ParallelId(parallel_id));
+      thrd_id = GetBoxingGpuThrdId(machine_id, dev_id, CudaWorkType::kCopyH2D);
 #else
       UNIMPLEMENTED();
 #endif
