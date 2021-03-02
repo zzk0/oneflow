@@ -28,8 +28,8 @@ limitations under the License.
 
 namespace oneflow {
 
-Maybe<void> InferOpSbpSignature(SbpSignature* signature, Operator* op,
-                                const SbpSignature& sbp_sig_conf, const ParallelDesc& parallel_desc,
+Maybe<void> InferOpSbpSignature(Operator* op, const SbpSignature& sbp_sig_conf,
+                                const ParallelDesc& parallel_desc,
                                 const HashMap<std::string, SbpInferHint>& ibn2sbp_infer_hint);
 
 namespace {
@@ -386,7 +386,7 @@ Maybe<void> Operator::FillSbpSignature(const SbpSignature& sbp_signature) {
 }
 
 Maybe<void> Operator::InferSbpSignatureIf(
-    SbpSignature* sbp_signature, const SbpSignature& sbp_sig_conf,
+    const SbpSignature& sbp_sig_conf,
     const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
     std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
     const ParallelDesc& parallel_desc) {
@@ -516,9 +516,7 @@ Maybe<void> Operator::InferParallelDistributionSignature(
                                  SbpInferHint(&hint->parallel_desc(), &hint->logical_blob_desc(),
                                               &hint->parallel_distribution().sbp_parallel(0)));
     }
-    SbpSignature sbp_signature;
-    CHECK_JUST(
-        InferOpSbpSignature(&sbp_signature, this, sbp_sig_conf, parallel_desc, ibn2sbp_infer_hint));
+    CHECK_JUST(InferOpSbpSignature(this, sbp_sig_conf, parallel_desc, ibn2sbp_infer_hint));
     for (const auto& pair : sbp_signature_->bn_in_op2sbp_parallel()) {
       *((*signature->mutable_bn_in_op2parallel_distribution())[pair.first].add_sbp_parallel()) =
           pair.second;
@@ -662,7 +660,7 @@ Maybe<void> Operator::InferParallelHierarchy(
 }
 
 Maybe<const SbpSignature*> Operator::sbp_signature() const {
-  //CHECK_OR_RETURN(sbp_signature_) << "sbp signature not infered";
+  // CHECK_OR_RETURN(sbp_signature_) << "sbp signature not infered";
   return sbp_signature_.get();
 }
 
@@ -1019,8 +1017,8 @@ Maybe<bool> ParseDisableBoxingFlag(const std::string& lbn_with_hint, bool* disab
   return true;
 }
 
-Maybe<void> InferOpSbpSignature(SbpSignature* signature, Operator* op,
-                                const SbpSignature& sbp_sig_conf, const ParallelDesc& parallel_desc,
+Maybe<void> InferOpSbpSignature(Operator* op, const SbpSignature& sbp_sig_conf,
+                                const ParallelDesc& parallel_desc,
                                 const HashMap<std::string, SbpInferHint>& ibn2sbp_infer_hint) {
   auto SbpInferHint4Ibn = [&](const std::string& ibn) -> Maybe<const SbpInferHint*> {
     auto it = ibn2sbp_infer_hint.find(ibn);
@@ -1068,7 +1066,7 @@ Maybe<void> InferOpSbpSignature(SbpSignature* signature, Operator* op,
   } else {
     CalcOrderValue4SbpSig = [](const SbpSignature&) -> int32_t { return 0; };
   }
-  JUST(op->InferSbpSignatureIf(signature, sbp_sig_conf, CalcOrderValue4SbpSig, SbpInferHint4Ibn,
+  JUST(op->InferSbpSignatureIf(sbp_sig_conf, CalcOrderValue4SbpSig, SbpInferHint4Ibn,
                                parallel_desc));
   return Maybe<void>::Ok();
 }
