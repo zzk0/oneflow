@@ -40,6 +40,7 @@ import oneflow
 import oneflow_api
 import inspect
 
+
 def Compile(session, function_desc, config_proto):
     with InterpretScope(session, function_desc, config_proto):
         _CompileJob(session, function_desc)
