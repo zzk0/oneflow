@@ -227,6 +227,7 @@ class UserKernelOpInferContext : public user_op::InferContext {
   const ArgVec& outputs() const override { return outputs_; }
   const JobDesc& job_desc() const override { return job_desc_; }
   const ParallelContext& parallel_ctx() const override { return parallel_ctx_; };
+  const Shape& parallel_hierarchy() const override { UNIMPLEMENTED(); }
   const SbpParallel& SbpParallel4ArgNameAndIndex(const std::string& arg_name,
                                                  int32_t index) const override {
     const auto& bn2sbp = sbp_signature_.bn_in_op2sbp_parallel();
@@ -235,7 +236,10 @@ class UserKernelOpInferContext : public user_op::InferContext {
     CHECK(it != bn2sbp.end());
     return it->second;
   }
-
+  const ParallelDistribution& ParallelDistribution4ArgNameAndIndex(const std::string& arg_name,
+                                                                   int32_t index) const override {
+    UNIMPLEMENTED();
+  }
   void UpdateArg2TensorDesc(const std::function<Blob*(const std::string&)>& BnInOp2Blob) {
     for (auto& pair : arg2tensor_desc_) {
       const auto& arg_pair = pair.first;

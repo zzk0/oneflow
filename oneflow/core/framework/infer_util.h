@@ -48,8 +48,11 @@ class InferContext {
   }
 
   virtual const ParallelContext& parallel_ctx() const = 0;
+  virtual const Shape& parallel_hierarchy() const = 0;
   virtual const JobDesc& job_desc() const = 0;
   virtual const SbpParallel& SbpParallel4ArgNameAndIndex(const std::string&, int32_t) const = 0;
+  virtual const ParallelDistribution& ParallelDistribution4ArgNameAndIndex(const std::string&,
+                                                                           int32_t) const = 0;
 
   virtual bool* IsDynamic4ArgNameAndIndex(const std::string&, int32_t) = 0;
   virtual bool* IsTensorList4ArgNameAndIndex(const std::string&, int32_t) = 0;

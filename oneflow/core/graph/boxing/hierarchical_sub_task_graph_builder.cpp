@@ -222,7 +222,7 @@ Maybe<SubTskGphBuilderStatus> BuildSliceBoxingAddSubTskGph(
     const Shape& out_parallel_hierarchy, const ParallelDistribution& in_parallel_distribution,
     const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) {
   CHECK_OR_RETURN(in_parallel_distribution.sbp_parallel(0).has_partial_sum_parallel());
-    const auto GetBoxingGpuThrdId = [](int64_t machine_id, int64_t dev_id,
+  const auto GetBoxingGpuThrdId = [](int64_t machine_id, int64_t dev_id,
                                      CudaWorkType work_type) -> int64_t {
     int64_t thrd_id = -1;
 #ifdef WITH_CUDA

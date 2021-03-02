@@ -58,14 +58,45 @@ Maybe<void> TensorDescInferFn(user_op::InferContext* ctx) {
   CHECK_GE_OR_RETURN(shape.NumAxes(), 1);
   DimVector dim_vec = {shape.dim_vec().begin(), shape.dim_vec().end()};
   FOR_RANGE(int32_t, i, 0, dim_vec.size()) { CHECK_GT_OR_RETURN(dim_vec.at(i), 0); }
-  const auto& sbp_parallel = ctx->SbpParallel4ArgNameAndIndex("out", 0);
+  const auto& parallel_distribution = ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
+  const auto& parallel_hierarchy = ctx->parallel_hierarchy();
+  LOG(ERROR) << "parallel_distribution " << parallel_distribution.DebugString()
+             << " parallel_hierarchy " << parallel_hierarchy.DebugStr();
   const auto& parallel_ctx = ctx->parallel_ctx();
-  if (sbp_parallel.has_split_parallel()) {
+  if (parallel_hierarchy.NumAxes() == 1) {
+    const auto& sbp_parallel = ctx->SbpParallel4ArgNameAndIndex("out", 0);
     const int64_t split_axis = sbp_parallel.split_parallel().axis();
     BalancedSplitter spliter(shape.dim_vec().at(split_axis), parallel_ctx.parallel_num());
     CHECK_GE_OR_RETURN(shape.dim_vec().at(split_axis), parallel_ctx.parallel_num());
     dim_vec.at(split_axis) = spliter.At(parallel_ctx.parallel_id()).size();
+  } else {
+    CHECK_EQ_OR_RETURN(parallel_hierarchy.NumAxes(), 2);
+    SbpParallel sbp_parallel_0 = parallel_distribution.sbp_parallel(0);
+    SbpParallel sbp_parallel_1 = parallel_distribution.sbp_parallel(1);
+    if (sbp_parallel_0.has_split_parallel() && sbp_parallel_1.has_split_parallel()
+        && sbp_parallel_0.split_parallel().axis() == sbp_parallel_1.split_parallel().axis()) {
+      const int64_t parallel_num = parallel_hierarchy.At(0) * parallel_hierarchy.At(1);
+      const int64_t split_axis = sbp_parallel_0.split_parallel().axis();
+      const BalancedSplitter bs(shape.dim_vec().at(split_axis), parallel_num);
+      FOR_RANGE(int64_t, i, 0, parallel_num) { dim_vec.at(split_axis) = bs.At(i).size(); }
+    } else {
+      FOR_RANGE(int64_t, i, 0, parallel_hierarchy.At(0)) {
+        if (sbp_parallel_0.has_split_parallel()) {
+          const int64_t split_axis = sbp_parallel_0.split_parallel().axis();
+          const BalancedSplitter bs_0(shape.dim_vec().at(split_axis), parallel_hierarchy.At(0));
+          dim_vec.at(split_axis) = bs_0.At(i).size();
+        }
+        FOR_RANGE(int64_t, j, 0, parallel_hierarchy.At(1)) {
+          if (sbp_parallel_1.has_split_parallel()) {
+            const int64_t split_axis = sbp_parallel_1.split_parallel().axis();
+            const BalancedSplitter bs_1(shape.dim_vec().at(split_axis), parallel_hierarchy.At(1));
+            dim_vec.at(split_axis) = bs_1.At(i).size();
+          }
+        }
+      }
+    }
   }
+
   *out_shape = Shape(dim_vec);
   CHECK_EQ_OR_RETURN(out_shape->elem_cnt(), in_shape.elem_cnt());
   return Maybe<void>::Ok();
