@@ -1041,9 +1041,7 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:job_reset");
   FOR_RANGE(int, i, 0, jobs.size()) { jobs.at(i).reset(new Job(conf_jobs.Get(i))); }
   OF_PROFILER_RANGE_POP();
-  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:job_CheckNonDistributeOptimizerAvailable");
   if (jobs.size() > 1) { CheckNonDistributeOptimizerAvailable(jobs); }
-  OF_PROFILER_RANGE_POP();
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     HashMap<std::string, ParallelBlobConf> var_op_name2parallel_blob_conf;
     FilterOpName2ParallelBlobConf({OperatorConf::kVariableConf}, jobs,
@@ -1063,13 +1061,10 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
   }
   std::vector<std::shared_ptr<Job>> function_jobs;
   function_jobs.reserve(jobs.size());
-  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:job_desc___is_user_function__");
   FOR_RANGE(int, i, 0, jobs.size()) {
     JobDesc job_desc(jobs.at(i)->job_conf(), i);
     if (job_desc.Bool("__is_user_function__")) { function_jobs.push_back(jobs.at(i)); }
   }
-  OF_PROFILER_RANGE_POP();
-  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:make_push_pull_job");
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     HashMap<std::string, ParallelBlobConf> push_op_name2parallel_blob_conf;
     FilterOpName2ParallelBlobConf({OperatorConf::kInputConf}, function_jobs,
@@ -1090,7 +1085,6 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       jobs.emplace_back(pull_job);
     }
   }
-  OF_PROFILER_RANGE_POP();
   OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:CompileCurJobOnMaster");
   std::vector<Plan> sub_plans(jobs.size());
   FOR_RANGE(int64_t, i, 0, jobs.size()) {
