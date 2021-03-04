@@ -717,7 +717,7 @@ void UserOp::VirtualGenKernelConf(
   auto user_conf = kernel_conf->mutable_user_conf();
   *(user_conf->mutable_parallel_ctx()) = *parallel_ctx;
   //*(user_conf->mutable_sbp_sig()) = *CHECK_JUST(sbp_signature());
-  LOG(ERROR) << "not pass sbp_sig to kernel conf";
+  LOG(INFO) << "not pass sbp_sig to kernel conf";
   ForEachBnInOp([&](const std::string& bn) {
     const BlobDesc* blob_desc = GetBlobDesc4BnInOp(bn);
     if (blob_desc) { blob_desc->ToProto(&(*user_conf->mutable_bn_in_op2blob_desc())[bn]); }

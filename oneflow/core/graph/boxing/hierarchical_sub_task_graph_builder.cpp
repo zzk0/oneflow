@@ -333,13 +333,13 @@ Maybe<SubTskGphBuilderStatus> BuildFirstAxisParallelDistributionChangeSubGph(
       || (out_parallel_distribution.sbp_parallel(0) == out_parallel_distribution.sbp_parallel(1)
           && out_parallel_distribution.sbp_parallel(0).has_split_parallel())) {
     if (in_parallel_distribution.sbp_parallel(0).has_partial_sum_parallel()) {
-      LOG(ERROR) << " slice boxing add";
+      LOG(INFO) << " slice boxing add";
       return BuildSliceBoxingAddSubTskGph(
           ctx, sub_tsk_gph_builder, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks,
           in_parallel_desc, out_parallel_desc, lbi, logical_blob_desc, in_parallel_hierarchy,
           out_parallel_hierarchy, in_parallel_distribution, out_parallel_distribution, time_shape);
     } else {
-      LOG(ERROR) << " slice boxing copy";
+      LOG(INFO) << " slice boxing copy";
       return Build2DSliceBoxingSubTskGph(
           ctx, sub_tsk_gph_builder, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks,
           in_parallel_desc, out_parallel_desc, lbi, logical_blob_desc, in_parallel_hierarchy,
