@@ -513,10 +513,10 @@ Maybe<void> Operator::InferParallelDistributionSignatureIf(
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
   ParallelDistributionSignature signature;
-  CHECK_JUST(InferParallelDistributionSignature(&signature, sbp_sig_conf, parallel_desc,
+  JUST(InferParallelDistributionSignature(&signature, sbp_sig_conf, parallel_desc,
                                                 parallel_hierarchy,
                                                 ParallelDistributionInferHint4Ibn));
-  SetParallelDistributionSignature(signature);
+  JUST(FillParallelDistributionSignature(signature));
   return Maybe<void>::Ok();
 }
 
