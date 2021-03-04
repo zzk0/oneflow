@@ -60,8 +60,6 @@ Maybe<void> TensorDescInferFn(user_op::InferContext* ctx) {
   FOR_RANGE(int32_t, i, 0, dim_vec.size()) { CHECK_GT_OR_RETURN(dim_vec.at(i), 0); }
   const auto& parallel_distribution = ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
   const auto& parallel_hierarchy = ctx->parallel_hierarchy();
-  LOG(ERROR) << "parallel_distribution " << parallel_distribution.DebugString()
-             << " parallel_hierarchy " << parallel_hierarchy.DebugStr();
   const auto& parallel_ctx = ctx->parallel_ctx();
   if (parallel_hierarchy.NumAxes() == 1) {
     const auto& sbp_parallel = ctx->SbpParallel4ArgNameAndIndex("out", 0);
