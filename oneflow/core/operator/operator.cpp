@@ -144,20 +144,25 @@ Maybe<void> Operator::FillBlobParallelDesc(
   CHECK_OR_RETURN(!bn2parallel_desc_);
   bn2parallel_desc_.reset(new HashMap<std::string, std::shared_ptr<const ParallelDesc>>);
   for (const auto& bn : input_output_bns()) {
-    CHECK(bn2parallel_desc_->emplace(bn, JUST(ParallelDesc4Bn(bn))).second);
+    auto blob_parallel_desc = JUST(ParallelDesc4Bn(bn));
+    (*op_attribute_.mutable_parallel_conf_signature()->mutable_bn_in_op2parallel_conf())[bn] =
+        blob_parallel_desc->parallel_conf();
+    CHECK(bn2parallel_desc_->emplace(bn, blob_parallel_desc).second);
   }
   return Maybe<void>::Ok();
 }
 
 Maybe<void> Operator::InferBlobParallelDesc() {
-  FillBlobParallelDesc(
-      [&](const std::string& bn) -> Maybe<const ParallelDesc> { return GetOpParallelDesc(); });
+  JUST(FillBlobParallelDesc(
+      [&](const std::string& bn) -> Maybe<const ParallelDesc> { return GetOpParallelDesc(); }));
   return Maybe<void>::Ok();
 }
 
 Maybe<void> Operator::FillOpParallelDesc(const ParallelDesc& parallel_desc) {
   CHECK_OR_RETURN(!op_parallel_desc_);
   op_parallel_desc_.reset(new ParallelDesc(parallel_desc));
+  *op_attribute_.mutable_parallel_conf_signature()->mutable_op_parallel_conf() =
+      op_parallel_desc_->parallel_conf();
   return Maybe<void>::Ok();
 }
 
@@ -187,13 +192,13 @@ Maybe<void> FillLogicalBlobDesc(
     const PbRpf<std::string>& bns,
     std::unique_ptr<HashMap<std::string, std::shared_ptr<const BlobDesc>>>*
         bn2logical_blob_desc_ptr) {
-  FillLogicalBlobDesc(
+  JUST(FillLogicalBlobDesc(
       [&](const std::string& bn) -> const BlobDesc& {
         const BlobDesc* blob_desc = BlobDesc4BnInOp(bn);
         CHECK_NOTNULL(blob_desc);
         return *blob_desc;
       },
-      bns, bn2logical_blob_desc_ptr);
+      bns, bn2logical_blob_desc_ptr));
   return Maybe<void>::Ok();
 }
 
@@ -272,8 +277,7 @@ Maybe<void> Operator::InferLogicalOutBlobDescsIf() {
     bn2blob_desc[ibn].reset(new BlobDesc(*JUST(GetLogicalBlobDesc4Ibn(ibn))));
   }
   for (const auto& obn : output_bns()) {
-    // TODO(liujuncheng) : use GlobalJobDesc().DefaultDataType() or DataType::kInvalidDataType
-    bn2blob_desc[obn].reset(new BlobDesc(DataType::kFloat));
+    bn2blob_desc[obn].reset(new BlobDesc(DataType::kInvalidDataType));
   }
   auto BlobDesc4BnInOp = [&](const std::string& bn) -> BlobDesc* {
     return bn2blob_desc.at(bn).get();
@@ -289,43 +293,39 @@ Maybe<void> Operator::InferLogicalOutBlobDescs(
   ParallelContext parallel_ctx;
   parallel_ctx.set_parallel_id(0);
   parallel_ctx.set_parallel_num(1);
-  SbpSignature sbp_signature;
-  auto* map = sbp_signature.mutable_bn_in_op2sbp_parallel();
-  for (const auto& ibn : input_bns()) { (*map)[ibn].mutable_split_parallel()->set_axis(0); }
-  for (const auto& obn : output_bns()) { (*map)[obn].mutable_split_parallel()->set_axis(0); }
-  return InferOutBlobDescsIf(BlobDesc4BnInOp, &parallel_ctx, &sbp_signature);
+  return InferOutBlobDescsIf(BlobDesc4BnInOp, &parallel_ctx);
 }
 
 Maybe<void> Operator::InferBlobDescsIf(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature) const {
-  JUST(InferOutBlobDescsIf(GetBlobDesc4BnInOp, parallel_ctx, sbp_signature));
-  JUST(InferInternalBlobDescsIf(GetBlobDesc4BnInOp, parallel_ctx, sbp_signature));
+    const ParallelContext* parallel_ctx) const {
+  JUST(InferOutBlobDescsIf(GetBlobDesc4BnInOp, parallel_ctx));
+  JUST(InferInternalBlobDescsIf(GetBlobDesc4BnInOp, parallel_ctx));
   return Maybe<void>::Ok();
 }
 
 Maybe<void> Operator::InferOutBlobDescsIf(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature) const {
-  return InferOutBlobDescs(GetBlobDesc4BnInOp, parallel_ctx, sbp_signature);
+    const ParallelContext* parallel_ctx) const {
+  return InferOutBlobDescs(GetBlobDesc4BnInOp, parallel_ctx);
 }
 
 Maybe<void> Operator::InferOutBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature) const {
+    const ParallelContext* parallel_ctx) const {
   UNIMPLEMENTED() << typeid(*this).name();
   return Maybe<void>::Ok();
 }
 
 Maybe<void> Operator::InferInternalBlobDescsIf(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature) const {
-  return InferInternalBlobDescs(GetBlobDesc4BnInOp, parallel_ctx, sbp_signature);
+    const ParallelContext* parallel_ctx) const {
+  return InferInternalBlobDescs(GetBlobDesc4BnInOp, parallel_ctx);
 }
 
 Maybe<void> Operator::InferInternalBlobDescs(
     std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx, const SbpSignature* sbp_signature) const {
+    const ParallelContext* parallel_ctx) const {
   return Maybe<void>::Ok();
 }
 
@@ -415,12 +415,12 @@ Maybe<void> Operator::InferSbpSignatureIf(
     for (const auto& ibn : input_bns()) { (*bn2sbp)[ibn].mutable_split_parallel()->set_axis(0); }
     for (const auto& obn : output_bns()) { (*bn2sbp)[obn].mutable_split_parallel()->set_axis(0); }
   } else if (parallel_desc.parallel_num() > 1) {
-    InferSbpSignature(&signature, sbp_sig_conf, CalcOrderValue4SbpSig, SbpInferHint4Ibn,
-                      parallel_desc);
+    JUST(InferSbpSignature(&signature, sbp_sig_conf, CalcOrderValue4SbpSig, SbpInferHint4Ibn,
+                           parallel_desc));
   } else {
     UNIMPLEMENTED();
   }
-  FillSbpSignature(signature);
+  JUST(FillSbpSignature(signature));
   return Maybe<void>::Ok();
 }
 
