@@ -167,7 +167,8 @@ Maybe<OpArgParallelAttribute> GetOpArgParallelAttribute(
     const std::string& bn_in_op) {
   const auto& parallel_distribution_signature =
       op_attribute.parallel_distribution_signature().bn_in_op2parallel_distribution();
-  const auto& mirrored_signature_map = op_attribute.mirrored_signature().bn_in_op2opt_mirrored_parallel();
+  const auto& mirrored_signature_map =
+      op_attribute.mirrored_signature().bn_in_op2opt_mirrored_parallel();
   std::shared_ptr<cfg::SbpParallel> sbp_parallel = std::make_shared<cfg::SbpParallel>();
   auto it = parallel_distribution_signature.find(bn_in_op);
   if (it != parallel_distribution_signature.end()) {

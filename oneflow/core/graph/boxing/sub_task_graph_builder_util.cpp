@@ -53,39 +53,32 @@ std::vector<TensorSliceView> SubTskGphBuilderUtil::GetTensorSliceView(
 std::vector<TensorSliceView> SubTskGphBuilderUtil::GetTensor2DSliceView(
     const Shape& parallel_hierarchy, const ParallelDistribution& parallel_distribution,
     const BlobDesc& blob_desc) {
+  LOG(INFO) << "logical shape\n" << blob_desc.shape().DebugStr();
+  LOG(INFO) << "parallel_distribution\n" << parallel_distribution.DebugString();
   std::vector<Range> ranges(blob_desc.shape().NumAxes());
-  FOR_RANGE(int64_t, i, 0, blob_desc.shape().NumAxes()) {
-    ranges[i].mut_begin() = 0;
-    ranges[i].mut_end() = blob_desc.shape().At(i);
-  }
   std::vector<TensorSliceView> views;
-  SbpParallel sbp_parallel_0 = parallel_distribution.sbp_parallel(0);
-  SbpParallel sbp_parallel_1 = parallel_distribution.sbp_parallel(1);
-  if (sbp_parallel_0.has_split_parallel() && sbp_parallel_1.has_split_parallel()
-      && sbp_parallel_0.split_parallel().axis() == sbp_parallel_1.split_parallel().axis()) {
-    const int64_t parallel_num = parallel_hierarchy.At(0) * parallel_hierarchy.At(1);
-    const int64_t split_axis = sbp_parallel_0.split_parallel().axis();
-    const BalancedSplitter bs(blob_desc.shape().At(split_axis), parallel_num);
-    FOR_RANGE(int64_t, i, 0, parallel_num) {
-      ranges[split_axis] = bs.At(i);
-      views.emplace_back(ranges);
+  FOR_RANGE(int64_t, i, 0, parallel_hierarchy.elem_cnt()) {
+    FOR_RANGE(int64_t, j, 0, blob_desc.shape().NumAxes()) {
+      ranges[j].mut_begin() = 0;
+      ranges[j].mut_end() = blob_desc.shape().At(j);
     }
-  } else {
-    FOR_RANGE(int64_t, i, 0, parallel_hierarchy.At(0)) {
-      if (sbp_parallel_0.has_split_parallel()) {
-        const int64_t split_axis = sbp_parallel_0.split_parallel().axis();
-        const BalancedSplitter bs_0(blob_desc.shape().At(split_axis), parallel_hierarchy.At(0));
-        ranges[split_axis] = bs_0.At(i);
-      }
-      FOR_RANGE(int64_t, j, 0, parallel_hierarchy.At(1)) {
-        if (sbp_parallel_1.has_split_parallel()) {
-          const int64_t split_axis = sbp_parallel_1.split_parallel().axis();
-          const BalancedSplitter bs_1(blob_desc.shape().At(split_axis), parallel_hierarchy.At(1));
-          ranges[split_axis] = bs_1.At(j);
-        }
-        views.emplace_back(ranges);
+    FOR_RANGE(int64_t, j, 0, parallel_hierarchy.NumAxes()) {
+      const int64_t parallel_id =
+          (i % parallel_hierarchy.Count(j)) / parallel_hierarchy.Count(j + 1);
+      const SbpParallel& sbp_parallel = parallel_distribution.sbp_parallel(j);
+      if (sbp_parallel.has_split_parallel()) {
+        const int64_t split_axis = sbp_parallel.split_parallel().axis();
+        CHECK_EQ(ranges[split_axis].size() % parallel_hierarchy.At(j), 0);
+        const int64_t range_size = ranges[split_axis].size() / parallel_hierarchy.At(j);
+        const int64_t dim_start = ranges[split_axis].begin() + parallel_id * range_size;
+        ranges[split_axis].mut_begin() = dim_start;
+        ranges[split_axis].mut_end() = dim_start + range_size;
       }
     }
+    views.emplace_back(ranges);
+    TensorSliceViewProto proto;
+    views.at(i).ToProto(&proto);
+    LOG(INFO) << "GetTensor2DSliceView: " << i << "\n" << proto.DebugString();
   }
   return views;
 }

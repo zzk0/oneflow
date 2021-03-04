@@ -26,7 +26,7 @@ RuntimeBlobShapeInferHelper::RuntimeBlobShapeInferHelper(const OperatorConf& op_
                                                          const JobDesc* job_desc) {
   op_ = ConstructOp(op_conf, job_desc);
   const OpAttribute& op_attribute = kernel_conf.op_attribute();
-  //if (op_attribute.has_sbp_signature()) {
+  // if (op_attribute.has_sbp_signature()) {
   //  sbp_signature_.reset(new SbpSignature(op_attribute.sbp_signature()));
   //  CHECK_JUST(op_->FillSbpSignature(*sbp_signature_));
   //}
