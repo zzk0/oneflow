@@ -159,6 +159,11 @@ void ParallelDesc::ClearUp() {
     SortAndRemoveDuplication((pair.second).get());
     parallel_num_ += pair.second->size();
   }
+  if (parallel_conf_.has_hierarchy()) {
+    hierarchy_ = Shape(parallel_conf_.hierarchy());
+  } else {
+    hierarchy_ = Shape({parallel_num_});
+  }
   SortAndRemoveDuplication(&sorted_machine_ids_);
   int64_t parallel_id = 0;
   for (int64_t machine_id : sorted_machine_ids_) {

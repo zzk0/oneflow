@@ -21,6 +21,7 @@ limitations under the License.
 #include "oneflow/core/job/placement.pb.h"
 #include "oneflow/core/record/record.pb.h"
 #include "oneflow/core/framework/to_string.h"
+#include "oneflow/core/common/shape.h"
 
 namespace oneflow {
 
@@ -70,6 +71,7 @@ class ParallelDesc final {
 
   Maybe<void> GetParallelContext(ParallelContext* parallel_ctx, int64_t machine_id,
                                  int64_t device_id) const;
+  const Shape& hierarchy() const { return hierarchy_; }
 
   // Setters
   void set_device_type(DeviceType device_type);
@@ -103,6 +105,7 @@ class ParallelDesc final {
   Maybe<int64_t> symbol_id_;
   DeviceType device_type_;
   ParallelConf parallel_conf_;
+  Shape hierarchy_;
   std::vector<int64_t> sorted_machine_ids_;
   std::shared_ptr<HashMap<int64_t, std::shared_ptr<std::vector<int64_t>>>>
       machine_id2sorted_dev_phy_ids_;
