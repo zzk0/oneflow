@@ -150,8 +150,9 @@ message VariableOpConf {
   optional OptInt64 split_axis = 8;
   optional int64 random_seed = 9;
   optional RegularizerConf regularizer = 10;
-  optional ShapeProto parallel_hierarchy = 11;
-  repeated string parallel_distribution = 12;
+  optional bool trainable = 11 [default = true];
+  optional ShapeProto parallel_hierarchy = 12;
+  repeated string parallel_distribution = 13;
 }
 
 message DecodeRandomOpConf {
@@ -485,7 +486,6 @@ message BoxingZerosOpConf {
 
 message OperatorConf {
   required string name = 1;
-  optional bool trainable = 3 [default = true];
   optional string device_tag = 4 [default = "invalid_device"];
   repeated string ctrl_in_op_name = 7;
   optional int64 scope_symbol_id = 8;

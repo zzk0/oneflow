@@ -117,7 +117,7 @@ class UserOpInferContext : public user_op::InferContext {
   UserOpInferContext(const OperatorConf& op_conf, const ParallelContext* parallel_ctx,
                      const SbpSignature* sbp_signature,
                      const ParallelDistributionSignature* parallel_distribution_signature,
-                     const JobDesc& job_desc,
+                     const JobDesc* job_desc,
                      std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                      int64_t parallel_num, const Shape* parallel_hierarchy)
       : user_op::InferContext(user_op::UserOpConfWrapper(op_conf)),
@@ -174,7 +174,11 @@ class UserOpInferContext : public user_op::InferContext {
   const ArgVec& inputs() const override { return inputs_; }
   const ArgVec& outputs() const override { return outputs_; }
   const ParallelContext& parallel_ctx() const override { return *parallel_ctx_; };
-  const JobDesc& job_desc() const override { return job_desc_; }
+  const JobDesc* job_desc() const override {
+    CHECK_NOTNULL(job_desc_);
+    return job_desc_;
+  }
+
   const SbpParallel& SbpParallel4ArgNameAndIndex(const std::string& arg_name,
                                                  int32_t index) const override {
     const auto& bn2sbp = sbp_signature_->bn_in_op2sbp_parallel();
@@ -201,7 +205,7 @@ class UserOpInferContext : public user_op::InferContext {
   const SbpSignature* sbp_signature_;
   const ParallelDistributionSignature* parallel_distribution_signature_;
   const Shape* parallel_hierarchy_;
-  const JobDesc& job_desc_;
+  const JobDesc* job_desc_;
   HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc> arg2tensor_desc_;
   int64_t parallel_num_;
 };
@@ -449,12 +453,12 @@ void UserOp::InitFromOpConf() {
 }
 
 Maybe<void> UserOp::InferInternalBlobDescs(
-    std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-    const ParallelContext* parallel_ctx) const {
+    const std::function<BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp,
+    const ParallelContext* parallel_ctx, const JobDesc* job_desc) const {
   // tmp buffer size must be inferred after out shape/dtype
   const auto sbp_signature = JUST(this->sbp_signature());
   UserOpInferContext infer_ctx(
-      op_conf(), parallel_ctx, sbp_signature, JUST(parallel_distribution_signature()), job_desc(),
+      op_conf(), parallel_ctx, sbp_signature, JUST(parallel_distribution_signature()), job_desc,
       GetBlobDesc4BnInOp, parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
   const user_op::OpKernelRegistryResult* kernel_reg_val =
       JUST(user_op::UserOpRegistryMgr::Get().GetOpKernelRegistryResult(
@@ -488,7 +492,7 @@ Maybe<void> UserOp::InferLogicalOutBlobDescs(
   }
 
   UserOpInferContext infer_ctx(op_conf(), nullptr, JUST(sbp_signature()),
-                               JUST(parallel_distribution_signature()), job_desc(), BlobDesc4BnInOp,
+                               JUST(parallel_distribution_signature()), nullptr, BlobDesc4BnInOp,
                                parallel_desc.parallel_num(), JUST(parallel_hierarchy()));
 
   JUST(val_->logical_tensor_desc_infer_fn(&infer_ctx));
@@ -518,7 +522,7 @@ Maybe<void> UserOp::InferOutBlobDescs(
   }
   const auto sbp_signature = JUST(this->sbp_signature());
   UserOpInferContext infer_ctx(
-      op_conf(), parallel_ctx, sbp_signature, JUST(parallel_distribution_signature()), job_desc(),
+      op_conf(), parallel_ctx, sbp_signature, JUST(parallel_distribution_signature()), nullptr,
       GetBlobDesc4BnInOp, parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
 
   JUST(val_->physical_tensor_desc_infer_fn(&infer_ctx));
@@ -540,7 +544,7 @@ Maybe<void> UserOp::InferInplaceObn2Ibn(
     const ParallelContext* parallel_ctx) const {
   UserOpInferContext infer_ctx(
       op_conf(), parallel_ctx, JUST(sbp_signature()), JUST(parallel_distribution_signature()),
-      job_desc(), GetBlobDesc4BnInOp, parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
+      nullptr, GetBlobDesc4BnInOp, parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
   const user_op::OpKernelRegistryResult* kernel_reg_val =
       JUST(user_op::UserOpRegistryMgr::Get().GetOpKernelRegistryResult(
           op_conf().user_conf().op_type_name(),
