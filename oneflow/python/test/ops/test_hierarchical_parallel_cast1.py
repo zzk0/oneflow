@@ -84,6 +84,8 @@ def _test_train(test_case):
         ).minimize(x)
         return x
 
+    check_point = flow.train.CheckPoint()
+    check_point.init()
     x_arr = np.random.rand(1024, 1024).astype(np.float32)
     y_arr = test_fn(x_arr)
     print("y_arr", y_arr.shape, y_arr.flatten()[0:10])
@@ -172,6 +174,48 @@ def _test_gather(test_case, condition):
                 parallel_distribution=["B", "B"],
                 name="gather_cast",
             )
+        elif condition == 5:  # (P, S0)->(S0, S0)
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
+            )
+            indices = flow.hierarchical_parallel_cast(
+                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
+            )
+            x = flow.gather(x, indices)
+            x = flow.hierarchical_parallel_cast(
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["S(0)", "S(0)"],
+                name="gather_cast",
+            )
+        elif condition == 6:  # (P, S1)->(S1, S1)
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(1)"]
+            )
+            indices = flow.hierarchical_parallel_cast(
+                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+            )
+            x = flow.gather(x, indices)
+            x = flow.hierarchical_parallel_cast(
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["S(1)", "S(1)"],
+                name="gather_cast",
+            )
+        elif condition == 7:  # (P, S1)->(S0, S1)
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(1)"]
+            )
+            indices = flow.hierarchical_parallel_cast(
+                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+            )
+            x = flow.gather(x, indices)
+            x = flow.hierarchical_parallel_cast(
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["S(0)", "S(1)"],
+                name="gather_cast",
+            )
         else:
             pass
 
@@ -194,12 +238,15 @@ def _test_gather(test_case, condition):
 class TestHierarchicalParallelCast(flow.unittest.TestCase):
     def test_hierarchy_parallel_cast(test_case):
         # _test(test_case)
-        # _test_train(test_case)
-        _test_gather(test_case, 0)  # (S0, P)->(S0, B)
-        _test_gather(test_case, 1)  # (P, S1)->(B, S1)
-        _test_gather(test_case, 2)  # (P, S0)->(B, S0)
-        _test_gather(test_case, 3)  # (S1, P)->(S1, B)
-        _test_gather(test_case, 4)  # (P, B)->(B, B)
+        _test_train(test_case)
+        # _test_gather(test_case, 0)  # (S0, P)->(S0, B)
+        # _test_gather(test_case, 1)  # (P, S1)->(B, S1)
+        # _test_gather(test_case, 2)  # (P, S0)->(B, S0)
+        # _test_gather(test_case, 3)  # (S1, P)->(S1, B)
+        # _test_gather(test_case, 4)  # (P, B)->(B, B)
+        # _test_gather(test_case, 5)  # (P, S0)->(S0, S0)
+        # _test_gather(test_case, 6)  # (P, S1)->(S1, S1)
+        # _test_gather(test_case, 7)  # (P, S1)->(S0, S1)
 
 
 if __name__ == "__main__":
