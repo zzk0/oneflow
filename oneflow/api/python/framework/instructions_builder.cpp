@@ -92,8 +92,10 @@ std::shared_ptr<Scope> BuildInitialScope(const std::shared_ptr<InstructionsBuild
 
 std::shared_ptr<Scope> BuildScopeWithNewParallelDesc(
     const std::shared_ptr<InstructionsBuilder>& x, const std::shared_ptr<Scope>& scope,
-    const std::string& device_tag, const std::vector<std::string>& machine_device_ids) {
-  return x->BuildScopeWithNewParallelDesc(scope, device_tag, machine_device_ids).GetPtrOrThrow();
+    const std::string& device_tag, const std::vector<std::string>& machine_device_ids,
+    const std::shared_ptr<Shape>& shape) {
+  return x->BuildScopeWithNewParallelDesc(scope, device_tag, machine_device_ids, shape)
+      .GetPtrOrThrow();
 }
 
 std::shared_ptr<Scope> BuildScopeWithNewParallelConf(
@@ -323,7 +325,9 @@ ONEFLOW_API_PYBIND11_MODULE("deprecated", m) {
       .def("UnpackLogicalBlobToPhysicalBlobs", &UnpackLogicalBlobToPhysicalBlobs)
       .def("MakeReferenceBlobObject", &MakeReferenceBlobObject)
       .def("BuildInitialScope", &BuildInitialScope)
-      .def("BuildScopeWithNewParallelDesc", &BuildScopeWithNewParallelDesc)
+      .def("BuildScopeWithNewParallelDesc", &BuildScopeWithNewParallelDesc,
+           py::arg("scope").none(false), py::arg("device_tag").none(false),
+           py::arg("machine_device_ids").none(false), py::arg("shape").none(true))
       .def("BuildScopeWithNewParallelConf", &BuildScopeWithNewParallelConf)
       .def("BuildScopeWithNewIsMirrored", &BuildScopeWithNewIsMirrored)
       .def("BuildScopeWithNewScopeName", &BuildScopeWithNewScopeName)
