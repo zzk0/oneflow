@@ -521,9 +521,9 @@ Maybe<void> UserOp::InferOutBlobDescs(
     }
   }
   const auto sbp_signature = JUST(this->sbp_signature());
-  UserOpInferContext infer_ctx(
-      op_conf(), parallel_ctx, sbp_signature, JUST(parallel_distribution_signature()), nullptr,
-      GetBlobDesc4BnInOp, parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
+  UserOpInferContext infer_ctx(op_conf(), parallel_ctx, sbp_signature,
+                               JUST(parallel_distribution_signature()), nullptr, GetBlobDesc4BnInOp,
+                               parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
 
   JUST(val_->physical_tensor_desc_infer_fn(&infer_ctx));
   for (const auto& pair : infer_ctx.outputs()) {
@@ -542,9 +542,9 @@ Maybe<void> UserOp::InferInplaceObn2Ibn(
     HashMap<std::string, std::string>* con_inplace_obn2ibn,
     const std::function<BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx) const {
-  UserOpInferContext infer_ctx(
-      op_conf(), parallel_ctx, JUST(sbp_signature()), JUST(parallel_distribution_signature()),
-      nullptr, GetBlobDesc4BnInOp, parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
+  UserOpInferContext infer_ctx(op_conf(), parallel_ctx, JUST(sbp_signature()),
+                               JUST(parallel_distribution_signature()), nullptr, GetBlobDesc4BnInOp,
+                               parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
   const user_op::OpKernelRegistryResult* kernel_reg_val =
       JUST(user_op::UserOpRegistryMgr::Get().GetOpKernelRegistryResult(
           op_conf().user_conf().op_type_name(),

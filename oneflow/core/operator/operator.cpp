@@ -510,8 +510,7 @@ Maybe<void> Operator::InferParallelDistributionSignatureIf(
         ParallelDistributionInferHint4Ibn) {
   ParallelDistributionSignature signature;
   JUST(InferParallelDistributionSignature(&signature, sbp_sig_conf, parallel_desc,
-                                                parallel_hierarchy,
-                                                ParallelDistributionInferHint4Ibn));
+                                          parallel_hierarchy, ParallelDistributionInferHint4Ibn));
   JUST(FillParallelDistributionSignature(signature));
   return Maybe<void>::Ok();
 }
