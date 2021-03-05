@@ -582,12 +582,12 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferOp(const OperatorConf& op_con
   op->InferParallelHierarchyIf(GetParallelHierarchy4Ibn, ParallelDesc(*parallel_conf));
   CHECK(op_name2parallel_hierarchy_.emplace(op->op_name(), *CHECK_JUST(op->parallel_hierarchy()))
             .second);
-  auto GetBlobDesc4BnInOp = [&](const std::string& bn) -> BlobDesc* {
+  auto GetBlobDesc4BnInOp = [&](const std::string& bn) -> const BlobDesc& {
     const LogicalBlobId& lbi = op->BnInOp2Lbi(bn);
-    if (lbi2logical_blob_desc_.find(lbi) != lbi2logical_blob_desc_.end()) {
-      return lbi2logical_blob_desc_.at(lbi).get();
-    }
-    return nullptr;
+    auto it = op_name2op_.find(lbi.op_name());
+    CHECK(it != op_name2op_.end());
+    auto producer_op = it->second;
+    return *CHECK_JUST(producer_op->GetLogicalBlobDesc4Obn(lbi.blob_name()));
   };
   JUST(op->FillLogicalInBlobDesc(GetBlobDesc4BnInOp));
 
