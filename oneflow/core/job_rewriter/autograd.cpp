@@ -729,7 +729,16 @@ Maybe<void> AutoGrad(JobPassCtx* ctx, const OpGraph& op_graph, JobBuilder* job_b
     JUST(GenerateBackwardOpConfIf(op_node->op(), &ops, DiffLbi4BnInOp, LogicalBlobDesc4BnInOp));
     int64_t scope_symbol_id = op_node->op().op_conf().scope_symbol_id();
     for (auto& op_conf : ops) { op_conf.set_scope_symbol_id(scope_symbol_id); }
-    job_builder->AddOps(op_node->parallel_desc().parallel_conf(), ops);
+
+    if (op_node->op().op_conf().has_user_conf()
+        && op_node->op().op_conf().user_conf().op_type_name() == "hierarchical_parallel_cast") {
+      const auto& producer_node = op_node->ProducerOpNode4Lbi(op_node->op().BnInOp2Lbi("in_0"));
+      LOG(INFO) << op_name << " producer_node parallel_conf"
+                << producer_node.parallel_desc().parallel_conf().DebugString();
+      job_builder->AddOps(producer_node.parallel_desc().parallel_conf(), ops);
+    } else {
+      job_builder->AddOps(op_node->parallel_desc().parallel_conf(), ops);
+    }
   }
   OpBlobArgPairs fw_bw_oba_pairs;
   CalcFwBwObaPairs(op_graph, in_oba2in_diff_lbi, out_oba2out_diff_lbi, out_oba2clone_bw_add_out_lbi,

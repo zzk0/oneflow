@@ -44,7 +44,15 @@ void PrependTickByParallelDesc(const OpGraph& op_graph, JobBuilder* job_builder)
     device_tick_op.set_name("System-AutoTick-Prepend-DeviceTick_" + NewUniqueId());
     auto* device_tick_op_conf = device_tick_op.mutable_device_tick_conf();
     device_tick_op_conf->set_out("out");
-    job_builder->AddOps(pair.first.parallel_conf(), {device_tick_op});
+
+    ParallelConf new_parallel_conf(pair.first.parallel_conf());
+    if (pair.first.parallel_conf().has_hierarchy()) {
+      const Shape& hierarchy = Shape(pair.first.parallel_conf().hierarchy());
+      LOG(INFO) << " tick hierarchy" << hierarchy.DebugStr();
+      Shape new_shape = {hierarchy.elem_cnt()};
+      new_shape.ToProto(new_parallel_conf.mutable_hierarchy());
+    }
+    job_builder->AddOps(new_parallel_conf, {device_tick_op});
 
     for (const auto* op_node : pair.second) {
       auto mut_tick_input_helper = NewMutOpConTickInputHelper(op_node->op().op_conf());
@@ -219,7 +227,14 @@ OperatorConf AppendTick(const std::string tick_name, const std::vector<std::stri
                         ParallelConf parallel_conf, JobBuilder* job_builder) {
   OperatorConf device_tick_op_conf = MakeDeviceTickOpConf(tick_name);
   for (const auto& op_name : op_names) { device_tick_op_conf.add_ctrl_in_op_name(op_name); }
-  job_builder->AddOps(parallel_conf, {device_tick_op_conf});
+  ParallelConf new_parallel_conf(parallel_conf);
+  if (parallel_conf.has_hierarchy()) {
+    const Shape& hierarchy = Shape(parallel_conf.hierarchy());
+    LOG(INFO) << " tick hierarchy" << hierarchy.DebugStr();
+    Shape new_shape = {hierarchy.elem_cnt()};
+    new_shape.ToProto(new_parallel_conf.mutable_hierarchy());
+  }
+  job_builder->AddOps(new_parallel_conf, {device_tick_op_conf});
   return device_tick_op_conf;
 }
 
@@ -246,7 +261,15 @@ OperatorConf PrependTick(const HashSet<const OpNode*>& op_nodes, JobBuilder* job
   job_builder->MutOpsOnlyOnce({op_confs});
   ParallelDesc pd((*op_nodes.begin())->parallel_desc());
   pd.set_device_type(DeviceType::kCPU);
-  job_builder->AddOps(pd.parallel_conf(), {tick_op_conf});
+  ParallelConf parallel_conf = pd.parallel_conf();
+  ParallelConf new_parallel_conf(parallel_conf);
+  if (parallel_conf.has_hierarchy()) {
+    const Shape& hierarchy = Shape(parallel_conf.hierarchy());
+    LOG(INFO) << " tick hierarchy" << hierarchy.DebugStr();
+    Shape new_shape = {hierarchy.elem_cnt()};
+    new_shape.ToProto(new_parallel_conf.mutable_hierarchy());
+  }
+  job_builder->AddOps(new_parallel_conf, {tick_op_conf});
   return tick_op_conf;
 }
 
@@ -271,8 +294,15 @@ OperatorConf AppendAccTick(const Shape& src_shape, const std::list<const OpNode*
     device_tick_conf->add_tick(acc_op_conf.name() + "/acc");
     device_tick_conf->set_out("out");
   }
-  job_builder->AddOps(op_nodes.front()->parallel_desc().parallel_conf(),
-                      {acc_op_conf, last_device_tick_op_conf});
+  ParallelConf parallel_conf = op_nodes.front()->parallel_desc().parallel_conf();
+  ParallelConf new_parallel_conf(parallel_conf);
+  if (parallel_conf.has_hierarchy()) {
+    const Shape& hierarchy = Shape(parallel_conf.hierarchy());
+    LOG(INFO) << " tick hierarchy" << hierarchy.DebugStr();
+    Shape new_shape = {hierarchy.elem_cnt()};
+    new_shape.ToProto(new_parallel_conf.mutable_hierarchy());
+  }
+  job_builder->AddOps(new_parallel_conf, {acc_op_conf, last_device_tick_op_conf});
   return last_device_tick_op_conf;
 }
 
