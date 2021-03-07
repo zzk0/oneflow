@@ -37,6 +37,8 @@ import oneflow
 import oneflow_api.oneflow.core.register.logical_blob_id as lbi_util
 import oneflow_api
 import os
+import traceback
+
 
 blob_register = oneflow_api.GetDefaultBlobRegister()
 
@@ -361,7 +363,11 @@ def GenerateVariableOpConf(
         op_conf.variable_conf.model_name = model_name
 
     if parallel_hierarchy is not None:
-        op_conf.variable_conf.parallel_hierarchy.dim.extend(parallel_hierarchy)
+        print(
+            "WARNING:",
+            "parallel_hierarchy param is deprecated\n",
+            traceback.format_stack()[-4],
+        )
 
     if parallel_distribution is None or len(parallel_distribution) == 0:
         parallel_distribution = ["B"]

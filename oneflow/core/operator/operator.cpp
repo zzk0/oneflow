@@ -526,7 +526,7 @@ Maybe<void> Operator::InferParallelDistributionSignature(
     for (const auto& ibn : input_bns()) {
       const ParallelDistributionInferHint* hint = JUST(ParallelDistributionInferHint4Ibn(ibn));
       LOG(INFO) << op_name() << " hierarchy 1 " << ibn << " lbi: " << lbi4ibn(ibn).DebugString()
-                << " " << parallel_hierarchy.DebugStr() << " sbp: \n"
+                << " parallel_hierarchy: " << parallel_hierarchy.DebugStr() << " sbp: \n"
                 << hint->parallel_distribution().DebugString();
       CHECK_EQ(hint->parallel_distribution().sbp_parallel_size(), 1);
       ibn2sbp_infer_hint.emplace(ibn,
@@ -553,7 +553,8 @@ Maybe<void> Operator::InferParallelDistributionSignature(
         for (const auto& ibn : input_bns()) {
           ParallelDistribution distribution =
               JUST(ParallelDistributionInferHint4Ibn(ibn))->parallel_distribution();
-          LOG(INFO) << op_name() << " hierarchy 2 " << ibn << "  " << parallel_hierarchy.DebugStr()
+          LOG(INFO) << op_name() << " hierarchy 2 " << ibn << " lbi: " << lbi4ibn(ibn).DebugString()
+                    << " parallel_hierarchy: " << parallel_hierarchy.DebugStr()
                     << " sbp: " << distribution.DebugString();
           CHECK_EQ_OR_RETURN(distribution.sbp_parallel_size(), parallel_hierarchy.NumAxes());
           if (sbp_signature.bn_in_op2sbp_parallel().at(ibn)
