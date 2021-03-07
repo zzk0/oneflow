@@ -58,7 +58,6 @@ class InferContext {
                                                                            int32_t) const = 0;
 
   virtual bool* IsDynamic4ArgNameAndIndex(const std::string&, int32_t) = 0;
-  virtual bool* IsTensorList4ArgNameAndIndex(const std::string&, int32_t) = 0;
 
   const UserOpConfWrapper& user_op_conf() const { return conf_; }
 
