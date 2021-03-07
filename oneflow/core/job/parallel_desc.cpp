@@ -165,6 +165,7 @@ void ParallelDesc::ClearUp() {
   } else {
     hierarchy_ = Shape({parallel_num_});
   }
+  hierarchy_.ToProto(parallel_conf_.mutable_hierarchy());
   SortAndRemoveDuplication(&sorted_machine_ids_);
   int64_t parallel_id = 0;
   for (int64_t machine_id : sorted_machine_ids_) {

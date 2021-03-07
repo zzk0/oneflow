@@ -46,6 +46,9 @@ class OpNode final : public Node<OpNode, OpEdge> {
   std::shared_ptr<const Operator> shared_op() const { return op_; }
   const ParallelDesc& parallel_desc() const { return parallel_desc_; }
   const SbpSignature& sbp_signature() const { return *CHECK_JUST(op().sbp_signature()); }
+  const ParallelDistributionSignature& parallel_distribution_signature() const {
+    return *CHECK_JUST(op().parallel_distribution_signature());
+  }
   const SbpParallel& SbpParallel4Lbi(const LogicalBlobId& lbi) const;
   const SbpParallel& SbpParallel4BnInOp(const std::string& bn_in_op) const;
   const ParallelDistribution& ParallelDistribution4Lbi(const LogicalBlobId& lbi) const;

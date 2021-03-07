@@ -1208,4 +1208,30 @@ Maybe<Shape> GetPhysicalShape(const Shape& logical_shape, const SbpParallel& sbp
   return physical;
 }
 
+Maybe<Shape> GetPhysicalShape(const Shape& logical_shape,
+                              const ParallelDistribution& parallel_distribution,
+                              const Shape& parallel_hierarchy, int64_t parallel_num,
+                              int64_t parallel_id) {
+  CHECK_LT_OR_RETURN(parallel_id, parallel_num);
+
+  CHECK_EQ_OR_RETURN(parallel_hierarchy.elem_cnt(), parallel_num);
+  CHECK_EQ_OR_RETURN(parallel_hierarchy.NumAxes(), parallel_distribution.sbp_parallel_size());
+  if (parallel_hierarchy.NumAxes() == 1) {
+    return GetPhysicalShape(logical_shape, parallel_distribution.sbp_parallel(0), parallel_num,
+                            parallel_id);
+  } else {
+    std::shared_ptr<Shape> physical = std::make_shared<Shape>(logical_shape);
+    FOR_RANGE(int64_t, i, 0, parallel_hierarchy.NumAxes()) {
+      const SbpParallel& sbp_parallel = parallel_distribution.sbp_parallel(i);
+      if (sbp_parallel.has_split_parallel()) {
+        const int64_t split_axis = sbp_parallel.split_parallel().axis();
+        CHECK_EQ_OR_RETURN(physical->At(split_axis) % parallel_hierarchy.At(i), 0);
+        physical->Set(split_axis, physical->At(split_axis) / parallel_hierarchy.At(i));
+      }
+    }
+    LOG(INFO) << "GetPhysicalShape 2D:\n" << physical->DebugStr();
+    return physical;
+  }
+}
+
 }  // namespace oneflow
