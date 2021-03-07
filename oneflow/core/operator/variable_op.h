@@ -41,12 +41,9 @@ class VariableOp final : public Operator {
       const ParallelDesc& parallel_desc) const override;
   Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override;
   Symbol<OperatorConf> GetOpConfWithoutOpNameAndLbn() const override;
-  Maybe<void> InferParallelHierarchy(
-      std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-      const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const override;
   Maybe<void> InferParallelDistributionSignature(
       ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
-      const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+      const ParallelDesc& parallel_desc,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
           ParallelDistributionInferHint4Ibn) override;
 };

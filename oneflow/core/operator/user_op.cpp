@@ -20,7 +20,6 @@ limitations under the License.
 #include "oneflow/core/operator/user_op.h"
 #include <utility>
 #include "oneflow/core/framework/infer_output_blob_time_shape_fn_context.h"
-#include "oneflow/core/framework/infer_parallel_hierarchy_fn_context.h"
 #include "oneflow/core/framework/infer_parallel_distribution_fn_context.h"
 #include "oneflow/core/graph/op_graph.h"
 
@@ -338,44 +337,6 @@ class UserOpInferOutputBlobTimeShapeFnContext : public user_op::InferOutputBlobT
   Shape* output_blob_time_shape_;
 };
 
-class UserOpInferParallelHierarchyFnContext : public user_op::InferParallelHierarchyFnContext {
- public:
-  UserOpInferParallelHierarchyFnContext(
-      const OperatorConf& op_conf,
-      const std::function<Maybe<const Shape*>(const std::string&)>& GetParallelHierarchy4Ibn,
-      const ParallelDesc& parallel_desc, Shape* parallel_hierarchy)
-      : user_op_conf_(op_conf),
-        parallel_hierarchy_(parallel_hierarchy),
-        parallel_num_(parallel_desc.parallel_num()) {
-    for (const auto& it : op_conf.user_conf().input()) {
-      const std::string& arg_name = it.first;
-      for (int32_t i = 0; i < it.second.s_size(); ++i) {
-        std::string ibn = GenRepeatedBn(arg_name, i);
-        arg2parallel_hierarchy_.emplace(std::make_pair(arg_name, i),
-                                        *CHECK_JUST(GetParallelHierarchy4Ibn(ibn)));
-      }
-    }
-  }
-  ~UserOpInferParallelHierarchyFnContext() override = default;
-
-  const Shape& ParallelHierarchy4InputArgNameAndIndex(const std::string& arg_name,
-                                                      int32_t index) override {
-    return arg2parallel_hierarchy_.at(std::make_pair(arg_name, index));
-  }
-
-  const user_op::UserOpConfWrapper& user_op_conf() const override { return user_op_conf_; }
-
-  int64_t parallel_num() const override { return parallel_num_; };
-
-  Shape* mut_parallel_hierarchy() override { return parallel_hierarchy_; };
-
- private:
-  HashMap<std::pair<std::string, int32_t>, Shape> arg2parallel_hierarchy_;
-  user_op::UserOpConfWrapper user_op_conf_;
-  Shape* parallel_hierarchy_;
-  int64_t parallel_num_;
-};
-
 class UserOpInferParallelDistributionFnContext
     : public user_op::InferParallelDistributionFnContext {
  public:
@@ -457,9 +418,11 @@ Maybe<void> UserOp::InferInternalBlobDescs(
     const ParallelContext* parallel_ctx, const JobDesc* job_desc) const {
   // tmp buffer size must be inferred after out shape/dtype
   const auto sbp_signature = JUST(this->sbp_signature());
+  const Shape& parallel_hierarchy = JUST(GetOpParallelDesc())->hierarchy();
+  LOG(INFO) << "user_op hierarchy " << parallel_hierarchy.DebugStr();
   UserOpInferContext infer_ctx(
       op_conf(), parallel_ctx, sbp_signature, JUST(parallel_distribution_signature()), job_desc,
-      GetBlobDesc4BnInOp, parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
+      GetBlobDesc4BnInOp, parallel_ctx->parallel_num(), &parallel_hierarchy);
   const user_op::OpKernelRegistryResult* kernel_reg_val =
       JUST(user_op::UserOpRegistryMgr::Get().GetOpKernelRegistryResult(
           op_conf().user_conf().op_type_name(),
@@ -490,10 +453,11 @@ Maybe<void> UserOp::InferLogicalOutBlobDescs(
       BlobDesc4BnInOp(obn)->CopyFrom(*first_in_blob_desc);
     }
   }
-
+  const Shape& parallel_hierarchy = parallel_desc.hierarchy();
+  LOG(INFO) << "user_op hierarchy " << parallel_hierarchy.DebugStr();
   UserOpInferContext infer_ctx(op_conf(), nullptr, JUST(sbp_signature()),
                                JUST(parallel_distribution_signature()), nullptr, BlobDesc4BnInOp,
-                               parallel_desc.parallel_num(), JUST(parallel_hierarchy()));
+                               parallel_desc.parallel_num(), &parallel_hierarchy);
 
   JUST(val_->logical_tensor_desc_infer_fn(&infer_ctx));
   for (const auto& pair : infer_ctx.outputs()) {
@@ -521,9 +485,11 @@ Maybe<void> UserOp::InferOutBlobDescs(
     }
   }
   const auto sbp_signature = JUST(this->sbp_signature());
+  const Shape& parallel_hierarchy = JUST(GetOpParallelDesc())->hierarchy();
+  LOG(INFO) << "user_op hierarchy " << parallel_hierarchy.DebugStr();
   UserOpInferContext infer_ctx(op_conf(), parallel_ctx, sbp_signature,
                                JUST(parallel_distribution_signature()), nullptr, GetBlobDesc4BnInOp,
-                               parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
+                               parallel_ctx->parallel_num(), &parallel_hierarchy);
 
   JUST(val_->physical_tensor_desc_infer_fn(&infer_ctx));
   for (const auto& pair : infer_ctx.outputs()) {
@@ -542,9 +508,11 @@ Maybe<void> UserOp::InferInplaceObn2Ibn(
     HashMap<std::string, std::string>* con_inplace_obn2ibn,
     const std::function<BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx) const {
+  const Shape& parallel_hierarchy = JUST(GetOpParallelDesc())->hierarchy();
+  LOG(INFO) << "user_op hierarchy " << parallel_hierarchy.DebugStr();
   UserOpInferContext infer_ctx(op_conf(), parallel_ctx, JUST(sbp_signature()),
                                JUST(parallel_distribution_signature()), nullptr, GetBlobDesc4BnInOp,
-                               parallel_ctx->parallel_num(), JUST(parallel_hierarchy()));
+                               parallel_ctx->parallel_num(), &parallel_hierarchy);
   const user_op::OpKernelRegistryResult* kernel_reg_val =
       JUST(user_op::UserOpRegistryMgr::Get().GetOpKernelRegistryResult(
           op_conf().user_conf().op_type_name(),
@@ -669,31 +637,19 @@ Maybe<void> UserOp::InferOutputBlobTimeShape(
   }
 }
 
-Maybe<void> UserOp::InferParallelHierarchy(
-    std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-    const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const {
-  if (val_->infer_parallel_hierarchy_fn) {
-    UserOpInferParallelHierarchyFnContext infer_parallel_hierarchy_fn_ctx(
-        this->op_conf(), GetParallelHierarchy4Ibn, parallel_desc, parallel_hierarchy);
-    return val_->infer_parallel_hierarchy_fn(&infer_parallel_hierarchy_fn_ctx);
-  } else {
-    return Operator::InferParallelHierarchy(GetParallelHierarchy4Ibn, parallel_desc,
-                                            parallel_hierarchy);
-  }
-}
-
 Maybe<void> UserOp::InferParallelDistributionSignature(
     ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
-    const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+    const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
+  const auto& parallel_hierarchy = parallel_desc.hierarchy();
   if (val_->infer_parallel_distribution_fn) {
     UserOpInferParallelDistributionFnContext ctx(op_conf(), ParallelDistributionInferHint4Ibn,
                                                  parallel_desc, parallel_hierarchy, signature);
     return val_->infer_parallel_distribution_fn(&ctx);
   } else {
     return Operator::InferParallelDistributionSignature(signature, sbp_sig_conf, parallel_desc,
-                                                        parallel_hierarchy,
+
                                                         ParallelDistributionInferHint4Ibn);
   }
 }
@@ -737,7 +693,6 @@ void UserOp::VirtualGenKernelConf(
   const OpNode* op_node = Global<OpGraph>::Get()->OpNode4OpName(op_conf().name());
   *(user_conf->mutable_parallel_distribution_sig()) =
       *CHECK_JUST(op_node->op().parallel_distribution_signature());
-  op_node->parallel_hierarchy()->ToProto(user_conf->mutable_parallel_hierarchy());
   *user_conf->mutable_parallel_conf() = CHECK_JUST(GetOpParallelDesc())->parallel_conf();
 }
 

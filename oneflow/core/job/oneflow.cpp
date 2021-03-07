@@ -61,7 +61,6 @@ namespace oneflow {
 bool operator==(const ParallelBlobConf& lhs, const ParallelBlobConf& rhs) {
   return BlobDesc(lhs.logical_blob_desc_conf()) == BlobDesc(rhs.logical_blob_desc_conf())
          && lhs.parallel_conf() == rhs.parallel_conf()
-         && Shape(lhs.parallel_hierarchy()) == Shape(rhs.parallel_hierarchy())
          && lhs.parallel_distribution() == rhs.parallel_distribution();
 }
 
@@ -542,13 +541,12 @@ void GetMemSharingOpBlobInfo(const JobBuilder& job_builder, const std::string& o
   ParallelBlobConf ret;
   *blob_conf->mutable_parallel_conf() = job_builder.ParallelConf4OpName(op_name);
   *blob_conf->mutable_logical_blob_desc_conf() = job.helper().lbn2logical_blob_desc().at(lbn);
-  *blob_conf->mutable_parallel_hierarchy() =
-      job.job_parallel_view_conf().op_name2parallel_hierarchy().at(op_name);
   *blob_conf->mutable_parallel_distribution() = job.job_parallel_view_conf()
                                                     .op_name2parallel_distribution_signature_conf()
                                                     .at(op_name)
                                                     .bn_in_op2parallel_distribution()
                                                     .at(obn);
+  LOG(INFO) << "op " << op_name << " " << lbn << " blob_conf:\n" << blob_conf->DebugString();
 }
 
 void FilterOpName2ParallelBlobConf(

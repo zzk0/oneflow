@@ -64,7 +64,7 @@ Maybe<void> InterfaceOpUtil::InferOutBlobDesc(const InterfaceBlobConf& blob_conf
   //  BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_ctx->parallel_num());
   //  out_blob_desc->mut_shape().Set(split_axis, bs.At(parallel_ctx->parallel_id()).size());
   //}
-  if (blob_conf.has_parallel_hierarchy()) {
+  if (blob_conf.has_parallel_distribution()) {
     const Shape& parallel_hierarchy = Shape(blob_conf.parallel_hierarchy());
     if (parallel_hierarchy.NumAxes() == 1
         || (blob_conf.parallel_distribution().sbp_parallel(0)
@@ -145,7 +145,10 @@ Maybe<void> InterfaceOpUtil::InitBlobConf(InterfaceBlobConf* blob_conf,
     OF_UNIMPLEMENTED();
   }
   *blob_conf->mutable_parallel_distribution() = parallel_blob_conf.parallel_distribution();
-  *blob_conf->mutable_parallel_hierarchy() = parallel_blob_conf.parallel_hierarchy();
+  ParallelDesc(parallel_blob_conf.parallel_conf())
+      .hierarchy()
+      .ToProto(blob_conf->mutable_parallel_hierarchy());
+  LOG(INFO) << "InterfaceBlobConf " << blob_conf->DebugString();
   return Maybe<void>::Ok();
 }
 

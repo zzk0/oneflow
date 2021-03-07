@@ -36,159 +36,176 @@ def _test_gather(test_case, src, dst):
         x: flow.typing.Numpy.Placeholder((1024, 1024)),
         indices: flow.typing.Numpy.Placeholder(shape=(64,), dtype=flow.int32),
     ) -> flow.typing.Numpy:
-        if src == "(S0, S0)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices,
-                parallel_hierarchy=[2, 2],
-                parallel_distribution=["S(0)", "S(0)"],
-            )
-            x = flow.gather(x, indices)
-        elif src == "(S0, S1)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(1)"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(S0, P)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(S0, B)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(S1, S0)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "B"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(S1, S1)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(1)"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(S1, P)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(0)"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(S1, B)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "B"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(P, S0)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(P, S1)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(1)"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(P, P)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(P, B)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(B, S0)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(B, S1)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(1)"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(B, P)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        elif src == "(B, B)":
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
-            )
-            x = flow.gather(x, indices)
-        else:
-            raise NotImplementedError
+        x = flow.identity(x)
+        indices = flow.identity(indices)
+        with flow.scope.placement("gpu", "0:0-3", (2, 2)):
+            if src == "(S0, S0)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices,
+                    parallel_hierarchy=[2, 2],
+                    parallel_distribution=["S(0)", "S(0)"],
+                )
+                x = flow.gather(x, indices)
+            elif src == "(S0, S1)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(1)"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices,
+                    parallel_hierarchy=[2, 2],
+                    parallel_distribution=["S(0)", "B"],
+                )
+                x = flow.gather(x, indices)
+            elif src == "(S0, P)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices,
+                    parallel_hierarchy=[2, 2],
+                    parallel_distribution=["S(0)", "B"],
+                )
+                x = flow.gather(x, indices)
+            elif src == "(S0, B)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices,
+                    parallel_hierarchy=[2, 2],
+                    parallel_distribution=["S(0)", "B"],
+                )
+                x = flow.gather(x, indices)
+            elif src == "(S1, S0)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "B"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices,
+                    parallel_hierarchy=[2, 2],
+                    parallel_distribution=["B", "S(0)"],
+                )
+                x = flow.gather(x, indices)
+            elif src == "(S1, S1)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(1)"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            elif src == "(S1, P)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(0)"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            elif src == "(S1, B)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "B"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            elif src == "(P, S0)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices,
+                    parallel_hierarchy=[2, 2],
+                    parallel_distribution=["B", "S(0)"],
+                )
+                x = flow.gather(x, indices)
+            elif src == "(P, S1)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(1)"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            elif src == "(P, P)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            elif src == "(P, B)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            elif src == "(B, S0)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices,
+                    parallel_hierarchy=[2, 2],
+                    parallel_distribution=["B", "S(0)"],
+                )
+                x = flow.gather(x, indices)
+            elif src == "(B, S1)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(1)"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            elif src == "(B, P)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            elif src == "(B, B)":
+                x = flow.hierarchical_parallel_cast(
+                    x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                indices = flow.hierarchical_parallel_cast(
+                    indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                )
+                x = flow.gather(x, indices)
+            else:
+                raise NotImplementedError
 
-        if len(dst) == 2:
-            x = flow.hierarchical_parallel_cast(
-                x,
-                parallel_hierarchy=[2, 2],
-                parallel_distribution=dst,
-                name="gather_cast",
-            )
-        elif len(dst) == 1:
-            x = flow.hierarchical_parallel_cast(
-                x,
-                parallel_hierarchy=[4],
-                parallel_distribution=dst,
-                name="gather_cast",
-            )
-        else:
-            raise NotImplementedError
-        x = flow.math.relu(x)
+            if len(dst) == 2:
+                with flow.scope.placement("gpu", "0:0-3", (2, 2)):
+                    x = flow.hierarchical_parallel_cast(
+                        x,
+                        parallel_hierarchy=[2, 2],
+                        parallel_distribution=dst,
+                        name="gather_cast",
+                    )
+            elif len(dst) == 1:
+                with flow.scope.placement("gpu", "0:0-3", (4,)):
+                    x = flow.hierarchical_parallel_cast(
+                        x,
+                        parallel_hierarchy=[4],
+                        parallel_distribution=dst,
+                        name="gather_cast",
+                    )
+            else:
+                raise NotImplementedError
         x = flow.hierarchical_parallel_cast(
             x, parallel_hierarchy=[4], parallel_distribution=["B"]
         )
+        x = flow.identity(x)
         return x
 
     x_arr = np.random.rand(1024, 1024).astype(np.float32)

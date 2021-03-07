@@ -947,10 +947,8 @@ void AddDiffParallelCast(const OpGraph& op_graph, JobBuilder* job_builder,
             .Op("hierarchical_parallel_cast")
             .Input("in", GenLogicalBlobName(diff_lbi))
             .Output("out")
-            .Attr<Shape>("parallel_hierarchy", *model_op_node->parallel_hierarchy())
             .Attr<std::vector<std::string>>("parallel_distribution", parallel_distribution)
             .Attr<std::string>("grad_mode", "auto")
-            .Attr<Shape>("grad_parallel_hierarchy", Shape())
             .Attr<std::vector<std::string>>("grad_parallel_distribution",
                                             std::vector<std::string>())
             .ScopeSymbolId(scope_symbol_id)

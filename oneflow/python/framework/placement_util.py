@@ -42,7 +42,7 @@ def deprecated_placement(*args, **kwargs):
 
 @oneflow_export("scope.placement")
 def api_placement(
-    device_tag: str, machine_device_ids: str
+    device_tag: str, machine_device_ids: str, hierarchy=None
 ) -> placement_ctx.PlacementScope:
     r"""Create a scope. All ops within the scope will run on specified device that placed by  "device_tag" and "machine_device_ids".
 
@@ -85,18 +85,20 @@ def api_placement(
             GetGlobalModePlacementScope,
         ]
     )
-    return func(device_tag, machine_device_ids)
+    return func(device_tag, machine_device_ids, hierarchy)
 
 
 @enable_if.condition(
     hob.in_normal_mode & hob.env_initialized & ~hob.session_initialized
 )
-def GetEmptyPlacementScope(device_tag, machine_device_ids):
+def GetEmptyPlacementScope(device_tag, machine_device_ids, hierarchy=None):
+    print("GetEmptyPlacementScope")
     return placement_ctx.EmptyPlacementScope(device_tag, machine_device_ids)
 
 
 @enable_if.condition(hob.in_normal_mode & hob.session_initialized)
 def GetNormalModePlacementScope(device_tag, machine_device_ids, hierarchy=None):
+    print("GetNormalModePlacementScope")
     if isinstance(machine_device_ids, tuple):
         machine_device_ids = list(machine_device_ids)
     if not isinstance(machine_device_ids, list):

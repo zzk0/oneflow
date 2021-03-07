@@ -41,7 +41,6 @@ class OpNode final : public Node<OpNode, OpEdge> {
   const Shape* GetInputBlobFastestTimeShape() const;
   const Shape* GetInputOutputFastestTimeShape() const;
   const Shape* out_blob_time_shape() const;
-  const Shape* parallel_hierarchy() const;
   bool IsTimeShapeIdentity() const;
   const Operator& op() const { return *op_; }
   std::shared_ptr<const Operator> shared_op() const { return op_; }
@@ -135,7 +134,6 @@ class OpGraph final : public Graph<OpNode, OpEdge> {
   const SbpParallel& GetSbpParallel(const std::string& op_name, const LogicalBlobId& lbi) const;
   const ParallelDistribution& GetParallelDistribution(const std::string& op_name,
                                                       const LogicalBlobId& lbi) const;
-  const Shape* GetParallelHierarchy(const std::string& op_name) const;
   DataType GetBlobDataType(const LogicalBlobId& lbi) const;
   const BlobDesc& GetLogicalBlobDesc(const LogicalBlobId& lbi) const;
 
@@ -154,7 +152,6 @@ class OpGraph final : public Graph<OpNode, OpEdge> {
   void DumpSbpSignature(Job* job) const;
   void DumpOpTimeShape(Job* job) const;
   void DumpArgSignature(Job* job) const;
-  void DumpParallelHierarchy(Job* job) const;
 
   Maybe<void> Init(const Job& job);
 

@@ -138,7 +138,6 @@ class Operator {
       const ParallelDesc& parallel_desc);
   Maybe<void> InferParallelDistributionSignatureIf(
       const SbpSignature& sbp_sig_conf, const ParallelDesc& parallel_desc,
-      const Shape& parallel_hierarchy,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
           ParallelDistributionInferHint4Ibn);
   // Infer blob's MirroredSignature
@@ -146,9 +145,6 @@ class Operator {
       std::function<Maybe<const MirroredSigInferHint*>(const std::string&)>
           MirroredSigInferHint4Ibn,
       bool is_mirrored_parallel_view_conf, const ParallelDesc& parallel_desc);
-  Maybe<void> InferParallelHierarchyIf(
-      std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-      const ParallelDesc& parallel_desc);
   void GenKernelConf(const std::function<const BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp,
                      const ParallelContext*, KernelConf*) const;
   const InputBlobModifier& InputBlobModifier4Ibn(const std::string& ibn) const;
@@ -167,8 +163,6 @@ class Operator {
   std::shared_ptr<OpAttribute> GetOpAttributeWithoutOpNameAndLbn() const;
 
   Maybe<const SbpSignature*> sbp_signature() const;
-  Maybe<const Shape*> parallel_hierarchy() const;
-  void SetParallelHierarchy(const Shape& hierarchy);
   Maybe<const ParallelDistributionSignature*> parallel_distribution_signature() const;
   Maybe<void> FillParallelDistributionSignature(const ParallelDistributionSignature& signature);
   BlobLastUsedSignature* mut_blob_last_used_signature() {
@@ -205,7 +199,7 @@ class Operator {
       const ParallelDesc& parallel_desc) const;
   virtual Maybe<void> InferParallelDistributionSignature(
       ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
-      const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+      const ParallelDesc& parallel_desc,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
           ParallelDistributionInferHint4Ibn);
   virtual Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
@@ -216,9 +210,6 @@ class Operator {
       std::function<Maybe<const MirroredSigInferHint*>(const std::string&)>
           MirroredSigInferHint4Ibn,
       bool is_mirrored_parallel_view_conf, const ParallelDesc& parallel_desc);
-  virtual Maybe<void> InferParallelHierarchy(
-      std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-      const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const;
 
   virtual Maybe<void> InferInplaceObn2Ibn(
       HashMap<std::string, std::string>* mut_inplace_obn2ibn,
@@ -283,7 +274,6 @@ class Operator {
 
   OpAttribute op_attribute_;
   HashMap<LogicalBlobId, std::string> lbi2obn_;
-  std::unique_ptr<Shape> parallel_hierarchy_;
   std::shared_ptr<const ParallelDesc> op_parallel_desc_;
   std::unique_ptr<HashMap<std::string, std::shared_ptr<const ParallelDesc>>> bn2parallel_desc_;
   std::unique_ptr<HashMap<std::string, std::shared_ptr<const BlobDesc>>> ibn2logical_blob_desc_;

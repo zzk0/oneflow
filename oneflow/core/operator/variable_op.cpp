@@ -63,12 +63,8 @@ Maybe<void> VariableOp::InferOutBlobDescs(
   CHECK_OR_RETURN(variable_conf.has_data_type());
   out_blob_desc->set_data_type(variable_conf.data_type());
   if (parallel_ctx->parallel_num() == 1) { return Maybe<void>::Ok(); }
-  Shape hierarchy;
-  if (variable_conf.has_parallel_hierarchy()) {
-    hierarchy = Shape(variable_conf.parallel_hierarchy());
-  } else {
-    hierarchy = Shape({parallel_ctx->parallel_num()});
-  }
+  const Shape& hierarchy = JUST(GetOpParallelDesc())->hierarchy();
+  LOG(INFO) << "variable hierarchy " << hierarchy.DebugStr();
   CHECK_EQ_OR_RETURN(variable_conf.parallel_distribution_size(), hierarchy.NumAxes());
   for (int64_t i = 0; i < hierarchy.NumAxes(); ++i) {
     SbpParallel sbp_parallel;
@@ -80,9 +76,6 @@ Maybe<void> VariableOp::InferOutBlobDescs(
                                      out_blob_desc->shape().At(split_axis) / hierarchy.At(i));
     }
   }
-  // LOG(ERROR) << "conf shape: \n" << variable_conf.shape().DebugString();
-  // LOG(ERROR) << "blob shape" << parallel_ctx->parallel_num() << " " <<
-  // out_blob_desc->shape().ToString();
   return Maybe<void>::Ok();
 }
 
@@ -113,25 +106,12 @@ Symbol<OperatorConf> VariableOp::GetOpConfWithoutOpNameAndLbn() const {
   return SymbolOf(this->op_conf());
 }
 
-Maybe<void> VariableOp::InferParallelHierarchy(
-    std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-    const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const {
-  const VariableOpConf& conf = this->op_conf().variable_conf();
-  if (conf.has_parallel_hierarchy()) {
-    const Shape conf_parallel_hierarchy(conf.parallel_hierarchy());
-    CHECK_EQ_OR_RETURN(conf_parallel_hierarchy.elem_cnt(), parallel_desc.parallel_num());
-    *parallel_hierarchy = conf_parallel_hierarchy;
-  } else {
-    *parallel_hierarchy = Shape({parallel_desc.parallel_num()});
-  }
-  return Maybe<void>::Ok();
-}
-
 Maybe<void> VariableOp::InferParallelDistributionSignature(
     ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
-    const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+    const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
+  const auto& parallel_hierarchy = parallel_desc.hierarchy();
   const VariableOpConf& conf = this->op_conf().variable_conf();
   CHECK_EQ_OR_RETURN(conf.parallel_distribution_size(), parallel_hierarchy.NumAxes());
   ParallelDistribution& out_parallel_distribution =

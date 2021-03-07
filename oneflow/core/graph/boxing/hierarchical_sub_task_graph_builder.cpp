@@ -654,8 +654,10 @@ Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
   ParallelDistribution reduced_out_parallel_distribution;
   LOG(INFO) << "before reduce in_parallel_distribution \n"
             << in_parallel_distribution.DebugString();
+  LOG(INFO) << "before reduce in_parallel_hierarchy \n" << in_parallel_hierarchy.DebugStr();
   LOG(INFO) << "before reduce out_parallel_distribution \n"
             << out_parallel_distribution.DebugString();
+  LOG(INFO) << "before reduce out_parallel_hierarchy \n" << out_parallel_hierarchy.DebugStr();
   InOutParallelhierarchyReduce(
       in_parallel_hierarchy, out_parallel_hierarchy, in_parallel_distribution,
       out_parallel_distribution, &reduced_in_parallel_hierarchy, &reduced_out_parallel_hierarchy,

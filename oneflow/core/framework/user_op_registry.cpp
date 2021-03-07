@@ -187,12 +187,6 @@ OpRegistry& OpRegistry::SetInferOutputBlobTimeShapeFn(
   return *this;
 }
 
-OpRegistry& OpRegistry::SetInferParallelHierarchyFn(
-    InferParallelHierarchyFn infer_parallel_hierarchy_fn) {
-  result_.infer_parallel_hierarchy_fn = std::move(infer_parallel_hierarchy_fn);
-  return *this;
-}
-
 OpRegistry& OpRegistry::SetInferParallelDistributionFn(
     InferParallelDistributionFn infer_parallel_distribution_fn) {
   result_.infer_parallel_distribution_fn = std::move(infer_parallel_distribution_fn);

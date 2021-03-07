@@ -8,7 +8,6 @@ import "oneflow/core/job/sbp_parallel.proto";
 import "oneflow/core/framework/user_op_attr.proto";
 import "oneflow/core/job/initializer_conf.proto";
 import "oneflow/core/job/learning_rate_schedule_conf.proto";
-import "oneflow/core/common/shape.proto";
 import "oneflow/core/register/logical_blob_id.proto";
 import "oneflow/core/operator/interface_blob_conf.proto";
 
@@ -175,8 +174,7 @@ message IndexedSlicesOptimizerConf {
 message ParallelBlobConf {
   required BlobDescProto logical_blob_desc_conf = 1;
   required ParallelConf parallel_conf = 2;
-  required ShapeProto parallel_hierarchy = 3;
-  required ParallelDistribution parallel_distribution = 4;
+  required ParallelDistribution parallel_distribution = 3;
 }
 
 message JobInputDef {

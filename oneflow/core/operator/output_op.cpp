@@ -61,21 +61,12 @@ Maybe<void> OutputOp::InferSbpSignature(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> OutputOp::InferParallelHierarchy(
-    std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-    const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const {
-  const InterfaceBlobConf& blob_conf = op_conf().output_conf().blob_conf();
-  *parallel_hierarchy = Shape(blob_conf.parallel_hierarchy());
-  LOG(INFO) << "OutputOp op InferParallelHierarchy" << parallel_hierarchy->DebugStr();
-
-  return Maybe<void>::Ok();
-}
-
 Maybe<void> OutputOp::InferParallelDistributionSignature(
     ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
-    const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+    const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
+  const auto& parallel_hierarchy = parallel_desc.hierarchy();
   const InterfaceBlobConf& blob_conf = op_conf().output_conf().blob_conf();
   ParallelDistribution& in_parallel_distribution =
       (*signature->mutable_bn_in_op2parallel_distribution())["in"];

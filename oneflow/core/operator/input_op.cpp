@@ -63,24 +63,12 @@ Maybe<void> InputOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) const {
   return Maybe<void>::Ok();
 }
 
-Maybe<void> InputOp::InferParallelHierarchy(
-    std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-    const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const {
-  const InterfaceBlobConf& blob_conf = op_conf().input_conf().blob_conf();
-  if (blob_conf.has_parallel_hierarchy()) {
-    *parallel_hierarchy = Shape(blob_conf.parallel_hierarchy());
-  } else {
-    *parallel_hierarchy = Shape({parallel_desc.parallel_num()});
-  }
-  LOG(INFO) << "input op InferParallelHierarchy" << parallel_hierarchy->DebugStr();
-  return Maybe<void>::Ok();
-}
-
 Maybe<void> InputOp::InferParallelDistributionSignature(
     ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
-    const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+    const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
+  const auto& parallel_hierarchy = parallel_desc.hierarchy();
   const InterfaceBlobConf& blob_conf = op_conf().input_conf().blob_conf();
   LOG(INFO) << "InputOp blob_conf" << blob_conf.DebugString();
   ParallelDistribution& in_parallel_distribution =

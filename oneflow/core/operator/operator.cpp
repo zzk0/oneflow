@@ -505,26 +505,29 @@ Maybe<void> Operator::InferSbpSignature(
 
 Maybe<void> Operator::InferParallelDistributionSignatureIf(
     const SbpSignature& sbp_sig_conf, const ParallelDesc& parallel_desc,
-    const Shape& parallel_hierarchy,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
   ParallelDistributionSignature signature;
   JUST(InferParallelDistributionSignature(&signature, sbp_sig_conf, parallel_desc,
-                                          parallel_hierarchy, ParallelDistributionInferHint4Ibn));
+                                          ParallelDistributionInferHint4Ibn));
   JUST(FillParallelDistributionSignature(signature));
   return Maybe<void>::Ok();
 }
 
 Maybe<void> Operator::InferParallelDistributionSignature(
     ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
-    const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+    const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
+  const auto& parallel_hierarchy = parallel_desc.hierarchy();
   CHECK_GT(parallel_hierarchy.NumAxes(), 0);
   if (parallel_hierarchy.NumAxes() == 1) {
     HashMap<std::string, SbpInferHint> ibn2sbp_infer_hint;
     for (const auto& ibn : input_bns()) {
       const ParallelDistributionInferHint* hint = JUST(ParallelDistributionInferHint4Ibn(ibn));
+      LOG(INFO) << op_name() << " hierarchy 1 " << ibn << " lbi: " << lbi4ibn(ibn).DebugString()
+                << " " << parallel_hierarchy.DebugStr() << " sbp: \n"
+                << hint->parallel_distribution().DebugString();
       CHECK_EQ(hint->parallel_distribution().sbp_parallel_size(), 1);
       ibn2sbp_infer_hint.emplace(ibn,
                                  SbpInferHint(&hint->parallel_desc(), &hint->logical_blob_desc(),
@@ -550,6 +553,8 @@ Maybe<void> Operator::InferParallelDistributionSignature(
         for (const auto& ibn : input_bns()) {
           ParallelDistribution distribution =
               JUST(ParallelDistributionInferHint4Ibn(ibn))->parallel_distribution();
+          LOG(INFO) << op_name() << " hierarchy 2 " << ibn << "  " << parallel_hierarchy.DebugStr()
+                    << " sbp: " << distribution.DebugString();
           CHECK_EQ_OR_RETURN(distribution.sbp_parallel_size(), parallel_hierarchy.NumAxes());
           if (sbp_signature.bn_in_op2sbp_parallel().at(ibn)
               != JUST(ParallelDistributionInferHint4Ibn(ibn))
@@ -580,6 +585,9 @@ Maybe<void> Operator::InferParallelDistributionSignature(
             matched_sbp_signature->bn_in_op2sbp_parallel().at(bn);
       }
     }
+    LOG(INFO) << op_name() << " signature: \n"
+              << signature->DebugString() << "\n hierarchy: \n"
+              << parallel_hierarchy.DebugStr();
     return Maybe<void>::Ok();
   }
 }
@@ -589,15 +597,6 @@ Maybe<void> Operator::InferMirroredSignatureIf(
     bool is_mirrored_parallel_view_conf, const ParallelDesc& parallel_desc) {
   return InferMirroredSignature(MirroredSigInferHint4Ibn, is_mirrored_parallel_view_conf,
                                 parallel_desc);
-}
-
-Maybe<void> Operator::InferParallelHierarchyIf(
-    std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-    const ParallelDesc& parallel_desc) {
-  Shape hierarchy;
-  CHECK_JUST(InferParallelHierarchy(GetParallelHierarchy4Ibn, parallel_desc, &hierarchy));
-  SetParallelHierarchy(hierarchy);
-  return Maybe<void>::Ok();
 }
 
 std::string DebugString4MirroredHint(
@@ -647,45 +646,9 @@ Maybe<void> Operator::InferMirroredSignature(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> Operator::InferParallelHierarchy(
-    std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-    const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const {
-  bool is_all_parallel_hierarchy_1d = true;
-  for (const auto& ibn : input_bns()) {
-    const auto* parallel_hierarchy_hint = JUST(GetParallelHierarchy4Ibn(ibn));
-    if (parallel_hierarchy_hint->NumAxes() > 1) { is_all_parallel_hierarchy_1d = false; }
-  }
-  if (is_all_parallel_hierarchy_1d) {
-    *parallel_hierarchy = Shape({parallel_desc.parallel_num()});
-  } else {
-    const Shape* op_parallel_hierarchy = nullptr;
-    for (const auto& ibn : input_bns()) {
-      const auto parallel_hierarchy_hint = JUST(GetParallelHierarchy4Ibn(ibn));
-      if (op_parallel_hierarchy == nullptr) {
-        op_parallel_hierarchy = parallel_hierarchy_hint;
-      } else {
-        CHECK_EQ_OR_RETURN(*parallel_hierarchy_hint, *op_parallel_hierarchy) << " op " << op_name();
-      }
-    }
-    CHECK_EQ_OR_RETURN(op_parallel_hierarchy->elem_cnt(), parallel_desc.parallel_num());
-    *parallel_hierarchy = *op_parallel_hierarchy;
-  }
-  return Maybe<void>::Ok();
-}
-
 Maybe<const SbpSignature*> Operator::sbp_signature() const {
   // CHECK_OR_RETURN(sbp_signature_) << "sbp signature not infered";
   return sbp_signature_.get();
-}
-
-Maybe<const Shape*> Operator::parallel_hierarchy() const {
-  CHECK_OR_RETURN(parallel_hierarchy_);
-  return Maybe<const Shape*>(parallel_hierarchy_.get());
-}
-
-void Operator::SetParallelHierarchy(const Shape& parallel_hierarchy) {
-  parallel_hierarchy.ToProto(op_attribute_.mutable_parallel_hierarchy());
-  parallel_hierarchy_.reset(new Shape(parallel_hierarchy.dim_vec()));
 }
 
 Maybe<const ParallelDistributionSignature*> Operator::parallel_distribution_signature() const {
@@ -698,7 +661,8 @@ Maybe<void> Operator::FillParallelDistributionSignature(
     const ParallelDistributionSignature& signature) {
   parallel_distribution_signature_.reset(new ParallelDistributionSignature(signature));
   *op_attribute_.mutable_parallel_distribution_signature() = signature;
-  if (JUST(parallel_hierarchy())->NumAxes() == 1) {
+  CHECK_OR_RETURN(op_parallel_desc_);
+  if (op_parallel_desc_->hierarchy().NumAxes() == 1) {
     SbpSignature sbp_signature;
     for (const auto& pair : signature.bn_in_op2parallel_distribution()) {
       (*sbp_signature.mutable_bn_in_op2sbp_parallel())[pair.first] = pair.second.sbp_parallel(0);

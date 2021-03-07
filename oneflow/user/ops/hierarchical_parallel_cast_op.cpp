@@ -21,19 +21,11 @@ namespace oneflow {
 REGISTER_USER_OP("hierarchical_parallel_cast")
     .Input("in")
     .Output("out")
-    .Attr<Shape>("parallel_hierarchy")
     .Attr<std::vector<std::string>>("parallel_distribution")
     .Attr<std::string>("grad_mode")
-    .Attr<Shape>("grad_parallel_hierarchy")
     .Attr<std::vector<std::string>>("grad_parallel_distribution")
     .SetTensorDescInferFn([](user_op::InferContext* ctx) -> Maybe<void> {
       *ctx->TensorDesc4ArgNameAndIndex("out", 0) = *ctx->TensorDesc4ArgNameAndIndex("in", 0);
-      return Maybe<void>::Ok();
-    })
-    .SetInferParallelHierarchyFn([](user_op::InferParallelHierarchyFnContext* ctx) -> Maybe<void> {
-      const Shape parallel_hierarchy = ctx->user_op_conf().attr<Shape>("parallel_hierarchy");
-      CHECK_EQ_OR_RETURN(parallel_hierarchy.elem_cnt(), ctx->parallel_num());
-      *ctx->mut_parallel_hierarchy() = parallel_hierarchy;
       return Maybe<void>::Ok();
     })
     .SetInferParallelDistributionFn([](user_op::InferParallelDistributionFnContext* ctx)
@@ -62,10 +54,6 @@ REGISTER_USER_OP("hierarchical_parallel_cast_like")
     .Output("out")
     .SetTensorDescInferFn([](user_op::InferContext* ctx) -> Maybe<void> {
       *ctx->TensorDesc4ArgNameAndIndex("out", 0) = *ctx->TensorDesc4ArgNameAndIndex("in", 0);
-      return Maybe<void>::Ok();
-    })
-    .SetInferParallelHierarchyFn([](user_op::InferParallelHierarchyFnContext* ctx) -> Maybe<void> {
-      *ctx->mut_parallel_hierarchy() = ctx->ParallelHierarchy4InputArgNameAndIndex("like", 0);
       return Maybe<void>::Ok();
     })
     .SetInferParallelDistributionFn([](user_op::InferParallelDistributionFnContext* ctx)
@@ -98,12 +86,9 @@ REGISTER_USER_OP_GRAD("hierarchical_parallel_cast")
             return builder.OpTypeName("hierarchical_parallel_cast")
                 .InputBind("in", ctx->FwOp().output_grad("out", 0))
                 .Output("out")
-                .Attr<Shape>("parallel_hierarchy",
-                             ctx->FwOp().attr<Shape>("grad_parallel_hierarchy"))
                 .Attr<std::vector<std::string>>(
                     "parallel_distribution",
                     ctx->FwOp().attr<std::vector<std::string>>("grad_parallel_distribution"))
-                .Attr<Shape>("grad_parallel_hierarchy", Shape())
                 .Attr<std::vector<std::string>>("grad_parallel_distribution",
                                                 std::vector<std::string>())
                 .Build();

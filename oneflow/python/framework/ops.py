@@ -28,6 +28,7 @@ from oneflow.python.oneflow_export import oneflow_export
 import oneflow
 import oneflow_api
 from typing import Union, Optional, Sequence
+import traceback
 
 
 @oneflow_export("repeat")
@@ -219,17 +220,20 @@ def hierarchical_parallel_cast(
         else:
             raise ValueError("unsupported distribute")
 
+    print(
+        "WARNING:",
+        "parallel_hierarchy and grad_parallel_hierarchy param is deprecated\n",
+        traceback.format_stack()[-3],
+    )
     op = (
         oneflow.user_op_builder(name)
         .Op("hierarchical_parallel_cast")
         .Input("in", [input])
         .Output("out")
-        .Attr("parallel_hierarchy", parallel_hierarchy)
         .Attr(
             "parallel_distribution", list(map(distribute_to_str, parallel_distribution))
         )
         .Attr("grad_mode", grad_mode or "restore")
-        .Attr("grad_parallel_hierarchy", grad_parallel_hierarchy or [])
         .Attr(
             "grad_parallel_distribution",
             list(map(distribute_to_str, grad_parallel_distribution))

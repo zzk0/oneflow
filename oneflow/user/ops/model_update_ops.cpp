@@ -254,12 +254,6 @@ REGISTER_USER_OP("sgd_update")
     .Attr<float>("l2", 0.0)
     .Attr<float>("weight_decay", 0.0)
     .SetTensorDescInferFn(InferSGDUpdateTensorDesc)
-    .SetInferParallelHierarchyFn([](user_op::InferParallelHierarchyFnContext* ctx) -> Maybe<void> {
-      const Shape& parallel_hierarchy = ctx->ParallelHierarchy4InputArgNameAndIndex("model", 0);
-      CHECK_EQ_OR_RETURN(parallel_hierarchy.elem_cnt(), ctx->parallel_num());
-      *ctx->mut_parallel_hierarchy() = parallel_hierarchy;
-      return Maybe<void>::Ok();
-    })
     .SetInferParallelDistributionFn(
         [](user_op::InferParallelDistributionFnContext* ctx) -> Maybe<void> {
           const ParallelDistribution& model_hint_distribution =

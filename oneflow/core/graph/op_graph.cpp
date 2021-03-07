@@ -66,7 +66,6 @@ bool OpEdge::CalcIsStrict121Connected() const {
   OpNode* src = src_node();
   OpNode* dst = dst_node();
   if (!src->parallel_desc().Equals(dst->parallel_desc())) { return false; }
-  if (*src->parallel_hierarchy() != *dst->parallel_hierarchy()) { return false; }
   if (src->IsTimeShapeIdentity() == false) { return false; }
   if (dst->IsTimeShapeIdentity() == false) { return false; }
   if (*src->GetInputOutputFastestTimeShape() != *dst->GetInputOutputFastestTimeShape()) {
@@ -152,8 +151,6 @@ Shape* OpNode::mut_out_blob_time_shape() {
   if (!out_blob_time_shape_) { out_blob_time_shape_.reset(new Shape()); }
   return out_blob_time_shape_.get();
 }
-
-const Shape* OpNode::parallel_hierarchy() const { return CHECK_JUST(op_->parallel_hierarchy()); }
 
 const Shape* OpNode::GetInputBlobTimeShape(const std::string& bn_in_op) const {
   return MutSrcNode4Ibn(bn_in_op)->out_blob_time_shape();
@@ -402,9 +399,8 @@ void OpGraph::InferOpNodeSbpSignature(OpNode* op_node, const SbpSignature& sbp_s
     return Maybe<const ParallelDistributionInferHint*>(&it->second);
   };
   CHECK_JUST(op_node->mut_op()->InferParallelDistributionSignatureIf(
-      sbp_sig_conf, op_node->parallel_desc(), *op_node->parallel_hierarchy(),
-      ParallelDistributionInferHint4Ibn));
-  if (op_node->parallel_hierarchy()->NumAxes() == 1) { op_node->InitLbi2SbpParallel(); }
+      sbp_sig_conf, op_node->parallel_desc(), ParallelDistributionInferHint4Ibn));
+  if (op_node->parallel_desc().hierarchy().NumAxes() == 1) { op_node->InitLbi2SbpParallel(); }
   op_node->InitLbi2ParallelDistribution();
 }
 
@@ -453,14 +449,6 @@ Maybe<void> OpGraph::InferLogicalBlobDesc(const Job& job) const {
     JUST(op_node->mut_op()->FillLogicalInBlobDesc(LogicalBlobDesc4BnInOp));
     // Infer ParallelSignature
     JUST(op_node->mut_op()->InferParallelSignatureIf());
-    const auto& ParallelHierarchy4Ibn = [&](const std::string& ibn) -> Maybe<const Shape*> {
-      const auto& lbi = op_node->op().BnInOp2Lbi(ibn);
-      const auto* producer = op_node->MutSrcNode4InputLbi(lbi);
-      CHECK_NOTNULL_OR_RETURN(producer);
-      return producer->parallel_hierarchy();
-    };
-    JUST(op_node->mut_op()->InferParallelHierarchyIf(ParallelHierarchy4Ibn,
-                                                     op_node->parallel_desc()));
     // Infer mirrored_signature
     bool is_mirrored_conf = false;
     {
@@ -503,10 +491,6 @@ const ParallelDistribution& OpGraph::GetParallelDistribution(const std::string& 
                                                              const LogicalBlobId& lbi) const {
   return op_name2op_node_.at(GetOpNameKey(op_name, lbi))
       ->ParallelDistribution4Lbi(GetLogicalBlobIdKey(op_name, lbi));
-}
-
-const Shape* OpGraph::GetParallelHierarchy(const std::string& op_name) const {
-  return op_name2op_node_.at(op_name)->parallel_hierarchy();
 }
 
 DataType OpGraph::GetBlobDataType(const LogicalBlobId& lbi) const {
@@ -648,14 +632,6 @@ void OpGraph::DumpArgSignature(Job* job) const {
       const auto& lbi = node->op().BnInOp2Lbi(obn);
       (*op_arg_signature->mutable_bn_in_op2lbi())[obn] = lbi;
     }
-  });
-}
-
-void OpGraph::DumpParallelHierarchy(Job* job) const {
-  ForEachNode([&](const OpNode* node) -> void {
-    node->parallel_hierarchy()->ToProto(
-        &(*job->mutable_job_parallel_view_conf()
-               ->mutable_op_name2parallel_hierarchy())[node->op().op_name()]);
   });
 }
 

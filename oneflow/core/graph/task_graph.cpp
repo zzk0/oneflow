@@ -556,10 +556,10 @@ DEFINE_BLD_SUB_TASK_GRAPH_METHOD(BldSubTskGphByBoxing) {
         Global<OpGraph>::Get()->GetParallelDistribution(src_logical->SoleOp()->op_name(), lbi);
     const ParallelDistribution& dst_parallel_distribution =
         Global<OpGraph>::Get()->GetParallelDistribution(dst_logical->SoleOp()->op_name(), lbi);
-    const Shape* src_parallel_hierarchy =
-        Global<OpGraph>::Get()->GetParallelHierarchy(src_logical->SoleOp()->op_name());
-    const Shape* dst_parallel_hierarchy =
-        Global<OpGraph>::Get()->GetParallelHierarchy(dst_logical->SoleOp()->op_name());
+    // const Shape* src_parallel_hierarchy =
+    //    Global<OpGraph>::Get()->GetParallelHierarchy(src_logical->SoleOp()->op_name());
+    // const Shape* dst_parallel_hierarchy =
+    //    Global<OpGraph>::Get()->GetParallelHierarchy(dst_logical->SoleOp()->op_name());
     const std::shared_ptr<const ParallelDesc>& src_parallel_desc = src_logical->parallel_desc();
     const std::shared_ptr<const ParallelDesc>& dst_parallel_desc = dst_logical->parallel_desc();
     const BlobDesc& blob_desc = Global<OpGraph>::Get()->GetLogicalBlobDesc(lbi);
@@ -571,12 +571,12 @@ DEFINE_BLD_SUB_TASK_GRAPH_METHOD(BldSubTskGphByBoxing) {
     HierarchicalSubTskGphBuilder hierarchical_builder;
     auto status = CHECK_JUST(hierarchical_builder.Build(
         sub_tsk_gph_builder_ctx_.get(), in_nodes, &out_nodes, &sorted_ctrl_tasks,
-        *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, *src_parallel_hierarchy,
-        *dst_parallel_hierarchy, src_parallel_distribution, dst_parallel_distribution,
+        *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, src_parallel_desc->hierarchy(),
+        dst_parallel_desc->hierarchy(), src_parallel_distribution, dst_parallel_distribution,
         *src_logical->out_blob_time_shape()));
     boxing_logger_->Log(*status, src_logical->SoleOp()->op_name(), dst_logical->SoleOp()->op_name(),
-                        *src_parallel_desc, *dst_parallel_desc, *src_parallel_hierarchy,
-                        *dst_parallel_hierarchy, src_parallel_distribution,
+                        *src_parallel_desc, *dst_parallel_desc, src_parallel_desc->hierarchy(),
+                        dst_parallel_desc->hierarchy(), src_parallel_distribution,
                         dst_parallel_distribution, lbi, blob_desc);
     sub_tsk_gph_builder_ctx_->ConnectAll121(out_nodes, sorted_dst_comp_tasks);
     if (!sorted_ctrl_tasks.empty()) {

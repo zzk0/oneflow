@@ -246,7 +246,6 @@ Maybe<void> JobBuildAndInferCtx::InferOpOutParallelDistribution(Operator* op,
   };
 
   JUST(op->InferParallelDistributionSignatureIf(sbp_sig_conf, parallel_desc,
-                                                op_name2parallel_hierarchy_.at(op->op_name()),
                                                 ParallelDistributionInferHint4Ibn));
 
   const auto& bn2parallel_distribution =
@@ -294,7 +293,7 @@ Maybe<void> JobBuildAndInferCtx::GenOpProducedEmptyLogicalBlobDesc(Operator* op)
 }
 
 Maybe<void> JobBuildAndInferCtx::CheckOpBlobSplitability(Operator* op, int64_t parallel_num) {
-  const Shape& parallel_hierarchy = op_name2parallel_hierarchy_.at(op->op_name());
+  const Shape& parallel_hierarchy = JUST(op->GetOpParallelDesc())->hierarchy();
   if (parallel_hierarchy.NumAxes() == 1) {
     HashSet<std::string> obns(op->output_bns().begin(), op->output_bns().end());
     auto GetParallelNum = [&](const std::string& bn_in_op) {
@@ -541,6 +540,7 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferConsistentOp(const OperatorCo
   CHECK_OR_RETURN(op_conf.has_scope_symbol_id());
   const auto& scope = Global<symbol::Storage<Scope>>::Get()->Get(op_conf.scope_symbol_id());
   const auto& parallel_desc = JUST(scope.GetParallelDesc(op_conf));
+  LOG(INFO) << op_conf.name() << " hierarchy: \n" << parallel_desc.hierarchy().DebugStr();
   const auto* job_desc = JUST(scope.job_desc());
   return AddAndInferOp(op_conf, parallel_desc.parallel_conf(), job_desc, false);
 }
@@ -569,19 +569,10 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferOp(const OperatorConf& op_con
   AddOpAndUpdateJobParallelViewConf(*new_op_conf, sbp_sig_conf, is_mirrored_parallel_view);
   auto parallel_conf = JUST(InferOpParallelConf(*op, origin_parallel_conf, ibn2disable_boxing));
   ParallelDesc parallel_desc(*parallel_conf);
+  LOG(INFO) << "op parallel hierarchy" << parallel_desc.hierarchy().DebugStr();
   JUST(op->FillOpParallelDesc(parallel_desc));
   JUST(AddOpNameParallelConf2Placement(op_name, *parallel_conf));
   UpdateLbi2DisableBoxing(*op, ibn2disable_boxing);
-  Shape parallel_hierarchy;
-  const auto GetParallelHierarchy4Ibn = [&](const std::string& ibn) -> Maybe<const Shape*> {
-    const LogicalBlobId& lbi = op->BnInOp2Lbi(ibn);
-    auto it = op_name2parallel_hierarchy_.find(lbi.op_name());
-    CHECK_OR_RETURN(it != op_name2parallel_hierarchy_.end());
-    return Maybe<const Shape*>(&it->second);
-  };
-  op->InferParallelHierarchyIf(GetParallelHierarchy4Ibn, ParallelDesc(*parallel_conf));
-  CHECK(op_name2parallel_hierarchy_.emplace(op->op_name(), *CHECK_JUST(op->parallel_hierarchy()))
-            .second);
   auto GetBlobDesc4BnInOp = [&](const std::string& bn) -> const BlobDesc& {
     const LogicalBlobId& lbi = op->BnInOp2Lbi(bn);
     auto it = op_name2op_.find(lbi.op_name());
@@ -1229,7 +1220,6 @@ Maybe<void> JobBuildAndInferCtx::Rebuild() {
   mirrored_lbi2sub_lbis_.clear();
   mirrored_lbi2parallel_desc_.clear();
   mirrored_lbi2sbp_parallel_.clear();
-  op_name2parallel_hierarchy_.clear();
   op_name2ancestors_need_no_grad_.clear();
   // record op mirror view
   HashMap<std::string, bool> op_name2is_mirrored;

@@ -40,12 +40,9 @@ class OutputOp final : public Operator {
       std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
       const ParallelDesc& parallel_desc) const override;
   Symbol<OperatorConf> GetOpConfWithoutOpNameAndLbn() const override;
-  Maybe<void> InferParallelHierarchy(
-      std::function<Maybe<const Shape*>(const std::string&)> GetParallelHierarchy4Ibn,
-      const ParallelDesc& parallel_desc, Shape* parallel_hierarchy) const override;
   Maybe<void> InferParallelDistributionSignature(
       ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
-      const ParallelDesc& parallel_desc, const Shape& parallel_hierarchy,
+      const ParallelDesc& parallel_desc,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
           ParallelDistributionInferHint4Ibn) override;
 };

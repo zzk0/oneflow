@@ -148,6 +148,8 @@ struct hash<oneflow::ParallelDesc> {
       ret ^= machine_id << shift_roundtrip << shift;
       ret ^= pr.sorted_dev_phy_ids(machine_id).size() << shift;
     }
+    const auto& shape_hash = std::hash<oneflow::Shape>();
+    ret ^= shape_hash(pr.hierarchy());
     return hash<size_t>()(ret);
   }
 };
