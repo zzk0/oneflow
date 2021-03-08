@@ -58,11 +58,14 @@ class GatherKernel final : public user_op::OpKernel {
     const ParallelDistribution& out_parallel_distribution =
         ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
     LOG(INFO) << "in_parallel_distribution:\n " << in_parallel_distribution.DebugString();
-    const Shape& in_parallel_hierarchy = ctx->ParallelHierarchy();
+    const Shape& parallel_hierarchy = ctx->ParallelHierarchy();
+    CHECK_EQ(parallel_hierarchy.NumAxes(), in_parallel_distribution.sbp_parallel_size());
+    CHECK_EQ(parallel_hierarchy.NumAxes(), indices_parallel_distribution.sbp_parallel_size());
+    CHECK_EQ(parallel_hierarchy.NumAxes(), out_parallel_distribution.sbp_parallel_size());
     const int64_t parallel_id = ctx->parallel_ctx().parallel_id();
     const TensorDesc* in_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("in", 0);
     const int64_t gather_dim_size = in_logical_desc->shape().At(axis);
-    if (in_parallel_hierarchy.NumAxes() == 1) {
+    if (parallel_hierarchy.NumAxes() == 1) {
       const SbpParallel& in_sbp = in_parallel_distribution.sbp_parallel(0);
       if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == axis) {
         CHECK(indices_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
@@ -74,44 +77,23 @@ class GatherKernel final : public user_op::OpKernel {
         return std::shared_ptr<OpKernelState>(nullptr);
       }
     } else {
-      CHECK_EQ(in_parallel_distribution.sbp_parallel_size(), 2);
-      CHECK_EQ(indices_parallel_distribution.sbp_parallel_size(), 2);
-      CHECK_EQ(out_parallel_distribution.sbp_parallel_size(), 2);
-      const SbpParallel& in_0_sbp = in_parallel_distribution.sbp_parallel(0);
-      const SbpParallel& in_1_sbp = in_parallel_distribution.sbp_parallel(1);
-
-      const int64_t parallel_rank_0 = parallel_id / in_parallel_hierarchy.At(1);
-      const int64_t parallel_rank_1 = parallel_id % in_parallel_hierarchy.At(1);
-
-      const TensorDesc* in_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("in", 0);
-      const int64_t gather_dim_size = in_logical_desc->shape().At(axis);
-      const bool is_sbp_0_split_axis =
-          (in_0_sbp.has_split_parallel() && in_0_sbp.split_parallel().axis() == axis);
-      const bool is_sbp_1_split_axis =
-          (in_1_sbp.has_split_parallel() && in_1_sbp.split_parallel().axis() == axis);
-      if (is_sbp_0_split_axis) {
-        CHECK(indices_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
-        CHECK(out_parallel_distribution.sbp_parallel(0).has_partial_sum_parallel());
+      int64_t lower = 0;
+      int64_t upper = gather_dim_size;
+      FOR_RANGE(int64_t, i, 0, parallel_hierarchy.NumAxes()) {
+        const SbpParallel& in_sbp = in_parallel_distribution.sbp_parallel(i);
+        const int64_t rank_id =
+            (parallel_id % parallel_hierarchy.Count(i)) / parallel_hierarchy.Count(i + 1);
+        if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == axis) {
+          CHECK(indices_parallel_distribution.sbp_parallel(i).has_broadcast_parallel());
+          CHECK(out_parallel_distribution.sbp_parallel(i).has_partial_sum_parallel());
+          const int64_t range_size = (upper - lower) / parallel_hierarchy.At(i);
+          lower = lower + rank_id * range_size;
+          upper = lower + range_size;
+        }
       }
-      if (is_sbp_1_split_axis) {
-        CHECK(indices_parallel_distribution.sbp_parallel(1).has_broadcast_parallel());
-        CHECK(out_parallel_distribution.sbp_parallel(1).has_partial_sum_parallel());
-      }
-      if (is_sbp_0_split_axis && is_sbp_1_split_axis) {
-        BalancedSplitter bs(gather_dim_size, ctx->parallel_ctx().parallel_num());
-        return std::make_shared<GatherOpKernelState>(bs.At(parallel_id).begin(),
-                                                     bs.At(parallel_id).end());
-      } else if (is_sbp_0_split_axis && !is_sbp_1_split_axis) {
-        BalancedSplitter bs(gather_dim_size, in_parallel_hierarchy.At(0));
-        return std::make_shared<GatherOpKernelState>(bs.At(parallel_rank_0).begin(),
-                                                     bs.At(parallel_rank_0).end());
-      } else if (is_sbp_1_split_axis && !is_sbp_0_split_axis) {
-        BalancedSplitter bs(gather_dim_size, in_parallel_hierarchy.At(1));
-        return std::make_shared<GatherOpKernelState>(bs.At(parallel_rank_1).begin(),
-                                                     bs.At(parallel_rank_1).end());
-      } else {
-        return std::shared_ptr<OpKernelState>(nullptr);
-      }
+      LOG(INFO) << " gather parallel_id: " << parallel_id << "  lower: " << lower
+                << " upper: " << upper;
+      return std::make_shared<GatherOpKernelState>(lower, upper);
     }
   }
 

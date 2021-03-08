@@ -34,13 +34,13 @@ def _test_gather_train(test_case):
         x = flow.identity(x)
         with flow.scope.placement("gpu", "0:0-3", (2, 2)):
             x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(1)"]
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
             )
             v = flow.get_variable(
                 name="v",
                 shape=(1024, 4),
                 parallel_hierarchy=(2, 2),
-                parallel_distribution=["S(1)", "S(1)"],
+                parallel_distribution=["S(0)", "S(0)"],
                 initializer=flow.zeros_initializer(),
             )
             x = x + v
@@ -49,7 +49,12 @@ def _test_gather_train(test_case):
             )
             x = flow.gather(x, indices)
             x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(1)"]
+                x,
+                parallel_hierarchy=[2, 2],
+                parallel_distribution=["B", "S(1)"],
+                grad_mode="manual",
+                grad_parallel_hierarchy=[2, 2],
+                grad_parallel_distribution=["B", "B"],
             )
             x = flow.math.relu(x)
         x = flow.hierarchical_parallel_cast(
