@@ -60,7 +60,8 @@ const AMPList& AutoMixedPrecisionLists::ClearList() {
                                "squeeze",
                                "expand_dims",
                                "cast_to_static_shape",
-                               "parallel_cast"};
+                               "parallel_cast",
+                               "hierarchical_parallel_cast"};
 
   return clear_list;
 }
