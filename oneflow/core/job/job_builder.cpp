@@ -71,7 +71,6 @@ JobBuilder::JobBuilder(Job* job) : job_(job) {
        *(job_parallel_view_conf->mutable_op_name2parallel_distribution_signature_conf())) {
     op_name2parallel_distribution_signature_conf_.emplace(pair.first, &pair.second);
   }
-  LOG(INFO) << "job_parallel_view_conf:\n" << job_parallel_view_conf->DebugString();
   if (all_ops_1d_hierarchy) {
     CHECK_EQ(job_parallel_view_conf->op_name2sbp_signature_conf_size(),
              job_parallel_view_conf->op_name2parallel_distribution_signature_conf_size());
