@@ -612,7 +612,7 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferOp(const OperatorConf& op_con
   // Infer whether input/output blobs are backward used
   InferBlobBackwardSignature(op);
   // Check splitability
-  // JUST(CheckOpBlobSplitability(op, parallel_desc.parallel_num()));
+  JUST(CheckOpBlobSplitability(op, parallel_desc.parallel_num()));
 
   return op->GetOpAttributeWithoutOpNameAndLbn();
 }

@@ -68,7 +68,7 @@ Maybe<void> InputOp::InferParallelDistributionSignature(
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
-  const auto& parallel_hierarchy = *parallel_desc.hierarchy();
+  const auto& parallel_hierarchy = parallel_desc.hierarchy();
   const InterfaceBlobConf& blob_conf = op_conf().input_conf().blob_conf();
   LOG(INFO) << "InputOp blob_conf" << blob_conf.DebugString();
   ParallelDistribution& in_parallel_distribution =
@@ -78,11 +78,11 @@ Maybe<void> InputOp::InferParallelDistributionSignature(
   if (blob_conf.has_parallel_distribution()) {
     out_parallel_distribution = blob_conf.parallel_distribution();
   } else {
-    FOR_RANGE(int64_t, i, 0, parallel_hierarchy.NumAxes()) {
+    FOR_RANGE(int64_t, i, 0, parallel_hierarchy->NumAxes()) {
       out_parallel_distribution.mutable_sbp_parallel()->Add()->mutable_broadcast_parallel();
     }
   }
-  FOR_RANGE(int64_t, i, 0, parallel_hierarchy.NumAxes()) {
+  FOR_RANGE(int64_t, i, 0, parallel_hierarchy->NumAxes()) {
     in_parallel_distribution.mutable_sbp_parallel()->Add()->mutable_broadcast_parallel();
   }
   LOG(INFO) << "input op InferParallelDistributionSignature in:\n"
