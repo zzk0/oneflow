@@ -83,9 +83,9 @@ Maybe<void> CheckPhysicalBlobDesc(const BlobDesc& logical,
                                   const ParallelDistribution& parallel_distribution,
                                   const Shape& parallel_hierarchy,
                                   const ParallelContext* parallel_ctx, const BlobDesc& physical) {
-  CHECK_EQ_OR_RETURN(
-      physical.shape(),
-      *CHECK_JUST(GetPhysicalShape(logical.shape(), parallel_distribution, parallel_hierarchy, parallel_ctx->parallel_id())));
+  CHECK_EQ_OR_RETURN(physical.shape(), *CHECK_JUST(GetPhysicalShape(
+                                           logical.shape(), parallel_distribution,
+                                           parallel_hierarchy, parallel_ctx->parallel_id())));
   return Maybe<void>::Ok();
 }
 
@@ -112,34 +112,11 @@ Maybe<void> CheckPhysicalBlobDesc(
   return Maybe<void>::Ok();
 }
 
-Maybe<void> CheckPhysicalBlobDesc(
-    const Operator& op, const PbRpf<std::string>& bns,
-    const std::function<Maybe<const BlobDesc>(const std::string&)>& GetLogicalBlobDesc,
-    const SbpSignature* sbp_signature, const ParallelContext* parallel_ctx,
-    const std::function<BlobDesc*(const std::string&)>& GetPhysicalBlobDesc) {
-  const std::shared_ptr<const ParallelDesc> op_parallel_desc = CHECK_JUST(op.GetOpParallelDesc());
-  for (const auto& bn : bns) {
-    const BlobDesc* physical_blob_desc = GetPhysicalBlobDesc(bn);
-    if (physical_blob_desc == nullptr) {
-      // TODO(liujuncheng): remove this hotfix
-      continue;
-    }
-    if (*CHECK_JUST(op.GetParallelDesc4BnInOp(bn)) == *op_parallel_desc) {
-      CHECK_JUST(CheckPhysicalBlobDesc(*CHECK_JUST(GetLogicalBlobDesc(bn)),
-                                       sbp_signature->bn_in_op2sbp_parallel().at(bn), parallel_ctx,
-                                       *physical_blob_desc));
-    }
-  }
-  return Maybe<void>::Ok();
-}
-
 }  // namespace
 
 void ExecNode::InferBlobDescs(const ParallelContext* parallel_ctx) {
   auto GetBlobDesc4BnInOp = GetBlobDesc4BnInOpFunc();
   const OpNode* op_node = Global<OpGraph>::Get()->OpNode4OpName(op()->op_name());
-  // const SbpSignature* sbp_signature = nullptr;
-  // if (op_node != nullptr) { sbp_signature = &op_node->sbp_signature(); }
   const ParallelDistributionSignature* parallel_distribution_signature = nullptr;
   if (op_node != nullptr) {
     parallel_distribution_signature = &op_node->parallel_distribution_signature();
