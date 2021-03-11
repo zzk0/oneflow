@@ -144,7 +144,7 @@ Maybe<void> InterfaceOpUtil::InitBlobConf(InterfaceBlobConf* blob_conf,
   *blob_conf->mutable_parallel_distribution() = parallel_blob_conf.parallel_distribution();
   ParallelDesc(parallel_blob_conf.parallel_conf())
       .hierarchy()
-      .ToProto(blob_conf->mutable_parallel_hierarchy());
+      ->ToProto(blob_conf->mutable_parallel_hierarchy());
   LOG(INFO) << "InterfaceBlobConf " << blob_conf->DebugString();
   return Maybe<void>::Ok();
 }

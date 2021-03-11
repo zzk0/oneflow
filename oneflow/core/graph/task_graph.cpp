@@ -339,37 +339,6 @@ void TaskGraph::ConnectCtrlEdges(const std::vector<CompTaskNode*>& src_task_node
   }
 }
 
-void TaskGraph::AcyclicTopoForEachNode(std::function<bool(TaskNode* node)> IsAllowedStartNode,
-                                       const std::function<void(TaskNode* node)>& Handler) const {
-  auto ForEachInNode = [&](TaskNode* node, const std::function<void(TaskNode*)>& Handler) {
-    node->ForEachNodeOnInEdge([&](TaskNode* node_on_in_edge) {
-      if (IsBackEdge(node_on_in_edge, node)) { return; }
-      Handler(const_cast<TaskNode*>(node_on_in_edge));
-    });
-  };
-  auto ForEachOutNode = [&](TaskNode* node, const std::function<void(TaskNode*)>& Handler) {
-    node->ForEachNodeOnOutEdge([&](TaskNode* node_on_out_edge) {
-      if (IsBackEdge(node, node_on_out_edge)) { return; }
-      Handler(const_cast<TaskNode*>(node_on_out_edge));
-    });
-  };
-  auto IsSourceNode = [&](TaskNode* node) {
-    int32_t in_node_num = 0;
-    ForEachInNode(node, [&](TaskNode* in_node) { ++in_node_num; });
-    return in_node_num == 0;
-  };
-  std::list<TaskNode*> starts;
-  ForEachNode([&](TaskNode* node) {
-    if (IsSourceNode(node) && IsAllowedStartNode(node)) { starts.push_back(node); }
-  });
-  // DfsTopo will cause inappropriate chain graph
-  TopoForEachNode(starts, ForEachInNode, ForEachOutNode, Handler);
-}
-
-void TaskGraph::AcyclicTopoForEachNode(const std::function<void(TaskNode* node)>& Handler) const {
-  return AcyclicTopoForEachNode([](TaskNode*) { return true; }, Handler);
-}
-
 void TaskGraph::RemoveEmptyRegsts() {
   ForEachNode([&](TaskNode* node) { node->EraseZeroSizeProducedBlob(); });
   ForEachNode([&](TaskNode* node) { node->EraseZeroSizeConsumedRegst(); });
@@ -389,7 +358,7 @@ void TaskGraph::SetOrderInGraphForEachNode() {
     ordered_task_nodes_.emplace_back(task_node);
     ++order_in_graph;
   };
-  AcyclicTopoForEachNode(SetOrderInGraph);
+  TopoForEachNode(SetOrderInGraph);
 }
 
 void TaskGraph::MergeChain() {
@@ -571,12 +540,12 @@ DEFINE_BLD_SUB_TASK_GRAPH_METHOD(BldSubTskGphByBoxing) {
     HierarchicalSubTskGphBuilder hierarchical_builder;
     auto status = CHECK_JUST(hierarchical_builder.Build(
         sub_tsk_gph_builder_ctx_.get(), in_nodes, &out_nodes, &sorted_ctrl_tasks,
-        *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, src_parallel_desc->hierarchy(),
-        dst_parallel_desc->hierarchy(), src_parallel_distribution, dst_parallel_distribution,
+        *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, *src_parallel_desc->hierarchy(),
+        *dst_parallel_desc->hierarchy(), src_parallel_distribution, dst_parallel_distribution,
         *src_logical->out_blob_time_shape()));
     boxing_logger_->Log(*status, src_logical->SoleOp()->op_name(), dst_logical->SoleOp()->op_name(),
-                        *src_parallel_desc, *dst_parallel_desc, src_parallel_desc->hierarchy(),
-                        dst_parallel_desc->hierarchy(), src_parallel_distribution,
+                        *src_parallel_desc, *dst_parallel_desc, *src_parallel_desc->hierarchy(),
+                        *dst_parallel_desc->hierarchy(), src_parallel_distribution,
                         dst_parallel_distribution, lbi, blob_desc);
     sub_tsk_gph_builder_ctx_->ConnectAll121(out_nodes, sorted_dst_comp_tasks);
     if (!sorted_ctrl_tasks.empty()) {
@@ -764,7 +733,5 @@ void TaskGraph::ConnectWithCopyCommNetIfNeed(TaskNode* src, TaskNode* dst) {
     Connect<TaskNode>(copy_comm_net_task, NewEdge(), dst);
   }
 }
-
-bool IsBackEdge(TaskNode* src, TaskNode* dst) { return false; }
 
 }  // namespace oneflow

@@ -107,7 +107,7 @@ Maybe<void> CheckPhysicalBlobDesc(
       CHECK_JUST(CheckPhysicalBlobDesc(
           *CHECK_JUST(GetLogicalBlobDesc(bn)),
           parallel_distribution_signature->bn_in_op2parallel_distribution().at(bn),
-          op_parallel_desc->hierarchy(), parallel_ctx, *physical_blob_desc));
+          *op_parallel_desc->hierarchy(), parallel_ctx, *physical_blob_desc));
     }
   }
   return Maybe<void>::Ok();

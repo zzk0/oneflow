@@ -55,7 +55,7 @@ Maybe<void> VariableOp::InferLogicalOutBlobDescs(
 }
 
 Maybe<void> VariableOp::InferOutBlobDescs(
-    std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+    const std::function<BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx) const {
   const VariableOpConf& variable_conf = op_conf().variable_conf();
   BlobDesc* out_blob_desc = GetBlobDesc4BnInOp("out");
@@ -63,7 +63,7 @@ Maybe<void> VariableOp::InferOutBlobDescs(
   CHECK_OR_RETURN(variable_conf.has_data_type());
   out_blob_desc->set_data_type(variable_conf.data_type());
   if (parallel_ctx->parallel_num() == 1) { return Maybe<void>::Ok(); }
-  const Shape& hierarchy = JUST(GetOpParallelDesc())->hierarchy();
+  const Shape& hierarchy = *JUST(GetOpParallelDesc())->hierarchy();
   LOG(INFO) << "variable hierarchy " << hierarchy.DebugStr();
   CHECK_EQ_OR_RETURN(variable_conf.parallel_distribution_size(), hierarchy.NumAxes());
   for (int64_t i = 0; i < hierarchy.NumAxes(); ++i) {
@@ -111,7 +111,7 @@ Maybe<void> VariableOp::InferParallelDistributionSignature(
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
-  const auto& parallel_hierarchy = parallel_desc.hierarchy();
+  const auto& parallel_hierarchy = *parallel_desc.hierarchy();
   const VariableOpConf& conf = this->op_conf().variable_conf();
   CHECK_EQ_OR_RETURN(conf.parallel_distribution_size(), parallel_hierarchy.NumAxes());
   ParallelDistribution& out_parallel_distribution =

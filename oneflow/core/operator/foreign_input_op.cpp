@@ -50,7 +50,7 @@ Maybe<void> ForeignInputOp::InferLogicalOutBlobDescs(
 }
 
 Maybe<void> ForeignInputOp::InferOutBlobDescs(
-    std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+    const std::function<BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx) const {
   CHECK_EQ_OR_RETURN(parallel_ctx->parallel_num(), 1);
   return InferBlobDescs(op_conf(), GetBlobDesc4BnInOp);
@@ -65,7 +65,7 @@ Maybe<void> ForeignInputOp::InferParallelDistributionSignature(
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
-  const auto& parallel_hierarchy = parallel_desc.hierarchy();
+  const auto& parallel_hierarchy = *parallel_desc.hierarchy();
   const InterfaceBlobConf& blob_conf = op_conf().foreign_input_conf().blob_conf();
   LOG(INFO) << "ForeignInputOp blob_conf" << blob_conf.DebugString();
 

@@ -35,7 +35,7 @@ Maybe<void> OutputOp::InferLogicalOutBlobDescs(
 }
 
 Maybe<void> OutputOp::InferOutBlobDescs(
-    std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
+    const std::function<BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx) const {
   const BlobDesc* in_blob_desc = GetBlobDesc4BnInOp("in");
   BlobDesc* out_blob_desc = GetBlobDesc4BnInOp("out");
@@ -66,7 +66,7 @@ Maybe<void> OutputOp::InferParallelDistributionSignature(
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
-  const auto& parallel_hierarchy = parallel_desc.hierarchy();
+  const auto& parallel_hierarchy = *parallel_desc.hierarchy();
   const InterfaceBlobConf& blob_conf = op_conf().output_conf().blob_conf();
   ParallelDistribution& in_parallel_distribution =
       (*signature->mutable_bn_in_op2parallel_distribution())["in"];

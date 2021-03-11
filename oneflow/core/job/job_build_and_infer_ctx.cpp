@@ -293,8 +293,8 @@ Maybe<void> JobBuildAndInferCtx::GenOpProducedEmptyLogicalBlobDesc(Operator* op)
 }
 
 Maybe<void> JobBuildAndInferCtx::CheckOpBlobSplitability(Operator* op, int64_t parallel_num) {
-  const Shape& parallel_hierarchy = JUST(op->GetOpParallelDesc())->hierarchy();
-  if (parallel_hierarchy.NumAxes() == 1) {
+  const auto parallel_hierarchy = JUST(op->GetOpParallelDesc())->hierarchy();
+  if (parallel_hierarchy->NumAxes() == 1) {
     HashSet<std::string> obns(op->output_bns().begin(), op->output_bns().end());
     auto GetParallelNum = [&](const std::string& bn_in_op) {
       if (obns.find(bn_in_op) == obns.end()) { return parallel_num; }
@@ -328,10 +328,11 @@ Maybe<void> JobBuildAndInferCtx::CheckOpBlobSplitability(Operator* op, int64_t p
         const SbpParallel& sbp_parallel = pair.second.sbp_parallel(i);
         if (sbp_parallel.has_split_parallel()) {
           const int64_t axis = sbp_parallel.split_parallel().axis();
-          CHECK_GE_OR_RETURN(current_shape.At(axis) % parallel_hierarchy.At(i), 0)
+          CHECK_GE_OR_RETURN(current_shape.At(axis) % parallel_hierarchy->At(i), 0)
               << "op_name: " << lbi.op_name() << " blob_name: " << lbi.blob_name()
-              << " cannot split blob by parallel_num: " << std::to_string(parallel_hierarchy.At(i));
-          current_shape.Set(axis, current_shape.At(axis) / parallel_hierarchy.At(i));
+              << " cannot split blob by parallel_num: "
+              << std::to_string(parallel_hierarchy->At(i));
+          current_shape.Set(axis, current_shape.At(axis) / parallel_hierarchy->At(i));
         }
       }
     }
@@ -540,7 +541,7 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferConsistentOp(const OperatorCo
   CHECK_OR_RETURN(op_conf.has_scope_symbol_id());
   const auto& scope = Global<symbol::Storage<Scope>>::Get()->Get(op_conf.scope_symbol_id());
   const auto& parallel_desc = JUST(scope.GetParallelDesc(op_conf));
-  LOG(INFO) << op_conf.name() << " hierarchy: \n" << parallel_desc.hierarchy().DebugStr();
+  LOG(INFO) << op_conf.name() << " hierarchy: \n" << parallel_desc.hierarchy()->DebugStr();
   const auto* job_desc = JUST(scope.job_desc());
   return AddAndInferOp(op_conf, parallel_desc.parallel_conf(), job_desc, false);
 }
@@ -569,7 +570,7 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferOp(const OperatorConf& op_con
   AddOpAndUpdateJobParallelViewConf(*new_op_conf, sbp_sig_conf, is_mirrored_parallel_view);
   auto parallel_conf = JUST(InferOpParallelConf(*op, origin_parallel_conf, ibn2disable_boxing));
   ParallelDesc parallel_desc(*parallel_conf);
-  LOG(INFO) << "op parallel hierarchy" << parallel_desc.hierarchy().DebugStr();
+  LOG(INFO) << "op parallel hierarchy" << parallel_desc.hierarchy()->DebugStr();
   JUST(op->FillOpParallelDesc(parallel_desc));
   JUST(AddOpNameParallelConf2Placement(op_name, *parallel_conf));
   UpdateLbi2DisableBoxing(*op, ibn2disable_boxing);
@@ -973,7 +974,7 @@ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
     JUST(DoPass("FuseUpdateOpsPass"));
     JUST(DoPass("DumpVariableInfoPass"));
   }
-  JUST(DoPass("DumpTimeShapeAndBlobParallelConfPass"));
+  JUST(DoPass("DumpBlobParallelConfPass"));
   return Maybe<void>::Ok();
 }
 
@@ -1250,7 +1251,6 @@ Maybe<void> JobBuildAndInferCtx::Rebuild() {
     }
   });
   // updata job_helper
-  op_graph.DumpOpTimeShape(job_);
   op_graph.DumpLogicalBlobDesc(job_);
   op_graph.DumpSbpSignature(job_);
   return Maybe<void>::Ok();
