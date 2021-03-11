@@ -581,6 +581,11 @@ Maybe<void> Operator::InferParallelDistributionSignature(
     SbpSignatureToParallelDistributionSignature(*sbp_signature_, signature);
     return Maybe<void>::Ok();
   } else {
+    if (parallel_distribution_sig_conf.bn_in_op2parallel_distribution_size() != 0) {
+      LOG(INFO) << op_name() << " parallel_distribution_sig_conf: \n"
+                << parallel_distribution_sig_conf.DebugString();
+    }
+    // TODO: process parallel_distribution_sig_conf
     SbpSignatureList list;
     const auto LogicalBlobDesc4Ibn = [&](const std::string& ibn) -> Maybe<const BlobDesc&> {
       return JUST(ParallelDistributionInferHint4Ibn(ibn))->logical_blob_desc();
@@ -593,20 +598,22 @@ Maybe<void> Operator::InferParallelDistributionSignature(
         for (const auto& ibn : input_bns()) {
           ParallelDistribution distribution =
               JUST(ParallelDistributionInferHint4Ibn(ibn))->parallel_distribution();
+          if (parallel_distribution_sig_conf.bn_in_op2parallel_distribution_size() != 0) {
+            const auto parallel_distribution_sig_conf_it =
+                parallel_distribution_sig_conf.bn_in_op2parallel_distribution().find(ibn);
+            if (parallel_distribution_sig_conf_it
+                != parallel_distribution_sig_conf.bn_in_op2parallel_distribution().end()) {
+              distribution = parallel_distribution_sig_conf_it->second;
+            }
+          }
           LOG(INFO) << op_name() << " hierarchy 2 " << ibn << " lbi: " << lbi4ibn(ibn).DebugString()
                     << " parallel_hierarchy: " << parallel_hierarchy->DebugStr()
                     << " sbp: " << distribution.DebugString();
           CHECK_EQ_OR_RETURN(distribution.sbp_parallel_size(), parallel_hierarchy->NumAxes());
-          if (sbp_signature.bn_in_op2sbp_parallel().at(ibn)
-              != JUST(ParallelDistributionInferHint4Ibn(ibn))
-                     ->parallel_distribution()
-                     .sbp_parallel(i)) {
+          if (sbp_signature.bn_in_op2sbp_parallel().at(ibn) != distribution.sbp_parallel(i)) {
             LOG(INFO) << op_name() << "  " << ibn << " not match "
                       << sbp_signature.bn_in_op2sbp_parallel().at(ibn).DebugString() << " "
-                      << JUST(ParallelDistributionInferHint4Ibn(ibn))
-                             ->parallel_distribution()
-                             .sbp_parallel(i)
-                             .DebugString();
+                      << distribution.sbp_parallel(i).DebugString();
             all_match = false;
             break;
           }
