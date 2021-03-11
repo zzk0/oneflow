@@ -85,8 +85,7 @@ Maybe<void> CheckPhysicalBlobDesc(const BlobDesc& logical,
                                   const ParallelContext* parallel_ctx, const BlobDesc& physical) {
   CHECK_EQ_OR_RETURN(
       physical.shape(),
-      *CHECK_JUST(GetPhysicalShape(logical.shape(), parallel_distribution, parallel_hierarchy,
-                                   parallel_ctx->parallel_num(), parallel_ctx->parallel_id())));
+      *CHECK_JUST(GetPhysicalShape(logical.shape(), parallel_distribution, parallel_hierarchy, parallel_ctx->parallel_id())));
   return Maybe<void>::Ok();
 }
 

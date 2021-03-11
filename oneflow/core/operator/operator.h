@@ -417,8 +417,7 @@ Maybe<Shape> GetPhysicalShape(const Shape& logical_shape, const SbpParallel& sbp
                               int64_t parallel_num, int64_t parallel_id);
 Maybe<Shape> GetPhysicalShape(const Shape& logical_shape,
                               const ParallelDistribution& parallel_distribution,
-                              const Shape& parallel_hierarchy, int64_t parallel_num,
-                              int64_t parallel_id);
+                              const Shape& parallel_hierarchy, int64_t parallel_id);
 }  // namespace oneflow
 
 namespace std {
