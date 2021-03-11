@@ -98,7 +98,7 @@ void JobCompleter::Complete(Job* job) const {
   JobPass4Name("DumpBlobParallelConfPass")(job, &job_pass_ctx);
   // NOTE(chengcheng): disable this pass for reduce boxing memory life cycle to memory cost.
   if (!Global<ResourceDesc, ForSession>::Get()->resource().disable_group_boxing_by_dst_parallel()) {
-    // WithOpGraphAndMutJobBuilder(job, &GroupBoxingByDstParallel);
+    WithOpGraphAndMutJobBuilder(job, &GroupBoxingByDstParallel);
   }
   WithOpGraphAndMutJobBuilder(job, &SetCtrlInOpName4VariableOp);
   // complete tick ops
