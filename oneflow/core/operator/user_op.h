@@ -64,7 +64,8 @@ class UserOp final : public Operator {
       const std::function<const Shape*(const std::string&)>& GetTimeShape4BnInOp,
       Shape* time_shape) const override;
   Maybe<void> InferParallelDistributionSignature(
-      ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
+      ParallelDistributionSignature* signature,
+      const ParallelDistributionSignature& parallel_distribution_sig_conf,
       const ParallelDesc& parallel_desc,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
           ParallelDistributionInferHint4Ibn) override;

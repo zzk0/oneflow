@@ -61,7 +61,8 @@ Maybe<void> ForeignInputOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) con
 }
 
 Maybe<void> ForeignInputOp::InferParallelDistributionSignature(
-    ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
+    ParallelDistributionSignature* signature,
+    const ParallelDistributionSignature& parallel_distribution_sig_conf,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {

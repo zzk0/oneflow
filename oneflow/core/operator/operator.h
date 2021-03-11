@@ -133,13 +133,15 @@ class Operator {
   Maybe<const Shape> GetInputOutputFastestTimeShape() const;
 
   Maybe<void> FillSbpSignature(const SbpSignature& sbp_signature);
+  Maybe<void> FillParallelDistributionSignature(const ParallelDistributionSignature& signature);
   Maybe<void> InferSbpSignatureIf(
       const SbpSignature& sbp_sig_conf,
       const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
       std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
       const ParallelDesc& parallel_desc);
   Maybe<void> InferParallelDistributionSignatureIf(
-      const SbpSignature& sbp_sig_conf, const ParallelDesc& parallel_desc,
+      const ParallelDistributionSignature& parallel_distribution_sig_conf,
+      const ParallelDesc& parallel_desc,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
           ParallelDistributionInferHint4Ibn);
   // Infer blob's MirroredSignature
@@ -166,7 +168,6 @@ class Operator {
 
   Maybe<const SbpSignature*> sbp_signature() const;
   Maybe<const ParallelDistributionSignature*> parallel_distribution_signature() const;
-  Maybe<void> FillParallelDistributionSignature(const ParallelDistributionSignature& signature);
   BlobLastUsedSignature* mut_blob_last_used_signature();
   BlobBackwardUsedSignature* mut_blob_backward_used_signature();
 
@@ -198,7 +199,8 @@ class Operator {
       std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
       const ParallelDesc& parallel_desc) const;
   virtual Maybe<void> InferParallelDistributionSignature(
-      ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
+      ParallelDistributionSignature* signature,
+      const ParallelDistributionSignature& parallel_distribution_sig_conf,
       const ParallelDesc& parallel_desc,
       std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
           ParallelDistributionInferHint4Ibn);

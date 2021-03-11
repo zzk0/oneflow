@@ -421,6 +421,21 @@ Maybe<void> Operator::FillSbpSignature(const SbpSignature& sbp_signature) {
   return Maybe<void>::Ok();
 }
 
+Maybe<void> Operator::FillParallelDistributionSignature(
+    const ParallelDistributionSignature& signature) {
+  CHECK_OR_RETURN(!parallel_distribution_signature_);
+  parallel_distribution_signature_.reset(new ParallelDistributionSignature(signature));
+  CHECK_OR_RETURN(op_parallel_desc_);
+  if (op_parallel_desc_->hierarchy()->NumAxes() == 1) {
+    SbpSignature sbp_signature;
+    for (const auto& pair : signature.bn_in_op2parallel_distribution()) {
+      (*sbp_signature.mutable_bn_in_op2sbp_parallel())[pair.first] = pair.second.sbp_parallel(0);
+    }
+    sbp_signature_.reset(new SbpSignature(sbp_signature));
+  }
+  return Maybe<void>::Ok();
+}
+
 Maybe<void> Operator::InferSbpSignatureIf(
     const SbpSignature& sbp_sig_conf,
     const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
@@ -525,22 +540,24 @@ Maybe<void> Operator::InferSbpSignature(
 }
 
 Maybe<void> Operator::InferParallelDistributionSignatureIf(
-    const SbpSignature& sbp_sig_conf, const ParallelDesc& parallel_desc,
+    const ParallelDistributionSignature& parallel_distribution_sig_conf,
+    const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
   ParallelDistributionSignature signature;
-  JUST(InferParallelDistributionSignature(&signature, sbp_sig_conf, parallel_desc,
+  JUST(InferParallelDistributionSignature(&signature, parallel_distribution_sig_conf, parallel_desc,
                                           ParallelDistributionInferHint4Ibn));
   JUST(FillParallelDistributionSignature(signature));
   return Maybe<void>::Ok();
 }
 
 Maybe<void> Operator::InferParallelDistributionSignature(
-    ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
+    ParallelDistributionSignature* signature,
+    const ParallelDistributionSignature& parallel_distribution_sig_conf,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
-  const auto& parallel_hierarchy = parallel_desc.hierarchy();
+  const auto parallel_hierarchy = parallel_desc.hierarchy();
   CHECK_GT(parallel_hierarchy->NumAxes(), 0);
   if (parallel_hierarchy->NumAxes() == 1) {
     HashMap<std::string, SbpInferHint> ibn2sbp_infer_hint;
@@ -554,14 +571,12 @@ Maybe<void> Operator::InferParallelDistributionSignature(
                                  SbpInferHint(&hint->parallel_desc(), &hint->logical_blob_desc(),
                                               &hint->parallel_distribution().sbp_parallel(0)));
     }
+    SbpSignature sbp_sig_conf;
+    ParallelDistributionSignatureToSbpSignature(parallel_distribution_sig_conf, &sbp_sig_conf);
     CHECK_JUST(InferOpSbpSignature(this, sbp_sig_conf, parallel_desc, ibn2sbp_infer_hint));
-    for (const auto& pair : sbp_signature_->bn_in_op2sbp_parallel()) {
-      *((*signature->mutable_bn_in_op2parallel_distribution())[pair.first].add_sbp_parallel()) =
-          pair.second;
-    }
+    SbpSignatureToParallelDistributionSignature(*sbp_signature_, signature);
     return Maybe<void>::Ok();
   } else {
-    CHECK(sbp_sig_conf.bn_in_op2sbp_parallel().empty());
     SbpSignatureList list;
     const auto LogicalBlobDesc4Ibn = [&](const std::string& ibn) -> Maybe<const BlobDesc&> {
       return JUST(ParallelDistributionInferHint4Ibn(ibn))->logical_blob_desc();
@@ -679,19 +694,6 @@ Maybe<const ParallelDistributionSignature*> Operator::parallel_distribution_sign
   return parallel_distribution_signature_.get();
 }
 
-Maybe<void> Operator::FillParallelDistributionSignature(
-    const ParallelDistributionSignature& signature) {
-  parallel_distribution_signature_.reset(new ParallelDistributionSignature(signature));
-  CHECK_OR_RETURN(op_parallel_desc_);
-  if (op_parallel_desc_->hierarchy()->NumAxes() == 1) {
-    SbpSignature sbp_signature;
-    for (const auto& pair : signature.bn_in_op2parallel_distribution()) {
-      (*sbp_signature.mutable_bn_in_op2sbp_parallel())[pair.first] = pair.second.sbp_parallel(0);
-    }
-    sbp_signature_.reset(new SbpSignature(sbp_signature));
-  }
-  return Maybe<void>::Ok();
-}
 BlobLastUsedSignature* Operator::mut_blob_last_used_signature() {
   if (!blob_last_used_signature_) { blob_last_used_signature_.reset(new BlobLastUsedSignature()); }
   return blob_last_used_signature_.get();
@@ -711,6 +713,7 @@ Maybe<const SbpParallel*> Operator::SbpParallel4BnInOp(const std::string& bn_in_
   CHECK_OR_RETURN(iter != map.end()) << "blob_name " << bn_in_op << " not found in sbp signature";
   return &iter->second;
 }
+
 Maybe<const ParallelDistribution*> Operator::ParallelDistribution4BnInOp(
     const std::string& bn_in_op) const {
   CHECK_OR_RETURN(parallel_distribution_signature_)
@@ -721,6 +724,7 @@ Maybe<const ParallelDistribution*> Operator::ParallelDistribution4BnInOp(
       << "blob_name " << bn_in_op << " not found in parallel distribution";
   return &iter->second;
 }
+
 Maybe<const OptMirroredParallel*> Operator::OptMirroredParallel4BnInOp(
     const std::string& bn_in_op) const {
   CHECK_OR_RETURN(mirrored_signature_) << "mirrored signature not infered";
@@ -1005,6 +1009,11 @@ Maybe<void> Operator::ToOpAttribute(OpAttribute* op_attribute) const {
   //} else {
   //  op_attribute->clear_sbp_signature();
   //}
+  if (parallel_distribution_signature_) {
+    *op_attribute->mutable_parallel_distribution_signature() = *parallel_distribution_signature_;
+  } else {
+    op_attribute->clear_parallel_distribution_signature();
+  }
   if (parallel_distribution_signature_) {
     *op_attribute->mutable_parallel_distribution_signature() = *parallel_distribution_signature_;
   } else {

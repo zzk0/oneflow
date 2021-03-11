@@ -107,7 +107,8 @@ Symbol<OperatorConf> VariableOp::GetOpConfWithoutOpNameAndLbn() const {
 }
 
 Maybe<void> VariableOp::InferParallelDistributionSignature(
-    ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
+    ParallelDistributionSignature* signature,
+    const ParallelDistributionSignature& parallel_distribution_sig_conf,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {

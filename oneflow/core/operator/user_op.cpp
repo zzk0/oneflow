@@ -648,7 +648,8 @@ Maybe<void> UserOp::InferOpTimeShape(
 }
 
 Maybe<void> UserOp::InferParallelDistributionSignature(
-    ParallelDistributionSignature* signature, const SbpSignature& sbp_sig_conf,
+    ParallelDistributionSignature* signature,
+    const ParallelDistributionSignature& parallel_distribution_sig_conf,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
@@ -658,7 +659,8 @@ Maybe<void> UserOp::InferParallelDistributionSignature(
                                                  parallel_desc, *parallel_hierarchy, signature);
     return val_->infer_parallel_distribution_fn(&ctx);
   } else {
-    return Operator::InferParallelDistributionSignature(signature, sbp_sig_conf, parallel_desc,
+    return Operator::InferParallelDistributionSignature(signature, parallel_distribution_sig_conf,
+                                                        parallel_desc,
 
                                                         ParallelDistributionInferHint4Ibn);
   }

@@ -68,9 +68,7 @@ class OpNode final : public Node<OpNode, OpEdge> {
   OpNode* MutSrcNode4InputLbi(const LogicalBlobId& lbi) const;
   void InferBlobParallelDesc();
   void InitLbi2SourceNode();
-  void InitLbi2SbpParallel();
   void InitLbi2ParallelDistribution();
-  void InitLbi2MirroredParallel();
 
   ParallelDesc parallel_desc_;
   HashMap<std::string, ParallelDesc> obn2blob_parallel_desc_;
@@ -78,8 +76,8 @@ class OpNode final : public Node<OpNode, OpEdge> {
   HashSet<std::string> ibns_;
   HashMap<LogicalBlobId, std::unique_ptr<BlobDesc>> lbi2logical_blob_desc_;
   HashMap<LogicalBlobId, OpNode*> lbi2source_node_;
-  HashMap<LogicalBlobId, SbpParallel> lbi2sbp_parallel_;
   HashMap<LogicalBlobId, ParallelDistribution> lbi2parallel_distribution_;
+  std::unique_ptr<Shape> parallel_hierarchy_;
 };
 
 class OpEdge final : public Edge<OpNode, OpEdge> {
@@ -145,6 +143,7 @@ class OpGraph final : public Graph<OpNode, OpEdge> {
   void DumpLogicalBlobDesc(Job* job) const;
   void DumpSbpSignature(Job* job) const;
   void DumpArgSignature(Job* job) const;
+  void DumpParallelDistributionSignature(Job* job) const;
 
   Maybe<void> Init(const Job& job);
 
@@ -155,7 +154,8 @@ class OpGraph final : public Graph<OpNode, OpEdge> {
   void CheckIsDAG() const;
   void InferBlobLastUsed() const;
   void InferTimeShape() const;
-  void InferOpNodeSbpSignature(OpNode* op_node, const SbpSignature& sbp_sig_conf) const;
+  void InferOpNodeParallelDistributionSignature(
+      OpNode* op_node, const ParallelDistributionSignature& parallel_distribution_sig_conf) const;
   Maybe<void> InferOpNodeMirroredSignature(OpNode* op_node, bool is_mirrored_conf) const;
   Maybe<void> InferLogicalBlobDesc(const Job& job) const;
   std::string GetOpNameKey(const std::string& op_name, const LogicalBlobId& lbi) const;

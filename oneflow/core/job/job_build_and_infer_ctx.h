@@ -111,12 +111,14 @@ class JobBuildAndInferCtx {
   Maybe<OperatorConf> DecodeLbiHintAndReturnNewOpConf(
       const Operator& op, SbpSignature* sbp_sig_conf,
       HashMap<std::string, bool>* ibn2disable_boxing) const;
-  void AddOpAndUpdateJobParallelViewConf(const OperatorConf& operator_conf,
-                                         const SbpSignature& sbp_signature,
-                                         bool is_mirrored_parallel_view) const;
+  void AddOpAndUpdateJobParallelViewConf(
+      const OperatorConf& operator_conf,
+      const ParallelDistributionSignature& parallel_distribution_signature,
+      bool is_mirrored_parallel_view) const;
   Maybe<void> InferMirroredSignature(Operator*, bool is_mirrored_parallel_view_conf,
                                      const ParallelDesc&);
-  Maybe<void> InferOpOutParallelDistribution(Operator*, const SbpSignature&, const ParallelDesc&);
+  Maybe<void> InferOpOutParallelDistribution(Operator*, const ParallelDistributionSignature&,
+                                             const ParallelDesc&);
   Maybe<void> GenOpProducedEmptyLogicalBlobDesc(Operator* op);
   Maybe<void> CheckOpBlobSplitability(Operator*, int64_t parallel_num);
   Maybe<void> CheckPlacement() const;
