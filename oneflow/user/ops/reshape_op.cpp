@@ -59,13 +59,13 @@ Maybe<void> TensorDescInferFn(user_op::InferContext* ctx) {
   DimVector dim_vec = {shape.dim_vec().begin(), shape.dim_vec().end()};
   FOR_RANGE(int32_t, i, 0, dim_vec.size()) { CHECK_GT_OR_RETURN(dim_vec.at(i), 0); }
   const auto& parallel_distribution = ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
-  const auto& parallel_hierarchy = ctx->parallel_hierarchy();
-  FOR_RANGE(int64_t, i, 0, parallel_hierarchy.NumAxes()) {
+  const auto& parallel_hierarchy = ctx->parallel_desc().hierarchy();
+  FOR_RANGE(int64_t, i, 0, parallel_hierarchy->NumAxes()) {
     const SbpParallel& sbp_parallel = parallel_distribution.sbp_parallel(i);
     if (sbp_parallel.has_split_parallel()) {
       const int64_t split_axis = sbp_parallel.split_parallel().axis();
-      CHECK_EQ_OR_RETURN(dim_vec[split_axis] % parallel_hierarchy.At(i), 0);
-      dim_vec[split_axis] /= parallel_hierarchy.At(i);
+      CHECK_EQ_OR_RETURN(dim_vec[split_axis] % parallel_hierarchy->At(i), 0);
+      dim_vec[split_axis] /= parallel_hierarchy->At(i);
     }
   }
   *out_shape = Shape(dim_vec);

@@ -21,6 +21,7 @@ limitations under the License.
 #include "oneflow/core/framework/tensor_desc.h"
 #include "oneflow/core/job/placement.pb.h"
 #include "oneflow/core/job/sbp_parallel.pb.h"
+#include "oneflow/core/job/parallel_desc.h"
 
 namespace oneflow {
 
@@ -50,7 +51,8 @@ class InferContext {
   }
 
   virtual const ParallelContext& parallel_ctx() const = 0;
-  virtual const Shape& parallel_hierarchy() const = 0;
+  virtual const ParallelDesc& parallel_desc() const = 0;
+
   virtual const JobDesc* job_desc() const {
     UNIMPLEMENTED();
     return nullptr;
