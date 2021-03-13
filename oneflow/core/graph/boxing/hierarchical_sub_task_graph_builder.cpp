@@ -630,14 +630,7 @@ Maybe<SubTskGphBuilderStatus> BuildSameElemcntParallelHierarchySubTskGph(
 
 }  // namespace
 
-Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
-    SubTskGphBuilderCtx* ctx, const std::vector<TaskNode*>& sorted_in_tasks,
-    std::vector<TaskNode*>* sorted_out_tasks,
-    std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
-    const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
-    const BlobDesc& logical_blob_desc, const ParallelDistribution& in_parallel_distribution,
-    const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) const {
-  std::shared_ptr<SubTskGphBuilder> sub_tsk_gph_builder_;
+HierarchicalSubTskGphBuilder::HierarchicalSubTskGphBuilder() {
   std::vector<std::shared_ptr<SubTskGphBuilder>> builders;
   builders.emplace_back(new OneToOneSubTskGphBuilder());
   builders.emplace_back(new B21SubTskGphBuilder());
@@ -646,32 +639,27 @@ Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
   builders.emplace_back(new NaiveB2BSubTskGphBuilder());
   builders.emplace_back(new NaiveB2PSubTskGphBuilder());
   sub_tsk_gph_builder_.reset(new ChainSubTskGphBuilder(builders));
+}
 
+Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
+    SubTskGphBuilderCtx* ctx, const std::vector<TaskNode*>& sorted_in_tasks,
+    std::vector<TaskNode*>* sorted_out_tasks,
+    std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
+    const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
+    const BlobDesc& logical_blob_desc, const ParallelDistribution& in_parallel_distribution,
+    const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) const {
   const Shape& in_parallel_hierarchy = *in_parallel_desc.hierarchy();
   const Shape& out_parallel_hierarchy = *out_parallel_desc.hierarchy();
   Shape reduced_in_parallel_hierarchy;
   Shape reduced_out_parallel_hierarchy;
   ParallelDistribution reduced_in_parallel_distribution;
   ParallelDistribution reduced_out_parallel_distribution;
-  LOG(INFO) << "before reduce in_parallel_distribution \n"
-            << in_parallel_distribution.DebugString();
-  LOG(INFO) << "before reduce in_parallel_hierarchy \n" << in_parallel_hierarchy.DebugStr();
-  LOG(INFO) << "before reduce out_parallel_distribution \n"
-            << out_parallel_distribution.DebugString();
-  LOG(INFO) << "before reduce out_parallel_hierarchy \n" << out_parallel_hierarchy.DebugStr();
   InOutParallelhierarchyReduce(
       in_parallel_hierarchy, out_parallel_hierarchy, in_parallel_distribution,
       out_parallel_distribution, &reduced_in_parallel_hierarchy, &reduced_out_parallel_hierarchy,
       &reduced_in_parallel_distribution, &reduced_out_parallel_distribution);
   CHECK_LE_OR_RETURN(reduced_in_parallel_hierarchy.NumAxes(), 2);
   CHECK_LE_OR_RETURN(reduced_out_parallel_hierarchy.NumAxes(), 2);
-
-  LOG(INFO) << "reduced_in_parallel_distribution \n"
-            << reduced_in_parallel_distribution.DebugString();
-  LOG(INFO) << "reduced_in_parallel_hierarchy \n" << reduced_in_parallel_hierarchy.DebugStr();
-  LOG(INFO) << "reduced_out_parallel_distribution \n"
-            << reduced_out_parallel_distribution.DebugString();
-  LOG(INFO) << "reduced_out_parallel_hierarchy \n" << reduced_out_parallel_hierarchy.DebugStr();
 
   if (reduced_in_parallel_hierarchy.NumAxes() == 1
       && reduced_out_parallel_hierarchy.NumAxes() == 1) {
