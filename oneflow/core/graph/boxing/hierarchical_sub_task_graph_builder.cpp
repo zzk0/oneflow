@@ -488,7 +488,7 @@ Maybe<SubTskGphBuilderStatus> BuildLastAxisParallelDistributionChangeSubGph(
   return composed_status;
 }
 
-Maybe<SubTskGphBuilderStatus> Build1DParallelHierarchySubTskGph(
+Maybe<SubTskGphBuilderStatus> Build1dParallelHierarchySubTskGph(
     SubTskGphBuilderCtx* ctx, const std::shared_ptr<SubTskGphBuilder> sub_tsk_gph_builder,
     const std::vector<TaskNode*>& sorted_in_tasks, std::vector<TaskNode*>* sorted_out_tasks,
     std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
@@ -496,13 +496,10 @@ Maybe<SubTskGphBuilderStatus> Build1DParallelHierarchySubTskGph(
     const BlobDesc& logical_blob_desc, const Shape& in_parallel_hierarchy,
     const Shape& out_parallel_hierarchy, const ParallelDistribution& in_parallel_distribution,
     const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) {
-  const SbpParallel& in_sbp_parallel = in_parallel_distribution.sbp_parallel(0);
-  const SbpParallel& out_sbp_parallel = out_parallel_distribution.sbp_parallel(0);
   Maybe<SubTskGphBuilderStatus> boxing_builder_status = TRY(sub_tsk_gph_builder->Build(
       ctx, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks, in_parallel_desc,
-      out_parallel_desc, lbi, logical_blob_desc, in_sbp_parallel, out_sbp_parallel, time_shape));
-  LOG(INFO) << " builder_name: " << CHECK_JUST(boxing_builder_status)->builder_name() << "   "
-            << CHECK_JUST(boxing_builder_status)->comment();
+      out_parallel_desc, lbi, logical_blob_desc, in_parallel_distribution.sbp_parallel(0),
+      out_parallel_distribution.sbp_parallel(0), time_shape));
   return boxing_builder_status;
 }
 
@@ -658,7 +655,8 @@ Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
     const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
     const BlobDesc& logical_blob_desc, const ParallelDistribution& in_parallel_distribution,
     const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) const {
-  ParallelDesc reduced_in_parallel_desc = in_parallel_desc;
+  ParallelDesc reduced_in_parallel_desc =
+      in_parallel_desc;  // redundant copy because no ParallelDesc()
   ParallelDesc reduced_out_parallel_desc = out_parallel_desc;
   ParallelDistribution reduced_in_parallel_distribution;
   ParallelDistribution reduced_out_parallel_distribution;
@@ -674,10 +672,7 @@ Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
 
   if (reduced_in_parallel_hierarchy.NumAxes() == 1
       && reduced_out_parallel_hierarchy.NumAxes() == 1) {
-    //(3)[s0]->(5)[B]
-    LOG(INFO) << "1D sbp condition: reduced_in_parallel_hierarchy.NumAxes() == 1 && "
-                 "reduced_out_parallel_hierarchy.NumAxes() == 1";
-    return Build1DParallelHierarchySubTskGph(
+    return Build1dParallelHierarchySubTskGph(
         ctx, sub_tsk_gph_builder_, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks,
         in_parallel_desc, out_parallel_desc, lbi, logical_blob_desc, reduced_in_parallel_hierarchy,
         reduced_out_parallel_hierarchy, reduced_in_parallel_distribution,
@@ -717,7 +712,7 @@ Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
     std::vector<TaskNode*> out_tasks;
     std::vector<std::vector<TaskNode*>> ctrl_tasks;
     //(1)[B]->(4)[B]
-    Maybe<SubTskGphBuilderStatus> first_status = Build1DParallelHierarchySubTskGph(
+    Maybe<SubTskGphBuilderStatus> first_status = Build1dParallelHierarchySubTskGph(
         ctx, sub_tsk_gph_builder_, sorted_in_tasks, &out_tasks, &ctrl_tasks, in_parallel_desc,
         intermediate_parallel_desc, lbi, logical_blob_desc, reduced_in_parallel_hierarchy,
         intermediate_parallel_hierarchy, reduced_in_parallel_distribution,
