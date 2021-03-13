@@ -22,7 +22,11 @@ limitations under the License.
 #include "oneflow/core/graph/op_graph.h"
 #include "oneflow/core/graph/normal_forward_compute_task_node.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_context.h"
-#include "oneflow/core/graph/boxing/sub_task_graph_builder.h"
+#include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
+#include "oneflow/core/graph/boxing_identity_task_node.h"
+#include "oneflow/core/job/scope.h"
+#include "oneflow/core/vm/symbol_storage.h"
+#include "oneflow/core/job_rewriter/calculation_pass.h"
 #include "oneflow/core/graph/boxing/chain_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/collective_boxing_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/slice_boxing_sub_task_graph_builder.h"
@@ -30,12 +34,8 @@ limitations under the License.
 #include "oneflow/core/graph/boxing/naive_b2p_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/b21_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/one_to_one_sub_task_graph_builder.h"
-#include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
-#include "oneflow/core/graph/boxing_identity_task_node.h"
-#include "oneflow/core/job/scope.h"
-#include "oneflow/core/vm/symbol_storage.h"
-#include "oneflow/core/job_rewriter/calculation_pass.h"
 #include "oneflow/core/graph/boxing/hierarchical_sub_task_graph_builder.h"
+#include "oneflow/core/graph/boxing/sub_task_graph_builder.h"
 
 namespace oneflow {
 
@@ -255,17 +255,8 @@ Maybe<void> MakeGetterTaskNode4MachineId7ThrdId(
 TaskGraph::TaskGraph(std::unique_ptr<const LogicalGraph>&& logical_gph) {
   logical_gph_ = std::move(logical_gph);
   sub_tsk_gph_builder_ctx_.reset(new SubTskGphBuilderCtx(this));
+  // sub_tsk_gph_builder_.reset(new HierarchicalSubTskGphBuilder());
   boxing_logger_ = CreateBoxingLogger();
-  std::vector<std::shared_ptr<SubTskGphBuilder>> builders;
-  builders.emplace_back(new OneToOneSubTskGphBuilder());
-  builders.emplace_back(new B21SubTskGphBuilder());
-  if (!Global<ResourceDesc, ForSession>::Get()->nccl_use_compute_stream()) {
-    builders.emplace_back(new CollectiveBoxingSubTskGphBuilder());
-  }
-  builders.emplace_back(new SliceBoxingSubTskGphBuilder());
-  builders.emplace_back(new NaiveB2BSubTskGphBuilder());
-  builders.emplace_back(new NaiveB2PSubTskGphBuilder());
-  sub_tsk_gph_builder_.reset(new ChainSubTskGphBuilder(builders));
   HashMap<const LogicalNode*, std::vector<CompTaskNode*>> logical2sorted_comp_tasks;
   HashMap<CompTaskNode*, HashMap<int64_t, std::vector<TaskNode*>>> buf_task;
   auto MutBufTask = [&](CompTaskNode* task_node, int64_t machine_id, int32_t mem_zone_id) {
@@ -517,35 +508,20 @@ DEFINE_BLD_SUB_TASK_GRAPH_METHOD(BldSubTskGphByBoxing) {
     std::vector<TaskNode*> out_nodes;
     out_nodes.reserve(sorted_dst_comp_tasks.size());
     std::vector<std::vector<TaskNode*>> sorted_ctrl_tasks;
-    // const SbpParallel& src_sbp_parallel =
-    //    Global<OpGraph>::Get()->GetSbpParallel(src_logical->SoleOp()->op_name(), lbi);
-    // const SbpParallel& dst_sbp_parallel =
-    //    Global<OpGraph>::Get()->GetSbpParallel(dst_logical->SoleOp()->op_name(), lbi);
     const ParallelDistribution& src_parallel_distribution =
         Global<OpGraph>::Get()->GetParallelDistribution(src_logical->SoleOp()->op_name(), lbi);
     const ParallelDistribution& dst_parallel_distribution =
         Global<OpGraph>::Get()->GetParallelDistribution(dst_logical->SoleOp()->op_name(), lbi);
-    // const Shape* src_parallel_hierarchy =
-    //    Global<OpGraph>::Get()->GetParallelHierarchy(src_logical->SoleOp()->op_name());
-    // const Shape* dst_parallel_hierarchy =
-    //    Global<OpGraph>::Get()->GetParallelHierarchy(dst_logical->SoleOp()->op_name());
     const std::shared_ptr<const ParallelDesc>& src_parallel_desc = src_logical->parallel_desc();
     const std::shared_ptr<const ParallelDesc>& dst_parallel_desc = dst_logical->parallel_desc();
     const BlobDesc& blob_desc = Global<OpGraph>::Get()->GetLogicalBlobDesc(lbi);
-
-    // auto status = CHECK_JUST(sub_tsk_gph_builder_->Build(
-    //    sub_tsk_gph_builder_ctx_.get(), in_nodes, &out_nodes, &sorted_ctrl_tasks,
-    //    *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, src_sbp_parallel,
-    //    dst_sbp_parallel, *src_logical->out_blob_time_shape()));
     HierarchicalSubTskGphBuilder hierarchical_builder;
     auto status = CHECK_JUST(hierarchical_builder.Build(
         sub_tsk_gph_builder_ctx_.get(), in_nodes, &out_nodes, &sorted_ctrl_tasks,
-        *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, *src_parallel_desc->hierarchy(),
-        *dst_parallel_desc->hierarchy(), src_parallel_distribution, dst_parallel_distribution,
-        *src_logical->out_blob_time_shape()));
+        *src_parallel_desc, *dst_parallel_desc, lbi, blob_desc, src_parallel_distribution,
+        dst_parallel_distribution, *src_logical->out_blob_time_shape()));
     boxing_logger_->Log(*status, src_logical->SoleOp()->op_name(), dst_logical->SoleOp()->op_name(),
-                        *src_parallel_desc, *dst_parallel_desc, *src_parallel_desc->hierarchy(),
-                        *dst_parallel_desc->hierarchy(), src_parallel_distribution,
+                        *src_parallel_desc, *dst_parallel_desc, src_parallel_distribution,
                         dst_parallel_distribution, lbi, blob_desc);
     sub_tsk_gph_builder_ctx_->ConnectAll121(out_nodes, sorted_dst_comp_tasks);
     if (!sorted_ctrl_tasks.empty()) {

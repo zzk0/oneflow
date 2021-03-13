@@ -635,8 +635,7 @@ Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
     std::vector<TaskNode*>* sorted_out_tasks,
     std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
     const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
-    const BlobDesc& logical_blob_desc, const Shape& in_parallel_hierarchy,
-    const Shape& out_parallel_hierarchy, const ParallelDistribution& in_parallel_distribution,
+    const BlobDesc& logical_blob_desc, const ParallelDistribution& in_parallel_distribution,
     const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) const {
   std::shared_ptr<SubTskGphBuilder> sub_tsk_gph_builder_;
   std::vector<std::shared_ptr<SubTskGphBuilder>> builders;
@@ -648,6 +647,8 @@ Maybe<SubTskGphBuilderStatus> HierarchicalSubTskGphBuilder::Build(
   builders.emplace_back(new NaiveB2PSubTskGphBuilder());
   sub_tsk_gph_builder_.reset(new ChainSubTskGphBuilder(builders));
 
+  const Shape& in_parallel_hierarchy = *in_parallel_desc.hierarchy();
+  const Shape& out_parallel_hierarchy = *out_parallel_desc.hierarchy();
   Shape reduced_in_parallel_hierarchy;
   Shape reduced_out_parallel_hierarchy;
   ParallelDistribution reduced_in_parallel_distribution;

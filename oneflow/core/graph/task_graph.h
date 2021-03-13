@@ -23,6 +23,7 @@ limitations under the License.
 #include "oneflow/core/graph/copy_task_node.h"
 #include "oneflow/core/register/op_blob_arg_info.h"
 #include "oneflow/core/graph/boxing/boxing_logger.h"
+//#include "oneflow/core/graph/boxing/hierarchical_sub_task_graph_builder.h"
 
 namespace oneflow {
 
@@ -97,7 +98,7 @@ class TaskGraph final : public Graph<TaskNode, TaskEdge> {
 
   std::unique_ptr<const LogicalGraph> logical_gph_;
   std::vector<TaskNode*> ordered_task_nodes_;
-  std::shared_ptr<SubTskGphBuilder> sub_tsk_gph_builder_;
+  // std::unique_ptr<HierarchicalSubTskGphBuilder> hierarchical_sub_tsk_gph_builder_;
   std::shared_ptr<SubTskGphBuilderCtx> sub_tsk_gph_builder_ctx_;
   std::unique_ptr<BoxingLogger> boxing_logger_;
 };

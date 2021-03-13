@@ -29,8 +29,7 @@ class BoxingLogger {
 
   virtual void Log(const SubTskGphBuilderStatus& status, const std::string& src_op_name,
                    const std::string& dst_op_name, const ParallelDesc& src_parallel_desc,
-                   const ParallelDesc& dst_parallel_desc, const Shape& src_parallel_hierarchy,
-                   const Shape& dst_parallel_hierarchy,
+                   const ParallelDesc& dst_parallel_desc,
                    const ParallelDistribution& src_parallel_distribution,
                    const ParallelDistribution& dst_parallel_distribution, const LogicalBlobId& lbi,
                    const BlobDesc& logical_blob_desc) = 0;
@@ -44,8 +43,7 @@ class NullBoxingLogger final : public BoxingLogger {
 
   void Log(const SubTskGphBuilderStatus& status, const std::string& src_op_name,
            const std::string& dst_op_name, const ParallelDesc& src_parallel_desc,
-           const ParallelDesc& dst_parallel_desc, const Shape& src_parallel_hierarchy,
-           const Shape& dst_parallel_hierarchy,
+           const ParallelDesc& dst_parallel_desc,
            const ParallelDistribution& src_parallel_distribution,
            const ParallelDistribution& dst_parallel_distribution, const LogicalBlobId& lbi,
            const BlobDesc& logical_blob_desc) override{};
@@ -60,8 +58,7 @@ class CsvBoxingLogger final : public BoxingLogger {
 
   void Log(const SubTskGphBuilderStatus& status, const std::string& src_op_name,
            const std::string& dst_op_name, const ParallelDesc& src_parallel_desc,
-           const ParallelDesc& dst_parallel_desc, const Shape& src_parallel_hierarchy,
-           const Shape& dst_parallel_hierarchy,
+           const ParallelDesc& dst_parallel_desc,
            const ParallelDistribution& src_parallel_distribution,
            const ParallelDistribution& dst_parallel_distribution, const LogicalBlobId& lbi,
            const BlobDesc& logical_blob_desc) override;

@@ -15,6 +15,7 @@ limitations under the License.
 */
 #ifndef ONEFLOW_CORE_GRAPH_BOXING_HIERARCHICAL_SUB_TASK_GRAPH_BUILDER_H_
 #define ONEFLOW_CORE_GRAPH_BOXING_HIERARCHICAL_SUB_TASK_GRAPH_BUILDER_H_
+#include "oneflow/core/graph/boxing/sub_task_graph_builder_context.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder.h"
 
 namespace oneflow {
@@ -30,8 +31,7 @@ class HierarchicalSubTskGphBuilder {
       std::vector<TaskNode*>* sorted_out_tasks,
       std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
       const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
-      const BlobDesc& logical_blob_desc, const Shape& in_parallel_hierarchy,
-      const Shape& out_parallel_hierarchy, const ParallelDistribution& in_parallel_distribution,
+      const BlobDesc& logical_blob_desc, const ParallelDistribution& in_parallel_distribution,
       const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) const;
 };
 
