@@ -1087,7 +1087,7 @@ bool IsCpuOnly(const OperatorConf& op_conf) {
 
 std::shared_ptr<Operator> ConstructOp(const OperatorConf& op_conf, DeviceType device_type) {
   OperatorConf dev_op_conf = op_conf;
-  dev_op_conf.set_device_tag(CHECK_JUST(DeviceTag4DeviceType(device_type)));
+  dev_op_conf.set_device_tag(*CHECK_JUST(DeviceTag4DeviceType(device_type)));
   return CheckAndConstructOp(dev_op_conf);
 }
 
@@ -1156,11 +1156,6 @@ Maybe<void> Operator::ToOpAttribute(OpAttribute* op_attribute) const {
     *op_attribute->mutable_sbp_signature() = *sbp_signature_;
   } else {
     op_attribute->clear_sbp_signature();
-  }
-  if (parallel_distribution_signature_) {
-    *op_attribute->mutable_parallel_distribution_signature() = *parallel_distribution_signature_;
-  } else {
-    op_attribute->clear_parallel_distribution_signature();
   }
   if (parallel_distribution_signature_) {
     *op_attribute->mutable_parallel_distribution_signature() = *parallel_distribution_signature_;

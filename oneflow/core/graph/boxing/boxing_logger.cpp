@@ -28,7 +28,7 @@ namespace {
 std::string ParallelDescToString(const ParallelDesc& parallel_desc) {
   std::string serialized_parallel_desc;
   std::string device_type;
-  device_type = CHECK_JUST(DeviceTag4DeviceType(parallel_desc.device_type()));
+  device_type = *CHECK_JUST(DeviceTag4DeviceType(parallel_desc.device_type()));
   auto sorted_machine_ids = parallel_desc.sorted_machine_ids();
   serialized_parallel_desc += "{";
   for (int64_t i = 0; i < sorted_machine_ids.size(); ++i) {

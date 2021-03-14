@@ -28,6 +28,23 @@ bool operator==(const SbpSignature& lhs, const SbpSignature& rhs) {
 
 bool operator!=(const SbpSignature& lhs, const SbpSignature& rhs) { return !(lhs == rhs); }
 
+//  S -> S
+//  P -> B
+//  B -> P
+SbpParallel GetDualSbpParallel(const SbpParallel& sbp_parallel) {
+  SbpParallel ret(sbp_parallel);
+  if (sbp_parallel.has_split_parallel()) {
+    //  do nothing
+  } else if (sbp_parallel.has_broadcast_parallel()) {
+    ret.mutable_partial_sum_parallel();
+  } else if (sbp_parallel.has_partial_sum_parallel()) {
+    ret.mutable_broadcast_parallel();
+  } else {
+    UNIMPLEMENTED();
+  }
+  return ret;
+}
+
 bool operator==(const ParallelDistribution& lhs, const ParallelDistribution& rhs) {
   return PbMd().Equals(lhs, rhs);
 }
@@ -44,23 +61,6 @@ bool operator==(const ParallelDistributionSignature& lhs,
 bool operator!=(const ParallelDistributionSignature& lhs,
                 const ParallelDistributionSignature& rhs) {
   return !(lhs == rhs);
-}
-
-//  S -> S
-//  P -> B
-//  B -> P
-SbpParallel GetDualSbpParallel(const SbpParallel& sbp_parallel) {
-  SbpParallel ret(sbp_parallel);
-  if (sbp_parallel.has_split_parallel()) {
-    //  do nothing
-  } else if (sbp_parallel.has_broadcast_parallel()) {
-    ret.mutable_partial_sum_parallel();
-  } else if (sbp_parallel.has_partial_sum_parallel()) {
-    ret.mutable_broadcast_parallel();
-  } else {
-    UNIMPLEMENTED();
-  }
-  return ret;
 }
 
 bool IsSbpSignatureContaining(const SbpSignature& bigger, const SbpSignature& smaller) {

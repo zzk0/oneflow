@@ -58,12 +58,12 @@ void ParallelAxesReduce(const ParallelDesc& parallel_desc,
 }
 
 void CollaborativeParallelAxesReduce(const ParallelDesc& in_parallel_desc,
-                                     const ParallelDistribution& in_parallel_distribution,
                                      const ParallelDesc& out_parallel_desc,
+                                     const ParallelDistribution& in_parallel_distribution,
                                      const ParallelDistribution& out_parallel_distribution,
                                      ParallelDesc* in_return_parallel_desc,
-                                     ParallelDistribution* in_return_parallel_distribution,
                                      ParallelDesc* out_return_parallel_desc,
+                                     ParallelDistribution* in_return_parallel_distribution,
                                      ParallelDistribution* out_return_parallel_distribution) {
   const auto& in_hierarchy = in_parallel_desc.hierarchy();
   const auto& out_hierarchy = out_parallel_desc.hierarchy();
@@ -124,9 +124,9 @@ void InOutParallelAxesReduce(const ParallelDesc& in_parallel_desc,
     ParallelAxesReduce(out_parallel_desc, out_parallel_distribution, return_out_parallel_desc,
                        return_out_parallel_distribution);
   } else {
-    CollaborativeParallelAxesReduce(in_parallel_desc, in_parallel_distribution, out_parallel_desc,
+    CollaborativeParallelAxesReduce(in_parallel_desc, out_parallel_desc, in_parallel_distribution,
                                     out_parallel_distribution, return_in_parallel_desc,
-                                    return_in_parallel_distribution, return_out_parallel_desc,
+                                    return_out_parallel_desc, return_in_parallel_distribution,
                                     return_out_parallel_distribution);
   }
 }

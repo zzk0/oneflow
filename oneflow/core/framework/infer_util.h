@@ -58,6 +58,7 @@ class InferContext {
     return nullptr;
   };
   virtual const SbpParallel& SbpParallel4ArgNameAndIndex(const std::string&, int32_t) const = 0;
+  
   virtual const ParallelDistribution& ParallelDistribution4ArgNameAndIndex(const std::string&,
                                                                            int32_t) const = 0;
 
