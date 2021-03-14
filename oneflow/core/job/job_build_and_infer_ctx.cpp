@@ -551,7 +551,6 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferConsistentOp(const OperatorCo
   CHECK_OR_RETURN(op_conf.has_scope_symbol_id());
   const auto& scope = Global<symbol::Storage<Scope>>::Get()->Get(op_conf.scope_symbol_id());
   const auto& parallel_desc = JUST(scope.GetParallelDesc(op_conf));
-  LOG(INFO) << op_conf.name() << " hierarchy: \n" << parallel_desc.hierarchy()->DebugStr();
   const auto* job_desc = JUST(scope.job_desc());
   return AddAndInferOp(op_conf, parallel_desc.parallel_conf(), job_desc, false);
 }
@@ -579,16 +578,16 @@ Maybe<OpAttribute> JobBuildAndInferCtx::AddAndInferOp(const OperatorConf& op_con
   auto new_op_conf = JUST(DecodeLbiHintAndReturnNewOpConf(*op, &sbp_sig_conf, &ibn2disable_boxing));
   auto parallel_conf = JUST(InferOpParallelConf(*op, origin_parallel_conf, ibn2disable_boxing));
   ParallelDesc parallel_desc(*parallel_conf);
-  LOG(INFO) << "op parallel hierarchy" << parallel_desc.hierarchy()->DebugStr();
   JUST(op->FillOpParallelDesc(parallel_desc));
   JUST(AddOpNameParallelConf2Placement(op_name, *parallel_conf));
   UpdateLbi2DisableBoxing(*op, ibn2disable_boxing);
-  auto GetBlobDesc4BnInOp = [&](const std::string& bn) -> const BlobDesc& {
+
+  auto GetBlobDesc4BnInOp = [&](const std::string& bn) -> BlobDesc* {
     const LogicalBlobId& lbi = op->BnInOp2Lbi(bn);
-    auto it = op_name2op_.find(lbi.op_name());
-    CHECK(it != op_name2op_.end());
-    auto producer_op = it->second;
-    return *CHECK_JUST(producer_op->GetLogicalBlobDesc4Obn(lbi.blob_name()));
+    if (lbi2logical_blob_desc_.find(lbi) != lbi2logical_blob_desc_.end()) {
+      return lbi2logical_blob_desc_.at(lbi).get();
+    }
+    return nullptr;
   };
   JUST(op->FillLogicalInBlobDesc(GetBlobDesc4BnInOp));
 

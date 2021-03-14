@@ -1112,7 +1112,7 @@ Maybe<OpNodeSignatureDesc> InstructionsBuilder::GetOpNodeSignatureSymbol(
   std::shared_ptr<cfg::OpNodeSignature> op_node_signature =
       std::make_shared<cfg::OpNodeSignature>();
   {
-    // op_node_signature->mutable_sbp_signature()->CopyFrom(op_attribute->sbp_signature());
+    op_node_signature->mutable_sbp_signature()->CopyFrom(op_attribute->sbp_signature());
     op_node_signature->mutable_mirrored_signature()->CopyFrom(op_attribute->mirrored_signature());
     op_node_signature->mutable_logical_blob_desc_signature()->CopyFrom(
         op_attribute->logical_blob_desc_signature());

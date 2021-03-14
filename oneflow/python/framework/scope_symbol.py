@@ -144,13 +144,11 @@ def BuildInitialScope(
     return instruction_builder.GetScopeSymbol(scope_proto)
 
 
-def MakeParallelConf(device_tag, machine_device_ids, hierarchy=None):
+def MakeParallelConf(device_tag, machine_device_ids):
     assert isinstance(machine_device_ids, (list, tuple))
 
     parallel_conf = placement_cfg.ParallelConf()
     parallel_conf.set_device_tag(device_tag)
-    if hierarchy is not None:
-        parallel_conf.hierarchy.dim.extend(hierarchy)
     for machine_device_id in machine_device_ids:
         assert isinstance(
             machine_device_id, str
