@@ -26,6 +26,7 @@ limitations under the License.
 #include "oneflow/core/framework/user_op_registry_manager.h"
 #include "oneflow/core/vm/vm_util.h"
 #include "oneflow/core/vm/symbol_storage.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 
@@ -92,9 +93,12 @@ inline Maybe<long long> GetOpParallelSymbolId(const std::string& op_conf_str) {
 }
 
 inline Maybe<std::string> CheckAndCompleteUserOpConf(const std::string& op_conf_str) {
+  OF_PROFILER_RANGE_PUSH("CheckAndCompleteUserOpConf");
   OperatorConf op_conf;
   CHECK_OR_RETURN(TxtString2PbMessage(op_conf_str, &op_conf)) << "operator conf parse failed";
-  return PbMessage2TxtString(*JUST(CheckAndCompleteUserOpConfImpl(op_conf)));
+  auto rtn = PbMessage2TxtString(*JUST(CheckAndCompleteUserOpConfImpl(op_conf)));
+  OF_PROFILER_RANGE_POP();
+  return rtn;
 }
 
 }  // namespace oneflow

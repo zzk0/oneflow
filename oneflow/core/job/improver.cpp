@@ -679,16 +679,28 @@ void Improver::Init(const AvailableMemDesc& amd, const Plan& naive_plan) {
 
 Maybe<Plan> Improver::GenAndInferMemBlockIdOnly(const AvailableMemDesc& amd,
                                                 const Plan& naive_plan) {
+  OF_PROFILER_RANGE_PUSH("Init");
   Init(amd, naive_plan);
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("GenAndInferMemBlockId");
   Plan complete_plan = GenAndInferMemBlockId(naive_plan);
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("MakeMemZoneRegstDescs");
   // Check if there is any zone out of memory even though all register_num == 1
   MemZoneRegstDescs mz_regst_descs;
   MakeMemZoneRegstDescs(complete_plan, &mz_regst_descs);
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("CheckAllZoneNotOOM");
   HashMap<int64_t, double> zero2one{{0, 1}};
   auto Zero2One = [&](int64_t) -> const HashMap<int64_t, double>& { return zero2one; };
   JUST(CheckAllZoneNotOOM(mz_regst_descs, Zero2One, Zero2One, 1));
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("SetUniqueMemBlockId4UnreusedMemRegst");
   SetUniqueMemBlockId4UnreusedMemRegst(&complete_plan);
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("GenMemBlockAndChunk4Plan");
   GenMemBlockAndChunk4Plan(&complete_plan);
+  OF_PROFILER_RANGE_POP();
   return complete_plan;
 }
 

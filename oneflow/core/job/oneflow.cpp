@@ -211,6 +211,7 @@ void GetDeviceDesc(const TaskProto* task_proto, boxing::collective::DeviceDesc* 
 }
 
 void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
+  OF_PROFILER_RANGE_PUSH("GenCollectiveBoxingPlan:" + job->job_conf().job_name());
   using namespace boxing::collective;
 
   struct RequestInfo {
@@ -220,13 +221,18 @@ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
     int64_t dependency_depth;
   };
 
+  OF_PROFILER_RANGE_PUSH("PlanTaskGraph");
   PlanTaskGraph plan_task_graph(*plan);
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("request_set");
   int64_t dependency_depth = 0;
   int64_t order = 0;
   RequestSet* request_set = &(*plan->mutable_collective_boxing_plan()
                                    ->mutable_job_id2request_set())[GlobalJobDesc().job_id()];
+  OF_PROFILER_RANGE_POP();
   HashSet<const PlanTaskNode*> all_visited;
   while (true) {
+    OF_PROFILER_RANGE_PUSH("while_before_break");
     std::list<const PlanTaskNode*> src_nodes;
     plan_task_graph.ForEachNode([&](const PlanTaskNode* node) {
       if (all_visited.count(node) != 0) { return; }
@@ -269,7 +275,9 @@ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
                                         collective_boxing_nodes.push_back(node);
                                       }
                                     });
+    OF_PROFILER_RANGE_POP();
     if (collective_boxing_nodes.empty()) { break; }
+    OF_PROFILER_RANGE_PUSH("while_after_break");
     HashMap<std::string, RequestInfo> name2request_info;
     for (const PlanTaskNode* node : collective_boxing_nodes) {
       const TaskProto* task_proto = node->task_proto();
@@ -315,17 +323,22 @@ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
     CHECK_GT(collected, 0);
     all_visited.insert(visited.begin(), visited.end());
     ++dependency_depth;
+    OF_PROFILER_RANGE_POP();
   }
+  OF_PROFILER_RANGE_POP();
 }
 
 Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_complete) {
+  OF_PROFILER_RANGE_PUSH("CompileCurJobOnMaster:" + job->job_conf().job_name());
   const JobDesc& job_desc = GlobalJobDesc();
   Plan naive_plan;
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     double start = GetCurTime();
     Compiler().Compile(job, &naive_plan, need_job_complete);
+    OF_PROFILER_RANGE_PUSH("GenAndInferMemBlockIdOnly");
     *improved_plan =
         *JUST(Improver().GenAndInferMemBlockIdOnly(*Global<AvailableMemDesc>::Get(), naive_plan));
+    OF_PROFILER_RANGE_POP();
     LOG(INFO) << "\njob_id: " << job_desc.job_id() << " , job_name: " << job_desc.job_name()
               << " , compile time: " << (GetCurTime() - start) / 1000000000.0 << " seconds.\n";
     if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
@@ -334,6 +347,7 @@ Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_c
     }
   }
   GenCollectiveBoxingPlan(job, improved_plan);
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
@@ -1010,7 +1024,9 @@ REGISTER_FUNCTION_CONFIG_DEF().Bool("__is_user_function__", true, "is user defin
 
 Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan) {
   std::vector<std::shared_ptr<Job>> jobs(conf_jobs.size());
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:job_reset");
   FOR_RANGE(int, i, 0, jobs.size()) { jobs.at(i).reset(new Job(conf_jobs.Get(i))); }
+  OF_PROFILER_RANGE_POP();
   if (jobs.size() > 1) { CheckNonDistributeOptimizerAvailable(jobs); }
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     HashMap<std::string, ParallelBlobConf> var_op_name2parallel_blob_conf;
@@ -1055,18 +1071,32 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       jobs.emplace_back(pull_job);
     }
   }
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:CompileCurJobOnMaster");
   std::vector<Plan> sub_plans(jobs.size());
   FOR_RANGE(int64_t, i, 0, jobs.size()) {
     AddJobName2JobId(jobs.at(i)->job_conf().job_name(), i);
     auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(i)->job_conf(), i);
     JUST(CompileCurJobOnMaster(jobs.at(i).get(), &sub_plans.at(i), true));
   }
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:merged_plan");
   if (GlobalProcessCtx::IsThisProcessMaster()) {
+    OF_PROFILER_RANGE_PUSH("merged_plan:MergeSubPlanWithoutGenNetTopo");
     MergeSubPlanWithoutGenNetTopo(plan, sub_plans);
+    OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_PUSH("merged_plan:MergeMemReusedChunkBetweenUserJobs");
     InterJobMemSharingUtil::MergeMemReusedChunkBetweenUserJobs(function_jobs, plan);
+    OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_PUSH("merged_plan:MergeMemSharedInterfaceMemBlockBetweenJobs");
     InterJobMemSharingUtil::MergeMemSharedInterfaceMemBlockBetweenJobs(jobs, plan);
+    OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_PUSH("merged_plan:SetForceInplaceMemBlock");
     PlanUtil::SetForceInplaceMemBlock(plan);
+    OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_PUSH("merged_plan:FinishGlobalCriticalSectionDesc");
     FinishGlobalCriticalSectionDesc(*plan, jobs.size());
+    OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_PUSH("merged_plan:AddJobName2JobId");
     Plan main_plan;
     std::vector<std::map<int64_t, std::string>> identity_tick_op_names;
     {
@@ -1076,19 +1106,29 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
       AddJobName2JobId(main_job.job_conf().job_name(), jobs.size());
       JUST(CompileMainJob(&main_job, lock_back_edges, sub_plans.size(), &main_plan));
     }
+    OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_PUSH("merged_plan:LinkMainPlan");
     LinkMainPlan(plan, main_plan, identity_tick_op_names);
+    OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_PUSH("merged_plan:CleanUselessMemBlockAndCheckValid");
     PlanUtil::CleanUselessMemBlockAndCheckValid(plan);
+    OF_PROFILER_RANGE_POP();
     if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
+      OF_PROFILER_RANGE_PUSH("merged_plan:Write");
       TeePersistentLogStream::Create("merged_plan")->Write(*plan);
       PlanUtil::ToDotFile(*plan, "/dot/merged_plan.dot");
+      OF_PROFILER_RANGE_POP();
     }
+    OF_PROFILER_RANGE_PUSH("merged_plan:PushPlan");
     PushPlan("merged_plan", *plan);
+    OF_PROFILER_RANGE_POP();
   } else {
     PullPlan("merged_plan", plan);
     if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
       TeePersistentLogStream::Create("merged_plan")->Write(*plan);
     }
   }
+  OF_PROFILER_RANGE_POP();
   OF_SESSION_BARRIER();
   return Maybe<void>::Ok();
 }
@@ -1104,7 +1144,7 @@ Maybe<void> Oneflow::Init(const oneflow::JobSet& job_set) {
   if (GlobalProcessCtx::IsThisProcessMaster()) {
     runtime_buffers_scope_.reset(new RuntimeBuffersScope(plan_));
   }
-  OF_PROFILER_RANGE_PUSH("new Runtime");
+  OF_PROFILER_RANGE_PUSH("new_Runtime");
   runtime_.reset(new Runtime(plan_, GetMaxVal<size_t>(), false));
   OF_PROFILER_RANGE_POP();  // new Runtime
   return Maybe<void>::Ok();

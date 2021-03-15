@@ -16,6 +16,7 @@ limitations under the License.
 #include "oneflow/core/actor/source_tick_compute_actor.h"
 #include "oneflow/core/job/runtime_context.h"
 #include "oneflow/core/record/record.pb.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 
@@ -25,8 +26,10 @@ void SourceTickComputeActor::VirtualCompActorInit(const TaskProto& task_proto) {
 }
 
 void SourceTickComputeActor::Act() {
+  OF_PROFILER_RANGE_PUSH("SourceTickComputeActor::Act");
   Regst* regst = GetNaiveCurWriteable("out");
   regst->set_piece_id(piece_id_++);
+  OF_PROFILER_RANGE_POP();
 }
 
 bool SourceTickComputeActor::IsCustomizedReadReady() const {

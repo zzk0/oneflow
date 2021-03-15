@@ -16,6 +16,7 @@ limitations under the License.
 #include "oneflow/core/job_rewriter/job_pass.h"
 #include "oneflow/core/register/runtime_blob_desc.h"
 #include "oneflow/core/framework/framework.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 
@@ -76,7 +77,7 @@ Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_bu
     if (user_op_conf.attr<double>("scale") != 1.0 || user_op_conf.attr<float>("l1") != 0.0f
         || user_op_conf.attr<float>("l2") != 0.0f) {
       return;
-    }
+    } 
     float l1 = 0;
     float l2 = 0;
     double scale = 1;
@@ -146,7 +147,6 @@ Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_bu
     }();
 
     if (!fused) { return; }
-
     user_op::UserOpConfWrapperBuilder fused_op_builder(user_op_conf.op_name());
     fused_op_builder.OpTypeName(user_op_conf.op_type_name())
         .Input("model", user_op_conf.input("model", 0))

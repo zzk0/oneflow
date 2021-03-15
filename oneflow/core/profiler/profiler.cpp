@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 #include "oneflow/core/profiler/profiler.h"
+#include "oneflow/core/common/util.h"
 #ifdef OF_ENABLE_PROFILER
 #include <nvtx3/nvToolsExt.h>
 #include <sys/syscall.h>
@@ -64,32 +65,22 @@ void RangePop() {
 }
 
 #ifdef OF_ENABLE_PROFILER
-
-class RangeGuardCtx {
- public:
-  OF_DISALLOW_COPY_AND_MOVE(RangeGuardCtx);
-  explicit RangeGuardCtx(nvtxRangeId_t range_id) : range_id_(range_id) {}
-  ~RangeGuardCtx() = default;
-
-  nvtxRangeId_t range_id() const { return range_id_; }
-
- private:
-  nvtxRangeId_t range_id_;
+struct RangeGuard::Impl {
+  nvtxRangeId_t range_id;
 };
-#else
-class RangeGuardCtx {};
 #endif  // OF_ENABLE_PROFILER
 
 RangeGuard::RangeGuard(const std::string& name) {
 #ifdef OF_ENABLE_PROFILER
   nvtxRangeId_t range_id = nvtxRangeStartA(name.c_str());
-  ctx_.reset(new RangeGuardCtx(range_id));
+  impl_.reset(new Impl());
+  impl_->range_id = range_id;
 #endif  // OF_ENABLE_PROFILER
 }
 
 RangeGuard::~RangeGuard() {
 #ifdef OF_ENABLE_PROFILER
-  nvtxRangeEnd(ctx_->range_id());
+  nvtxRangeEnd(impl_->range_id);
 #endif  // OF_ENABLE_PROFILER
 }
 

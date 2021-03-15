@@ -22,6 +22,7 @@ limitations under the License.
 #include <glog/logging.h>
 #include "oneflow/core/common/maybe.h"
 #include "oneflow/core/common/constant.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 
@@ -32,6 +33,8 @@ class Global final {
   static void SetAllocated(T* val) { *GetPPtr() = val; }
   template<typename... Args>
   static void New(Args&&... args) {
+    std::string tn(typeid(T).name());
+    OF_PROFILER_RANGE_GUARD("NewGlobal:" + tn);
     CHECK(Get() == nullptr);
     LOG(INFO) << "NewGlobal " << typeid(T).name();
     *GetPPtr() = new T(std::forward<Args>(args)...);

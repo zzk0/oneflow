@@ -29,10 +29,20 @@ bool PlanTaskGraph::IsReachable(int64_t src_task_id, int64_t dst_task_id) const 
 }
 
 PlanTaskGraph::PlanTaskGraph(const Plan& plan) : plan_(&plan) {
+  OF_PROFILER_RANGE_PUSH("PlanTaskGraph");  
+  OF_PROFILER_RANGE_PUSH("InitNodes");  
   InitNodes();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("InitEdges");
   InitEdges();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("InitNode2Ancestor");
   InitNode2Ancestor();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("InitChainId2SortedPlanTaskNode");
   InitChainId2SortedPlanTaskNode();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
 }
 
 void PlanTaskGraph::InitNodes() {

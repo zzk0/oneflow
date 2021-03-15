@@ -1,0 +1,537 @@
+diff --git a/oneflow/api/python/op/op_mgr.h b/oneflow/api/python/op/op_mgr.h
+index 9af6da3..62bc5ea 100644
+--- a/oneflow/api/python/op/op_mgr.h
++++ b/oneflow/api/python/op/op_mgr.h
+@@ -26,6 +26,7 @@ limitations under the License.
+ #include "oneflow/core/framework/user_op_registry_manager.h"
+ #include "oneflow/core/vm/vm_util.h"
+ #include "oneflow/core/vm/symbol_storage.h"
++#include "oneflow/core/profiler/profiler.h"
+ 
+ namespace oneflow {
+ 
+@@ -92,9 +93,12 @@ inline Maybe<long long> GetOpParallelSymbolId(const std::string& op_conf_str) {
+ }
+ 
+ inline Maybe<std::string> CheckAndCompleteUserOpConf(const std::string& op_conf_str) {
++  OF_PROFILER_RANGE_PUSH("CheckAndCompleteUserOpConf");
+   OperatorConf op_conf;
+   CHECK_OR_RETURN(TxtString2PbMessage(op_conf_str, &op_conf)) << "operator conf parse failed";
+-  return PbMessage2TxtString(*JUST(CheckAndCompleteUserOpConfImpl(op_conf)));
++  auto rtn = PbMessage2TxtString(*JUST(CheckAndCompleteUserOpConfImpl(op_conf)));
++  OF_PROFILER_RANGE_POP();
++  return rtn;
+ }
+ 
+ }  // namespace oneflow
+diff --git a/oneflow/core/actor/source_tick_compute_actor.cpp b/oneflow/core/actor/source_tick_compute_actor.cpp
+index f929888..97ba484 100644
+--- a/oneflow/core/actor/source_tick_compute_actor.cpp
++++ b/oneflow/core/actor/source_tick_compute_actor.cpp
+@@ -16,6 +16,7 @@ limitations under the License.
+ #include "oneflow/core/actor/source_tick_compute_actor.h"
+ #include "oneflow/core/job/runtime_context.h"
+ #include "oneflow/core/record/record.pb.h"
++#include "oneflow/core/profiler/profiler.h"
+ 
+ namespace oneflow {
+ 
+@@ -25,8 +26,10 @@ void SourceTickComputeActor::VirtualCompActorInit(const TaskProto& task_proto) {
+ }
+ 
+ void SourceTickComputeActor::Act() {
++  OF_PROFILER_RANGE_PUSH("SourceTickComputeActor::Act");
+   Regst* regst = GetNaiveCurWriteable("out");
+   regst->set_piece_id(piece_id_++);
++  OF_PROFILER_RANGE_POP();
+ }
+ 
+ bool SourceTickComputeActor::IsCustomizedReadReady() const {
+diff --git a/oneflow/core/common/global.h b/oneflow/core/common/global.h
+index b09625a..1583ae7 100644
+--- a/oneflow/core/common/global.h
++++ b/oneflow/core/common/global.h
+@@ -22,6 +22,7 @@ limitations under the License.
+ #include <glog/logging.h>
+ #include "oneflow/core/common/maybe.h"
+ #include "oneflow/core/common/constant.h"
++#include "oneflow/core/profiler/profiler.h"
+ 
+ namespace oneflow {
+ 
+@@ -32,6 +33,8 @@ class Global final {
+   static void SetAllocated(T* val) { *GetPPtr() = val; }
+   template<typename... Args>
+   static void New(Args&&... args) {
++    std::string tn(typeid(T).name());
++    OF_PROFILER_RANGE_GUARD("NewGlobal:" + tn);
+     CHECK(Get() == nullptr);
+     LOG(INFO) << "NewGlobal " << typeid(T).name();
+     *GetPPtr() = new T(std::forward<Args>(args)...);
+diff --git a/oneflow/core/graph/op_graph.cpp b/oneflow/core/graph/op_graph.cpp
+index eae76cd..89649b7 100644
+--- a/oneflow/core/graph/op_graph.cpp
++++ b/oneflow/core/graph/op_graph.cpp
+@@ -206,6 +206,7 @@ Maybe<OpGraph> OpGraph::New(const Job& job) {
+ }
+ 
+ Maybe<void> OpGraph::Init(const Job& job) {
++  OF_PROFILER_RANGE_PUSH("OpGraph::Init:" + job.job_conf().job_name());
+   InitNodes(job);
+   ForEachNode([&](OpNode* node) {
+     CHECK(op_name2op_node_.emplace(node->op().op_name(), node).second)
+@@ -217,8 +218,11 @@ Maybe<void> OpGraph::Init(const Job& job) {
+   ForEachNode([](OpNode* node) { node->InitLbi2SourceNode(); });
+   InferBlobLastUsed();
+   InferTimeShape();
++  OF_PROFILER_RANGE_PUSH("OpGraph::Init:InferLogicalBlobDesc");
+   JUST(InferLogicalBlobDesc(job));
++  OF_PROFILER_RANGE_POP();
+   ForEachEdge([](OpEdge* edge) { edge->InitDistributeHierarchyInfo(); });
++  OF_PROFILER_RANGE_POP();
+   return Maybe<void>::Ok();
+ }
+ 
+diff --git a/oneflow/core/graph/plan_task_graph.cpp b/oneflow/core/graph/plan_task_graph.cpp
+index ff4f9d5..568d9ab 100644
+--- a/oneflow/core/graph/plan_task_graph.cpp
++++ b/oneflow/core/graph/plan_task_graph.cpp
+@@ -29,10 +29,20 @@ bool PlanTaskGraph::IsReachable(int64_t src_task_id, int64_t dst_task_id) const
+ }
+ 
+ PlanTaskGraph::PlanTaskGraph(const Plan& plan) : plan_(&plan) {
++  OF_PROFILER_RANGE_PUSH("PlanTaskGraph");  
++  OF_PROFILER_RANGE_PUSH("InitNodes");  
+   InitNodes();
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("InitEdges");
+   InitEdges();
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("InitNode2Ancestor");
+   InitNode2Ancestor();
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("InitChainId2SortedPlanTaskNode");
+   InitChainId2SortedPlanTaskNode();
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_POP();
+ }
+ 
+ void PlanTaskGraph::InitNodes() {
+diff --git a/oneflow/core/job/compiler.cpp b/oneflow/core/job/compiler.cpp
+index ceffc3f..fdc5e27 100644
+--- a/oneflow/core/job/compiler.cpp
++++ b/oneflow/core/job/compiler.cpp
+@@ -18,6 +18,7 @@ limitations under the License.
+ #include "oneflow/core/persistence/tee_persistent_log_stream.h"
+ #include "oneflow/core/graph/op_graph.h"
+ #include "oneflow/core/job_rewriter/job_completer.h"
++#include "oneflow/core/profiler/profiler.h"
+ 
+ namespace oneflow {
+ 
+@@ -63,8 +64,12 @@ void Compiler::GenNetTopo(Plan* plan) const {
+ }
+ 
+ void Compiler::Compile(Job* job, Plan* plan, bool need_job_complete) const {
++  OF_PROFILER_RANGE_PUSH("Compiler::Compile:" + job->job_conf().job_name());
+   const JobDesc& job_desc = GlobalJobDesc();
++  OF_PROFILER_RANGE_PUSH("Compiler::Compile_JobCompleter");
+   if (need_job_complete) { JobCompleter().Complete(job); }
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("Compiler::Compile:TaskGraph");
+   Global<OpGraph>::New(*job);
+   if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
+     TeePersistentLogStream::Create(StrCat("optimized_job", job_desc.job_id()))->Write(*job);
+@@ -95,6 +100,8 @@ void Compiler::Compile(Job* job, Plan* plan, bool need_job_complete) const {
+     (*job_id2job_conf)[GlobalJobDesc().job_id()] = GlobalJobDesc().job_conf();
+   }
+   Global<OpGraph>::Delete();
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_POP();
+ }
+ 
+ }  // namespace oneflow
+diff --git a/oneflow/core/job/improver.cpp b/oneflow/core/job/improver.cpp
+index 4f1f10d..bf2205c 100644
+--- a/oneflow/core/job/improver.cpp
++++ b/oneflow/core/job/improver.cpp
+@@ -679,16 +679,28 @@ void Improver::Init(const AvailableMemDesc& amd, const Plan& naive_plan) {
+ 
+ Maybe<Plan> Improver::GenAndInferMemBlockIdOnly(const AvailableMemDesc& amd,
+                                                 const Plan& naive_plan) {
++  OF_PROFILER_RANGE_PUSH("Init");
+   Init(amd, naive_plan);
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("GenAndInferMemBlockId");
+   Plan complete_plan = GenAndInferMemBlockId(naive_plan);
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("MakeMemZoneRegstDescs");
+   // Check if there is any zone out of memory even though all register_num == 1
+   MemZoneRegstDescs mz_regst_descs;
+   MakeMemZoneRegstDescs(complete_plan, &mz_regst_descs);
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("CheckAllZoneNotOOM");
+   HashMap<int64_t, double> zero2one{{0, 1}};
+   auto Zero2One = [&](int64_t) -> const HashMap<int64_t, double>& { return zero2one; };
+   JUST(CheckAllZoneNotOOM(mz_regst_descs, Zero2One, Zero2One, 1));
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("SetUniqueMemBlockId4UnreusedMemRegst");
+   SetUniqueMemBlockId4UnreusedMemRegst(&complete_plan);
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("GenMemBlockAndChunk4Plan");
+   GenMemBlockAndChunk4Plan(&complete_plan);
++  OF_PROFILER_RANGE_POP();
+   return complete_plan;
+ }
+ 
+diff --git a/oneflow/core/job/job_build_and_infer_ctx.cpp b/oneflow/core/job/job_build_and_infer_ctx.cpp
+index 09b48d3..21f8c1f 100644
+--- a/oneflow/core/job/job_build_and_infer_ctx.cpp
++++ b/oneflow/core/job/job_build_and_infer_ctx.cpp
+@@ -24,6 +24,7 @@ limitations under the License.
+ #include "oneflow/core/job_rewriter/autograd.h"
+ #include "oneflow/core/job_rewriter/job_pass.h"
+ #include "oneflow/user/summary/summary_converter.h"
++#include "oneflow/core/profiler/profiler.h"
+ 
+ #include <google/protobuf/text_format.h>
+ #include <json.hpp>
+@@ -897,12 +898,16 @@ Maybe<LogicalBlobId> EagerJobBuildAndInferCtx::FindOrCreateMirroredLbiFromCompat
+ }
+ 
+ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
++  OF_PROFILER_RANGE_PUSH("LazyJobBuildAndInferCtx::Complete");
+   CHECK_NOTNULL(Global<JobDesc>::Get());
+   Global<JobDesc>::Delete();
+   auto scope = std::make_unique<GlobalJobDescScope>(mut_job()->job_conf(), job_id());
+   JobPassCtx job_pass_ctx(GlobalJobDesc());
+   auto DoPass = [&](const std::string& pass_name) -> Maybe<void> {
+-    return JobPass4Name(pass_name)(mut_job(), &job_pass_ctx);
++    OF_PROFILER_RANGE_PUSH(pass_name);
++    auto ret = JobPass4Name(pass_name)(mut_job(), &job_pass_ctx);
++    OF_PROFILER_RANGE_POP();
++    return ret;
+   };
+   if (GlobalJobDesc().Bool("__is_user_function__")) {
+     JUST(DoPass("ModelUpdateConfCompatiblePass"));
+@@ -932,6 +937,7 @@ Maybe<void> LazyJobBuildAndInferCtx::Complete() {
+     JUST(DoPass("DumpVariableInfoPass"));
+   }
+   JUST(DoPass("DumpBlobParallelConfPass"));
++  OF_PROFILER_RANGE_POP();
+   return Maybe<void>::Ok();
+ }
+ 
+diff --git a/oneflow/core/job/oneflow.cpp b/oneflow/core/job/oneflow.cpp
+index cbbe2d2..6f71d22 100644
+--- a/oneflow/core/job/oneflow.cpp
++++ b/oneflow/core/job/oneflow.cpp
+@@ -211,6 +211,7 @@ void GetDeviceDesc(const TaskProto* task_proto, boxing::collective::DeviceDesc*
+ }
+ 
+ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
++  OF_PROFILER_RANGE_PUSH("GenCollectiveBoxingPlan:" + job->job_conf().job_name());
+   using namespace boxing::collective;
+ 
+   struct RequestInfo {
+@@ -220,13 +221,18 @@ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
+     int64_t dependency_depth;
+   };
+ 
++  OF_PROFILER_RANGE_PUSH("PlanTaskGraph");
+   PlanTaskGraph plan_task_graph(*plan);
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("request_set");
+   int64_t dependency_depth = 0;
+   int64_t order = 0;
+   RequestSet* request_set = &(*plan->mutable_collective_boxing_plan()
+                                    ->mutable_job_id2request_set())[GlobalJobDesc().job_id()];
++  OF_PROFILER_RANGE_POP();
+   HashSet<const PlanTaskNode*> all_visited;
+   while (true) {
++    OF_PROFILER_RANGE_PUSH("while_before_break");
+     std::list<const PlanTaskNode*> src_nodes;
+     plan_task_graph.ForEachNode([&](const PlanTaskNode* node) {
+       if (all_visited.count(node) != 0) { return; }
+@@ -269,7 +275,9 @@ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
+                                         collective_boxing_nodes.push_back(node);
+                                       }
+                                     });
++    OF_PROFILER_RANGE_POP();
+     if (collective_boxing_nodes.empty()) { break; }
++    OF_PROFILER_RANGE_PUSH("while_after_break");
+     HashMap<std::string, RequestInfo> name2request_info;
+     for (const PlanTaskNode* node : collective_boxing_nodes) {
+       const TaskProto* task_proto = node->task_proto();
+@@ -315,17 +323,22 @@ void GenCollectiveBoxingPlan(Job* job, Plan* plan) {
+     CHECK_GT(collected, 0);
+     all_visited.insert(visited.begin(), visited.end());
+     ++dependency_depth;
++    OF_PROFILER_RANGE_POP();
+   }
++  OF_PROFILER_RANGE_POP();
+ }
+ 
+ Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_complete) {
++  OF_PROFILER_RANGE_PUSH("CompileCurJobOnMaster:" + job->job_conf().job_name());
+   const JobDesc& job_desc = GlobalJobDesc();
+   Plan naive_plan;
+   if (GlobalProcessCtx::IsThisProcessMaster()) {
+     double start = GetCurTime();
+     Compiler().Compile(job, &naive_plan, need_job_complete);
++    OF_PROFILER_RANGE_PUSH("GenAndInferMemBlockIdOnly");
+     *improved_plan =
+         *JUST(Improver().GenAndInferMemBlockIdOnly(*Global<AvailableMemDesc>::Get(), naive_plan));
++    OF_PROFILER_RANGE_POP();
+     LOG(INFO) << "\njob_id: " << job_desc.job_id() << " , job_name: " << job_desc.job_name()
+               << " , compile time: " << (GetCurTime() - start) / 1000000000.0 << " seconds.\n";
+     if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
+@@ -334,6 +347,7 @@ Maybe<void> CompileCurJobOnMaster(Job* job, Plan* improved_plan, bool need_job_c
+     }
+   }
+   GenCollectiveBoxingPlan(job, improved_plan);
++  OF_PROFILER_RANGE_POP();
+   return Maybe<void>::Ok();
+ }
+ 
+@@ -1010,7 +1024,9 @@ REGISTER_FUNCTION_CONFIG_DEF().Bool("__is_user_function__", true, "is user defin
+ 
+ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan) {
+   std::vector<std::shared_ptr<Job>> jobs(conf_jobs.size());
++  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:job_reset");
+   FOR_RANGE(int, i, 0, jobs.size()) { jobs.at(i).reset(new Job(conf_jobs.Get(i))); }
++  OF_PROFILER_RANGE_POP();
+   if (jobs.size() > 1) { CheckNonDistributeOptimizerAvailable(jobs); }
+   if (GlobalProcessCtx::IsThisProcessMaster()) {
+     HashMap<std::string, ParallelBlobConf> var_op_name2parallel_blob_conf;
+@@ -1055,18 +1071,32 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
+       jobs.emplace_back(pull_job);
+     }
+   }
++  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:CompileCurJobOnMaster");
+   std::vector<Plan> sub_plans(jobs.size());
+   FOR_RANGE(int64_t, i, 0, jobs.size()) {
+     AddJobName2JobId(jobs.at(i)->job_conf().job_name(), i);
+     auto scope = std::make_unique<GlobalJobDescScope>(jobs.at(i)->job_conf(), i);
+     JUST(CompileCurJobOnMaster(jobs.at(i).get(), &sub_plans.at(i), true));
+   }
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("CompileAndMergePlanOnMaster:merged_plan");
+   if (GlobalProcessCtx::IsThisProcessMaster()) {
++    OF_PROFILER_RANGE_PUSH("merged_plan:MergeSubPlanWithoutGenNetTopo");
+     MergeSubPlanWithoutGenNetTopo(plan, sub_plans);
++    OF_PROFILER_RANGE_POP();
++    OF_PROFILER_RANGE_PUSH("merged_plan:MergeMemReusedChunkBetweenUserJobs");
+     InterJobMemSharingUtil::MergeMemReusedChunkBetweenUserJobs(function_jobs, plan);
++    OF_PROFILER_RANGE_POP();
++    OF_PROFILER_RANGE_PUSH("merged_plan:MergeMemSharedInterfaceMemBlockBetweenJobs");
+     InterJobMemSharingUtil::MergeMemSharedInterfaceMemBlockBetweenJobs(jobs, plan);
++    OF_PROFILER_RANGE_POP();
++    OF_PROFILER_RANGE_PUSH("merged_plan:SetForceInplaceMemBlock");
+     PlanUtil::SetForceInplaceMemBlock(plan);
++    OF_PROFILER_RANGE_POP();
++    OF_PROFILER_RANGE_PUSH("merged_plan:FinishGlobalCriticalSectionDesc");
+     FinishGlobalCriticalSectionDesc(*plan, jobs.size());
++    OF_PROFILER_RANGE_POP();
++    OF_PROFILER_RANGE_PUSH("merged_plan:AddJobName2JobId");
+     Plan main_plan;
+     std::vector<std::map<int64_t, std::string>> identity_tick_op_names;
+     {
+@@ -1076,19 +1106,29 @@ Maybe<void> CompileAndMergePlanOnMaster(const PbRpf<Job>& conf_jobs, Plan* plan)
+       AddJobName2JobId(main_job.job_conf().job_name(), jobs.size());
+       JUST(CompileMainJob(&main_job, lock_back_edges, sub_plans.size(), &main_plan));
+     }
++    OF_PROFILER_RANGE_POP();
++    OF_PROFILER_RANGE_PUSH("merged_plan:LinkMainPlan");
+     LinkMainPlan(plan, main_plan, identity_tick_op_names);
++    OF_PROFILER_RANGE_POP();
++    OF_PROFILER_RANGE_PUSH("merged_plan:CleanUselessMemBlockAndCheckValid");
+     PlanUtil::CleanUselessMemBlockAndCheckValid(plan);
++    OF_PROFILER_RANGE_POP();
+     if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
++      OF_PROFILER_RANGE_PUSH("merged_plan:Write");
+       TeePersistentLogStream::Create("merged_plan")->Write(*plan);
+       PlanUtil::ToDotFile(*plan, "/dot/merged_plan.dot");
++      OF_PROFILER_RANGE_POP();
+     }
++    OF_PROFILER_RANGE_PUSH("merged_plan:PushPlan");
+     PushPlan("merged_plan", *plan);
++    OF_PROFILER_RANGE_POP();
+   } else {
+     PullPlan("merged_plan", plan);
+     if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) {
+       TeePersistentLogStream::Create("merged_plan")->Write(*plan);
+     }
+   }
++  OF_PROFILER_RANGE_POP();
+   OF_SESSION_BARRIER();
+   return Maybe<void>::Ok();
+ }
+@@ -1104,7 +1144,7 @@ Maybe<void> Oneflow::Init(const oneflow::JobSet& job_set) {
+   if (GlobalProcessCtx::IsThisProcessMaster()) {
+     runtime_buffers_scope_.reset(new RuntimeBuffersScope(plan_));
+   }
+-  OF_PROFILER_RANGE_PUSH("new Runtime");
++  OF_PROFILER_RANGE_PUSH("new_Runtime");
+   runtime_.reset(new Runtime(plan_, GetMaxVal<size_t>(), false));
+   OF_PROFILER_RANGE_POP();  // new Runtime
+   return Maybe<void>::Ok();
+diff --git a/oneflow/core/job/runtime.cpp b/oneflow/core/job/runtime.cpp
+index 192723c..d307d34 100644
+--- a/oneflow/core/job/runtime.cpp
++++ b/oneflow/core/job/runtime.cpp
+@@ -31,6 +31,7 @@ limitations under the License.
+ #include "oneflow/user/summary/events_writer.h"
+ #include "oneflow/core/job/collective_boxing_executor.h"
+ #include "oneflow/core/job/collective_boxing_device_ctx_poller.h"
++#include "oneflow/core/profiler/profiler.h"
+ 
+ namespace oneflow {
+ 
+@@ -61,7 +62,9 @@ bool HasNonCtrlConsumedRegstDescId(const TaskProto& task) {
+ }  // namespace
+ 
+ Runtime::Runtime(const Plan& plan, size_t total_piece_num, bool is_experiment_phase) {
++  OF_PROFILER_RANGE_PUSH("NewAllGlobal");
+   NewAllGlobal(plan, total_piece_num, is_experiment_phase);
++  OF_PROFILER_RANGE_POP();
+   std::vector<const TaskProto*> source_tasks;
+   std::vector<const TaskProto*> other_tasks;
+   int64_t this_machine_task_num = 0;
+@@ -76,14 +79,18 @@ Runtime::Runtime(const Plan& plan, size_t total_piece_num, bool is_experiment_ph
+   }
+   RuntimeCtx* runtime_ctx = Global<RuntimeCtx>::Get();
+   runtime_ctx->NewCounter("constructing_actor_cnt", this_machine_task_num);
++  OF_PROFILER_RANGE_PUSH("HandoutTasks");
+   HandoutTasks(source_tasks);
+   HandoutTasks(other_tasks);
+   runtime_ctx->WaitUntilCntEqualZero("constructing_actor_cnt");
+   LOG(INFO) << "Actors on this machine constructed";
+   OF_SESSION_BARRIER();
+   LOG(INFO) << "Actors on every machine constructed";
++  OF_PROFILER_RANGE_POP();
++  OF_PROFILER_RANGE_PUSH("RegisterMemoryDone");
+   if (Global<CommNet>::Get()) { Global<CommNet>::Get()->RegisterMemoryDone(); }
+   OF_SESSION_BARRIER();
++  OF_PROFILER_RANGE_POP();
+   runtime_ctx->NewCounter("running_actor_cnt", this_machine_task_num);
+   SendCmdMsg(source_tasks, ActorCmd::kStart);
+ }
+diff --git a/oneflow/core/job_rewriter/fuse_update_ops_pass.cpp b/oneflow/core/job_rewriter/fuse_update_ops_pass.cpp
+index 20fde55..7fdab2a 100644
+--- a/oneflow/core/job_rewriter/fuse_update_ops_pass.cpp
++++ b/oneflow/core/job_rewriter/fuse_update_ops_pass.cpp
+@@ -16,6 +16,7 @@ limitations under the License.
+ #include "oneflow/core/job_rewriter/job_pass.h"
+ #include "oneflow/core/register/runtime_blob_desc.h"
+ #include "oneflow/core/framework/framework.h"
++#include "oneflow/core/profiler/profiler.h"
+ 
+ namespace oneflow {
+ 
+@@ -76,7 +77,7 @@ Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_bu
+     if (user_op_conf.attr<double>("scale") != 1.0 || user_op_conf.attr<float>("l1") != 0.0f
+         || user_op_conf.attr<float>("l2") != 0.0f) {
+       return;
+-    }
++    } 
+     float l1 = 0;
+     float l2 = 0;
+     double scale = 1;
+@@ -146,7 +147,6 @@ Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_bu
+     }();
+ 
+     if (!fused) { return; }
+-
+     user_op::UserOpConfWrapperBuilder fused_op_builder(user_op_conf.op_name());
+     fused_op_builder.OpTypeName(user_op_conf.op_type_name())
+         .Input("model", user_op_conf.input("model", 0))
+diff --git a/oneflow/core/profiler/profiler.cpp b/oneflow/core/profiler/profiler.cpp
+index 3a3c60f..e8126be 100644
+--- a/oneflow/core/profiler/profiler.cpp
++++ b/oneflow/core/profiler/profiler.cpp
+@@ -15,6 +15,7 @@ limitations under the License.
+ */
+ 
+ #include "oneflow/core/profiler/profiler.h"
++#include "oneflow/core/common/util.h"
+ #ifdef OF_ENABLE_PROFILER
+ #include <nvtx3/nvToolsExt.h>
+ #include <sys/syscall.h>
+@@ -64,32 +65,22 @@ void RangePop() {
+ }
+ 
+ #ifdef OF_ENABLE_PROFILER
+-
+-class RangeGuardCtx {
+- public:
+-  OF_DISALLOW_COPY_AND_MOVE(RangeGuardCtx);
+-  explicit RangeGuardCtx(nvtxRangeId_t range_id) : range_id_(range_id) {}
+-  ~RangeGuardCtx() = default;
+-
+-  nvtxRangeId_t range_id() const { return range_id_; }
+-
+- private:
+-  nvtxRangeId_t range_id_;
++struct RangeGuard::Impl {
++  nvtxRangeId_t range_id;
+ };
+-#else
+-class RangeGuardCtx {};
+ #endif  // OF_ENABLE_PROFILER
+ 
+ RangeGuard::RangeGuard(const std::string& name) {
+ #ifdef OF_ENABLE_PROFILER
+   nvtxRangeId_t range_id = nvtxRangeStartA(name.c_str());
+-  ctx_.reset(new RangeGuardCtx(range_id));
++  impl_.reset(new Impl());
++  impl_->range_id = range_id;
+ #endif  // OF_ENABLE_PROFILER
+ }
+ 
+ RangeGuard::~RangeGuard() {
+ #ifdef OF_ENABLE_PROFILER
+-  nvtxRangeEnd(ctx_->range_id());
++  nvtxRangeEnd(impl_->range_id);
+ #endif  // OF_ENABLE_PROFILER
+ }
+ 
+diff --git a/oneflow/core/profiler/profiler.h b/oneflow/core/profiler/profiler.h
+index 5d4a9a0..9c237cf 100644
+--- a/oneflow/core/profiler/profiler.h
++++ b/oneflow/core/profiler/profiler.h
+@@ -16,7 +16,8 @@ limitations under the License.
+ #ifndef ONEFLOW_CORE_PROFILER_PROFILER_H_
+ #define ONEFLOW_CORE_PROFILER_PROFILER_H_
+ 
+-#include "oneflow/core/common/util.h"
++#include <memory>
++#include "oneflow/core/common/preprocessor.h"
+ 
+ namespace oneflow {
+ 
+@@ -30,16 +31,20 @@ void RangePush(const std::string& name);
+ 
+ void RangePop();
+ 
+-class RangeGuardCtx;
+-
+ class RangeGuard final {
+  public:
+-  OF_DISALLOW_COPY_AND_MOVE(RangeGuard);
+   explicit RangeGuard(const std::string& name);
+   ~RangeGuard();
+ 
++  // OF_DISALLOW_COPY_AND_MOVE
++  RangeGuard(const RangeGuard&) = delete; 
++  RangeGuard& operator=(const RangeGuard&) = delete;
++  RangeGuard(RangeGuard&&) = delete;  
++  RangeGuard& operator=(RangeGuard&&) = delete;
++
+  private:
+-  std::shared_ptr<RangeGuardCtx> ctx_;
++   struct Impl;
++   std::unique_ptr<Impl> impl_;
+ };
+ 
+ #ifdef OF_ENABLE_PROFILER

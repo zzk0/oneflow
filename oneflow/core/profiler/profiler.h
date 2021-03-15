@@ -16,7 +16,8 @@ limitations under the License.
 #ifndef ONEFLOW_CORE_PROFILER_PROFILER_H_
 #define ONEFLOW_CORE_PROFILER_PROFILER_H_
 
-#include "oneflow/core/common/util.h"
+#include <memory>
+#include "oneflow/core/common/preprocessor.h"
 
 namespace oneflow {
 
@@ -30,16 +31,20 @@ void RangePush(const std::string& name);
 
 void RangePop();
 
-class RangeGuardCtx;
-
 class RangeGuard final {
  public:
-  OF_DISALLOW_COPY_AND_MOVE(RangeGuard);
   explicit RangeGuard(const std::string& name);
   ~RangeGuard();
 
+  // OF_DISALLOW_COPY_AND_MOVE
+  RangeGuard(const RangeGuard&) = delete; 
+  RangeGuard& operator=(const RangeGuard&) = delete;
+  RangeGuard(RangeGuard&&) = delete;  
+  RangeGuard& operator=(RangeGuard&&) = delete;
+
  private:
-  std::shared_ptr<RangeGuardCtx> ctx_;
+   struct Impl;
+   std::unique_ptr<Impl> impl_;
 };
 
 #ifdef OF_ENABLE_PROFILER

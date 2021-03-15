@@ -31,6 +31,7 @@ limitations under the License.
 #include "oneflow/user/summary/events_writer.h"
 #include "oneflow/core/job/collective_boxing_executor.h"
 #include "oneflow/core/job/collective_boxing_device_ctx_poller.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 
@@ -61,7 +62,9 @@ bool HasNonCtrlConsumedRegstDescId(const TaskProto& task) {
 }  // namespace
 
 Runtime::Runtime(const Plan& plan, size_t total_piece_num, bool is_experiment_phase) {
+  OF_PROFILER_RANGE_PUSH("NewAllGlobal");
   NewAllGlobal(plan, total_piece_num, is_experiment_phase);
+  OF_PROFILER_RANGE_POP();
   std::vector<const TaskProto*> source_tasks;
   std::vector<const TaskProto*> other_tasks;
   int64_t this_machine_task_num = 0;
@@ -76,14 +79,18 @@ Runtime::Runtime(const Plan& plan, size_t total_piece_num, bool is_experiment_ph
   }
   RuntimeCtx* runtime_ctx = Global<RuntimeCtx>::Get();
   runtime_ctx->NewCounter("constructing_actor_cnt", this_machine_task_num);
+  OF_PROFILER_RANGE_PUSH("HandoutTasks");
   HandoutTasks(source_tasks);
   HandoutTasks(other_tasks);
   runtime_ctx->WaitUntilCntEqualZero("constructing_actor_cnt");
   LOG(INFO) << "Actors on this machine constructed";
   OF_SESSION_BARRIER();
   LOG(INFO) << "Actors on every machine constructed";
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("RegisterMemoryDone");
   if (Global<CommNet>::Get()) { Global<CommNet>::Get()->RegisterMemoryDone(); }
   OF_SESSION_BARRIER();
+  OF_PROFILER_RANGE_POP();
   runtime_ctx->NewCounter("running_actor_cnt", this_machine_task_num);
   SendCmdMsg(source_tasks, ActorCmd::kStart);
 }

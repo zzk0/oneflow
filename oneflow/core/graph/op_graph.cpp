@@ -201,6 +201,7 @@ Maybe<OpGraph> OpGraph::New(const Job& job) {
 }
 
 Maybe<void> OpGraph::Init(const Job& job) {
+  OF_PROFILER_RANGE_PUSH("OpGraph::Init:" + job.job_conf().job_name());
   InitNodes(job);
   ForEachNode([&](OpNode* node) {
     CHECK(op_name2op_node_.emplace(node->op().op_name(), node).second)
@@ -212,8 +213,11 @@ Maybe<void> OpGraph::Init(const Job& job) {
   ForEachNode([](OpNode* node) { node->InitLbi2SourceNode(); });
   InferBlobLastUsed();
   InferTimeShape();
+  OF_PROFILER_RANGE_PUSH("OpGraph::Init:InferLogicalBlobDesc");
   JUST(InferLogicalBlobDesc(job));
+  OF_PROFILER_RANGE_POP();
   ForEachEdge([](OpEdge* edge) { edge->InitDistributeHierarchyInfo(); });
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
