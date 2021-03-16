@@ -339,13 +339,20 @@ void BindFwBwObaPairs(const OpGraph& op_graph, const OpBlobArgPairs& fw_bw_oba_p
   op_graph.ForEachNode([&](OpNode* op_node) {
     auto TryInserSplitParalleledObas = [&](const std::string& bn) {
       const auto& lbi = op_node->op().BnInOp2Lbi(bn);
-      const auto& fw_sbp_parallel = op_node->SbpParallel4Lbi(lbi);
-      if (fw_sbp_parallel.has_split_parallel()) {
+      const auto& fw_parallel_distribution = op_node->ParallelDistribution4Lbi(lbi);
+      bool all_sbp_split = true;
+      for (int64_t i = 0; i < fw_parallel_distribution.sbp_parallel_size(); ++i) {
+        if (!fw_parallel_distribution.sbp_parallel(i).has_split_parallel()) {
+          all_sbp_split = false;
+          break;
+        }
+      }
+      if (all_sbp_split) {
         split_paralleled_obas.insert(GenOpBlobArg(op_node->op().op_name(), bn));
       }
     };
     for (const auto& ibn : op_node->op().input_bns()) { TryInserSplitParalleledObas(ibn); }
-    for (const auto& obn : op_node->op().input_bns()) { TryInserSplitParalleledObas(obn); }
+    for (const auto& obn : op_node->op().output_bns()) { TryInserSplitParalleledObas(obn); }
   });
   for (const auto& pair : fw_bw_oba_pairs.pair()) {
     CHECK(split_paralleled_obas.find(pair.first()) == split_paralleled_obas.end());
@@ -387,6 +394,16 @@ void CalcFwBwObaPairs(const OpGraph& op_graph,
     CHECK(clone_bw_add_out_lbi2out_oba.emplace(pair.second, pair.first).second);
   }
   job_builder.ForEachOperator([&](const Operator& op) {
+    if (op.op_conf().has_user_conf()
+        && op.op_conf().user_conf().op_type_name() == "hierarchical_parallel_cast") {
+      LOG(INFO) << " skip hierarchical_parallel_cast " << op.op_name();
+      return;
+    }
+    if (op.op_conf().has_user_conf()
+        && op.op_conf().user_conf().op_type_name() == "hierarchical_parallel_cast_like") {
+      LOG(INFO) << " skip hierarchical_parallel_cast_like " << op.op_name();
+      return;
+    }
     for (const auto& ibn : op.input_bns()) {
       const auto& out_oba_it = out_diff_lbi2out_oba.find(op.BnInOp2Lbi(ibn));
       if (out_oba_it == out_diff_lbi2out_oba.end()) { continue; }
@@ -735,8 +752,6 @@ Maybe<void> AutoGrad(JobPassCtx* ctx, const OpGraph& op_graph, JobBuilder* job_b
     if (op_node->op().op_conf().has_user_conf()
         && op_node->op().op_conf().user_conf().op_type_name() == "hierarchical_parallel_cast") {
       const auto& producer_node = op_node->ProducerOpNode4Lbi(op_node->op().BnInOp2Lbi("in_0"));
-      LOG(INFO) << op_name << " producer_node parallel_conf"
-                << producer_node.parallel_desc().parallel_conf().DebugString();
       job_builder->AddOps(producer_node.parallel_desc().parallel_conf(), ops);
     } else {
       job_builder->AddOps(op_node->parallel_desc().parallel_conf(), ops);
@@ -745,7 +760,7 @@ Maybe<void> AutoGrad(JobPassCtx* ctx, const OpGraph& op_graph, JobBuilder* job_b
   OpBlobArgPairs fw_bw_oba_pairs;
   CalcFwBwObaPairs(op_graph, in_oba2in_diff_lbi, out_oba2out_diff_lbi, out_oba2clone_bw_add_out_lbi,
                    *job_builder, &fw_bw_oba_pairs);
-  // BindFwBwObaPairs(op_graph, fw_bw_oba_pairs, job_builder);
+  BindFwBwObaPairs(op_graph, fw_bw_oba_pairs, job_builder);
   CalcOutLbi2OutDiffLbi(op_graph, out_oba2out_diff_lbi, out_lbi2out_diff_lbi);
   return Maybe<void>::Ok();
 }

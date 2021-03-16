@@ -43,7 +43,11 @@ void UpdateJobParallelViewConf(
       auto iter = parallel_distribution_signature->mutable_bn_in_op2parallel_distribution()->find(
           identical_obas.bn_in_op());
       if (iter
-          == parallel_distribution_signature->mutable_bn_in_op2parallel_distribution()->end()) {
+          != parallel_distribution_signature->mutable_bn_in_op2parallel_distribution()->end()) {
+        LOG(ERROR) << "oba: " << oba.DebugString() << " identical_obas "
+                   << identical_obas.DebugString() << " iter->second:\n "
+                   << iter->second.DebugString() << " parallel_distribution:\n"
+                   << parallel_distribution.DebugString();
         CHECK(iter->second == parallel_distribution);
       } else {
         iter->second = parallel_distribution;
@@ -54,7 +58,7 @@ void UpdateJobParallelViewConf(
         auto* sbp_signature = &(*op_name2sbp_signature)[identical_obas.op_name()];
         auto sbp_iter =
             sbp_signature->mutable_bn_in_op2sbp_parallel()->find(identical_obas.bn_in_op());
-        if (sbp_iter == sbp_signature->mutable_bn_in_op2sbp_parallel()->end()) {
+        if (sbp_iter != sbp_signature->mutable_bn_in_op2sbp_parallel()->end()) {
           CHECK(sbp_iter->second == sbp_parallel);
         } else {
           sbp_iter->second = sbp_parallel;

@@ -242,8 +242,10 @@ void JobBuilder::RemoveOpByName(const std::unordered_set<std::string>& removing_
     // Update ParallelDistribution, Sbp
     if (op_name2parallel_distribution_signature_conf->count(op_name) > 0) {
       op_name2parallel_distribution_signature_conf->erase(op_name);
-      CHECK(op_name2sbp_signature_conf->count(op_name) > 0);
-      op_name2sbp_signature_conf->erase(op_name);
+      if (GetParallelHierarchyNumAxes(op_name2parallel_conf_, op_name) == 1) {
+        CHECK(op_name2sbp_signature_conf->count(op_name) > 0);
+        op_name2sbp_signature_conf->erase(op_name);
+      }
     }
   }
   // Update identical sbp oba pairs
