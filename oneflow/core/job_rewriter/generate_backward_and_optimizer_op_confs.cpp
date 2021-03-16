@@ -216,7 +216,7 @@ Maybe<void> GenerateBackwardAndOptimizerOpConfs::Apply(Job* job, JobPassCtx* ctx
   }));
   UpdateJobHelperConfProducedLbi2ConsumedDiffLbi(lbi2diff_lbi, job_builder.get());
   SetParallelDistributionSignatureHintByIdenticalSbpObaPairs(op_graph, identical_sbp_oba_pairs,
-                                                             job_builder);
+                                                             job_builder.get());
   return Maybe<void>::Ok();
 }
 

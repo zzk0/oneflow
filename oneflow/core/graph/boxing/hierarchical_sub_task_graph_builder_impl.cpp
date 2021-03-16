@@ -24,6 +24,13 @@ limitations under the License.
 #include "oneflow/core/graph/boxing/b21_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/one_to_one_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
+#include "oneflow/core/graph/slice_boxing_task_node.h"
+#include "oneflow/core/common/id_util.h"
+#include "oneflow/core/graph/id_serialization.h"
+#include "oneflow/core/device/cpu_stream_index.h"
+#ifdef WITH_CUDA
+#include "oneflow/core/device/cuda_stream_index.h"
+#endif
 
 namespace oneflow {
 
@@ -698,8 +705,8 @@ Maybe<SubTskGphBuilderStatus> DispatchHierarchicalSubTskGphBuilder::Build(
                          out_parallel_distribution, &reduced_in_parallel_desc,
                          &reduced_out_parallel_desc, &reduced_in_parallel_distribution,
                          &reduced_out_parallel_distribution);
-  const auto& reduced_in_parallel_hierarchy = reduced_in_parallel_desc.hierarchy();
-  const auto& reduced_out_parallel_hierarchy = reduced_out_parallel_desc.hierarchy();
+  const auto& reduced_in_parallel_hierarchy = *reduced_in_parallel_desc.hierarchy();
+  const auto& reduced_out_parallel_hierarchy = *reduced_out_parallel_desc.hierarchy();
 
   std::shared_ptr<SubTskGphBuilder> sub_tsk_gph_builder_;
   std::vector<std::shared_ptr<SubTskGphBuilder>> builders;
@@ -711,8 +718,8 @@ Maybe<SubTskGphBuilderStatus> DispatchHierarchicalSubTskGphBuilder::Build(
   builders.emplace_back(new NaiveB2PSubTskGphBuilder());
   sub_tsk_gph_builder_.reset(new ChainSubTskGphBuilder(builders));
 
-  if (reduced_in_parallel_hierarchy->NumAxes() == 1
-      && reduced_out_parallel_hierarchy->NumAxes() == 1) {
+  if (reduced_in_parallel_hierarchy.NumAxes() == 1
+      && reduced_out_parallel_hierarchy.NumAxes() == 1) {
     return impl_->flat_sub_tsk_gph_builder_->Build(
         ctx, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks, reduced_in_parallel_desc,
         reduced_out_parallel_desc, lbi, logical_blob_desc, reduced_in_parallel_distribution,
@@ -773,8 +780,6 @@ Maybe<SubTskGphBuilderStatus> DispatchHierarchicalSubTskGphBuilder::Build(
     UNIMPLEMENTED();
   }
   return Error::BoxingNotSupportedError();
-}
-
 }
 
 }  // namespace oneflow

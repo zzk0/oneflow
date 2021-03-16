@@ -146,7 +146,7 @@ Maybe<void> Operator::FillOpParallelDesc(const ParallelDesc& parallel_desc) {
 }
 
 Maybe<void> Operator::FillOpParallelDesc(std::shared_ptr<const ParallelDesc> parallel_desc) {
-  CHECK_EQ_OR_RETURN(parallel_desc->hierarchy()->NumAxes(), 1);
+  // CHECK_EQ_OR_RETURN(parallel_desc->hierarchy()->NumAxes(), 1);
   CHECK_OR_RETURN(!op_parallel_desc_);
   op_parallel_desc_ = std::move(parallel_desc);
   return Maybe<void>::Ok();

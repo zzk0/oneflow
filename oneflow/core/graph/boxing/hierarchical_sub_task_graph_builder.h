@@ -25,10 +25,6 @@ namespace oneflow {
 class HierarchicalSubTskGphBuilder {
  public:
   OF_DISALLOW_COPY_AND_MOVE(HierarchicalSubTskGphBuilder);
-  HierarchicalSubTskGphBuilder();
-  ~HierarchicalSubTskGphBuilder() = default;
-
-  Maybe<SubTskGphBuilderStatus> Build(
   HierarchicalSubTskGphBuilder() = default;
   virtual ~HierarchicalSubTskGphBuilder() = default;
 
