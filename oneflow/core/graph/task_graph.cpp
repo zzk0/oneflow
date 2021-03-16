@@ -26,7 +26,7 @@ limitations under the License.
 #include "oneflow/core/vm/symbol_storage.h"
 #include "oneflow/core/job_rewriter/calculation_pass.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
-#include "oneflow/core/graph/boxing/hierarchical_sub_task_graph_builder.h"
+#include "oneflow/core/graph/boxing/hierarchical_sub_task_graph_builder_impl.h"
 
 namespace oneflow {
 
@@ -247,7 +247,7 @@ TaskGraph::TaskGraph(std::unique_ptr<const LogicalGraph>&& logical_gph) {
   logical_gph_ = std::move(logical_gph);
   sub_tsk_gph_builder_ctx_.reset(new SubTskGphBuilderCtx(this));
   boxing_logger_ = CreateBoxingLogger();
-  hierarchical_sub_tsk_gph_builder_.reset(new HierarchicalSubTskGphBuilder());
+  hierarchical_sub_tsk_gph_builder_.reset(new DispatchHierarchicalSubTskGphBuilder());
   HashMap<const LogicalNode*, std::vector<CompTaskNode*>> logical2sorted_comp_tasks;
   HashMap<CompTaskNode*, HashMap<int64_t, std::vector<TaskNode*>>> buf_task;
   auto MutBufTask = [&](CompTaskNode* task_node, int64_t machine_id, int32_t mem_zone_id) {
@@ -288,6 +288,8 @@ TaskGraph::TaskGraph(std::unique_ptr<const LogicalGraph>&& logical_gph) {
   SetOrderInGraphForEachNode();
   if (Global<ResourceDesc, ForSession>::Get()->enable_debug_mode()) { ToDotWithAutoFilePath(); }
 }
+
+TaskGraph::~TaskGraph() = default;
 
 Maybe<void> TaskGraph::ConnectDstSubsetTickEdges(const std::vector<CompTaskNode*>& src_task_nodes,
                                                  const std::vector<CompTaskNode*>& dst_task_nodes) {
@@ -370,8 +372,17 @@ void TaskGraph::BuildCtrlRegstDescInSameChain() {
     if (iter == chain_id2node.end()) {
       CHECK(chain_id2node.emplace(chain_id, node).second);
     } else {
-      iter->second->BuildCtrlRegstDescIfNeed(node);
-      iter->second = node;
+      TaskNode* src_node = iter->second;
+      TaskNode* dst_node = node;
+      std::string ctrl_regst_name;
+      bool build_ctrl_edge = src_node->BuildCtrlRegstDescIfNeed(dst_node, &ctrl_regst_name);
+      if (build_ctrl_edge) {
+        CHECK(!ctrl_regst_name.empty());
+        TaskEdge* edge = NewEdge();
+        Connect<TaskNode>(src_node, edge, dst_node);
+        src_node->BindEdgeWithProducedRegst(edge, ctrl_regst_name);
+      }
+      iter->second = dst_node;
     }
   }
 }
@@ -516,8 +527,11 @@ DEFINE_BLD_SUB_TASK_GRAPH_METHOD(BldSubTskGphByBoxing) {
       CHECK_EQ(sorted_ctrl_tasks.size(), sorted_dst_comp_tasks.size());
       FOR_RANGE(size_t, i, 0, sorted_dst_comp_tasks.size()) {
         for (TaskNode* ctrl_node : sorted_ctrl_tasks.at(i)) {
-          Connect<TaskNode>(ctrl_node, NewEdge(), sorted_dst_comp_tasks.at(i));
-          ctrl_node->BuildCtrlRegstDesc(sorted_dst_comp_tasks.at(i));
+          std::string regst_desc_name;
+          ctrl_node->BuildCtrlRegstDesc(sorted_dst_comp_tasks.at(i), &regst_desc_name);
+          TaskEdge* edge = NewEdge();
+          Connect<TaskNode>(ctrl_node, edge, sorted_dst_comp_tasks.at(i));
+          ctrl_node->BindEdgeWithProducedRegst(edge, regst_desc_name);
         }
       }
     }
@@ -620,7 +634,6 @@ void TaskGraph::BuildTaskPath(
     }
     return new_val;
   };
-
   TaskNode* cur_node = src;
   while (cur_node->machine_id() != dst->machine_id()
          || cur_node->MemZoneId121() != dst->MemZoneId121()) {
