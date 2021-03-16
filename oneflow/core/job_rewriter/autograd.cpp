@@ -334,7 +334,7 @@ Maybe<void> MakeGetterLossOpNode4OpName(
 }
 
 void BindFwBwObaPairs(const OpGraph& op_graph, const OpBlobArgPairs& fw_bw_oba_pairs,
-                      JobBuilder* job_builder) {
+                      OpBlobArgPairs* identical_sbp_oba_pairs) {
   HashSet<OpBlobArg> split_paralleled_obas;
   op_graph.ForEachNode([&](OpNode* op_node) {
     auto TryInserSplitParalleledObas = [&](const std::string& bn) {
@@ -357,7 +357,10 @@ void BindFwBwObaPairs(const OpGraph& op_graph, const OpBlobArgPairs& fw_bw_oba_p
   for (const auto& pair : fw_bw_oba_pairs.pair()) {
     CHECK(split_paralleled_obas.find(pair.first()) == split_paralleled_obas.end());
     if (split_paralleled_obas.find(pair.second()) != split_paralleled_obas.end()) {
-      job_builder->BindIdenticalSbpOpBlobArgPair(pair.first(), pair.second());
+      // job_builder->BindIdenticalSbpOpBlobArgPair(pair.first(), pair.second());
+      auto* pair = identical_sbp_oba_pairs->mutable_pair()->Add();
+      *pair->mutable_first() = pair.first();
+      *pair->mutable_second() = pair.second();
     }
   }
 }
@@ -689,7 +692,8 @@ Maybe<void> GenerateBackwardOpConfIf(
 }
 
 Maybe<void> AutoGrad(JobPassCtx* ctx, const OpGraph& op_graph, JobBuilder* job_builder,
-                     HashMap<LogicalBlobId, LogicalBlobId>* out_lbi2out_diff_lbi) {
+                     HashMap<LogicalBlobId, LogicalBlobId>* out_lbi2out_diff_lbi,
+                     OpBlobArgPairs* identical_sbp_oba_pairs) {
   std::function<bool(OpNode*)> NeedBackwardOp;
   JUST(MakePredicatorNeedBackwardOp(op_graph, &NeedBackwardOp));
   std::list<OpNode*> loss_nodes;
@@ -760,7 +764,7 @@ Maybe<void> AutoGrad(JobPassCtx* ctx, const OpGraph& op_graph, JobBuilder* job_b
   OpBlobArgPairs fw_bw_oba_pairs;
   CalcFwBwObaPairs(op_graph, in_oba2in_diff_lbi, out_oba2out_diff_lbi, out_oba2clone_bw_add_out_lbi,
                    *job_builder, &fw_bw_oba_pairs);
-  BindFwBwObaPairs(op_graph, fw_bw_oba_pairs, job_builder);
+  BindFwBwObaPairs(op_graph, fw_bw_oba_pairs, job_builder, identical_sbp_oba_pairs);
   CalcOutLbi2OutDiffLbi(op_graph, out_oba2out_diff_lbi, out_lbi2out_diff_lbi);
   return Maybe<void>::Ok();
 }

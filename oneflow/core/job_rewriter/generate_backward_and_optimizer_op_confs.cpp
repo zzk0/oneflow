@@ -41,22 +41,9 @@ void UpdateJobHelperConfProducedLbi2ConsumedDiffLbi(
   }
 }
 
-void BindIdenticalSbpObaPairsBetweenIbns(const OpNode& op_node, JobBuilder* job_builder) {
-  HashMap<LogicalBlobId, std::vector<OpBlobArg>> in_lbi2obas;
-  for (const std::string& ibn : op_node.op().input_bns()) {
-    in_lbi2obas[op_node.op().BnInOp2Lbi(ibn)].push_back(GenOpBlobArg(op_node.op().op_name(), ibn));
-  }
-  for (const auto& pair : in_lbi2obas) {
-    if (pair.second.size() > 1) {
-      FOR_RANGE(int32_t, i, 1, pair.second.size()) {
-        job_builder->BindIdenticalSbpOpBlobArgPair(pair.second.at(0), pair.second.at(i));
-      }
-    }
-  }
-}
-
-void SetParallelDistributionSignatureHintByIdenticalSbpObaPairs(const OpGraph& op_graph,
-                                                                JobBuilder* job_builder) {
+void SetParallelDistributionSignatureHintByIdenticalSbpObaPairs(
+    const OpGraph& op_graph, const OpBlobArgPairs& identical_sbp_oba_pairs,
+    JobBuilder* job_builder) {
   HashMap<OpBlobArg, const ParallelDistribution*> oba2parallel_distribution;
   op_graph.ForEachNode([&](OpNode* op_node) {
     auto ForEachBn = [&](const std::function<void(const std::string&)>& Handler) {
@@ -72,7 +59,7 @@ void SetParallelDistributionSignatureHintByIdenticalSbpObaPairs(const OpGraph& o
   auto HasParallelDistribution = [&](const OpBlobArg& oba) {
     return oba2parallel_distribution.find(oba) != oba2parallel_distribution.end();
   };
-  for (const auto& pair : job_builder->job().helper().identical_sbp_oba_pairs().pair()) {
+  for (const auto& pair : identical_sbp_oba_pairs.pair()) {
     const ParallelDistribution* parallel_distribution = nullptr;
     if (HasParallelDistribution(pair.first()) && HasParallelDistribution(pair.second())) {
       CHECK(oba2parallel_distribution.at(pair.first())
@@ -88,12 +75,6 @@ void SetParallelDistributionSignatureHintByIdenticalSbpObaPairs(const OpGraph& o
     job_builder->SetParallelDistribution4Oba(pair.first(), *parallel_distribution);
     job_builder->SetParallelDistribution4Oba(pair.second(), *parallel_distribution);
   }
-}
-
-void UpdateOpParallelDistributionSignatureHint(const OpGraph& op_graph, JobBuilder* job_builder) {
-  op_graph.ForEachNode(
-      [&](OpNode* op_node) { BindIdenticalSbpObaPairsBetweenIbns(*op_node, job_builder); });
-  SetParallelDistributionSignatureHintByIdenticalSbpObaPairs(op_graph, job_builder);
 }
 
 class GenerateBackwardAndOptimizerOpConfs final : public JobPass {
@@ -194,9 +175,10 @@ Maybe<void> GenerateBackwardAndOptimizerOpConfs::Apply(Job* job, JobPassCtx* ctx
   const JobBuilder* old_job_builder = job_builder.get();
   LogicalBlobId total_loss_instance_num;
   HashMap<LogicalBlobId, LogicalBlobId> lbi2diff_lbi;
+  OpBlobArgPairs identical_sbp_oba_pairs;
   job_builder = JUST(WithCalculationPassScope(kBackwardPass, job, [&]() -> Maybe<void> {
     CHECK(old_job_builder == job_builder.get());  // Check this lambda never been async called
-    JUST(AutoGrad(ctx, op_graph, job_builder.get(), &lbi2diff_lbi));
+    JUST(AutoGrad(ctx, op_graph, job_builder.get(), &lbi2diff_lbi, &identical_sbp_oba_pairs));
     return Maybe<void>::Ok();
   }));
   HashMap<LogicalBlobId, LogicalBlobId> model_lbi2model_diff_lbi;
@@ -233,7 +215,8 @@ Maybe<void> GenerateBackwardAndOptimizerOpConfs::Apply(Job* job, JobPassCtx* ctx
     return Maybe<void>::Ok();
   }));
   UpdateJobHelperConfProducedLbi2ConsumedDiffLbi(lbi2diff_lbi, job_builder.get());
-  UpdateOpParallelDistributionSignatureHint(op_graph, job_builder.get());
+  SetParallelDistributionSignatureHintByIdenticalSbpObaPairs(op_graph, identical_sbp_oba_pairs,
+                                                             job_builder);
   return Maybe<void>::Ok();
 }
 
