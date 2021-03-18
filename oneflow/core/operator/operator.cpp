@@ -475,7 +475,9 @@ Maybe<void> Operator::GetSbpSignaturesIf(
     const ParallelDesc& parallel_desc,
     std::vector<std::shared_ptr<const SbpSignature>>* sbp_sig_list) const {
   SbpSignatureList list;
+  OF_PROFILER_RANGE_PUSH("GetSbpSignaturesIfPtr");
   GetSbpSignaturesIf(LogicalBlobDesc4Ibn, parallel_desc, &list);
+  OF_PROFILER_RANGE_POP();
   sbp_sig_list->reserve(list.sbp_signature_size());
   for (const SbpSignature& signature : list.sbp_signature()) {
     sbp_sig_list->emplace_back(std::make_shared<const SbpSignature>(signature));
