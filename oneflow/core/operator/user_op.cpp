@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include <oneflow/core/profiler/profiler.h>
+
+#include <utility>
 #include "oneflow/core/framework/infer_util.h"
 #include "oneflow/core/framework/sbp_context.h"
 #include "oneflow/core/framework/tensor_desc.h"
@@ -216,21 +218,23 @@ class UserOpSbpContext : public user_op::SbpContext {
 
   UserOpSbpContext(const UserOp* op, SbpSignatureList* sbp_sig_list,
                    std::function<Maybe<const BlobDesc&>(const std::string&)> LogicalBlobDesc4Ibn)
-      : op_(op), sbp_sig_list_(sbp_sig_list) {
-    const auto& user_op_conf = op->op_conf().user_conf();
-    for (auto it = user_op_conf.input().begin(); it != user_op_conf.input().end(); ++it) {
-      const std::string& arg_name = it->first;
-      for (int32_t i = 0; i < it->second.s_size(); ++i) {
-        const BlobDesc* blob = &CHECK_JUST(LogicalBlobDesc4Ibn(GenRepeatedBn(arg_name, i)));
-        arg2tensor_desc_.emplace(std::make_pair(arg_name, i), GenTensorDescFromBlobDesc(blob));
-      }
-    }
-  }
+      : op_(op),
+        sbp_sig_list_(sbp_sig_list),
+        arg2tensor_desc_(new HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc>),
+        logical_blob_desc4ibn_(std::move(LogicalBlobDesc4Ibn)) {}
   ~UserOpSbpContext() override = default;
 
   const user_op::TensorDesc& LogicalTensorDesc4InputArgNameAndIndex(
       const std::string& input_arg_name, int32_t index) const override {
-    return arg2tensor_desc_.at(std::make_pair(input_arg_name, index));
+    const auto arg = std::make_pair(input_arg_name, index);
+    auto it = arg2tensor_desc_->find(arg);
+    if (it != arg2tensor_desc_->end()) {
+      return it->second;
+    } else {
+      const BlobDesc* blob =
+          &CHECK_JUST(logical_blob_desc4ibn_(GenRepeatedBn(input_arg_name, index)));
+      return arg2tensor_desc_->emplace(arg, GenTensorDescFromBlobDesc(blob)).first->second;
+    }
   }
   const ArgVec& inputs() const override { return op_->inputs(); }
   const ArgVec& outputs() const override { return op_->outputs(); }
@@ -249,7 +253,8 @@ class UserOpSbpContext : public user_op::SbpContext {
  private:
   const UserOp* op_;
   SbpSignatureList* sbp_sig_list_;
-  HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc> arg2tensor_desc_;
+  std::unique_ptr<HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc>> arg2tensor_desc_;
+  std::function<Maybe<const BlobDesc&>(const std::string&)> logical_blob_desc4ibn_;
 };
 
 class UserOpInferSbpSignatureFnContext : public user_op::InferSbpSignatureFnContext {
