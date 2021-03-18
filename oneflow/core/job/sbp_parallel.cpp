@@ -87,11 +87,13 @@ bool IsSbpSignatureContaining(const SbpSignature& bigger, const SbpSignature& sm
   return true;
 }
 
-void FilterSbpSignatureList(const SbpSignatureList& sbp_sig_list, const SbpSignature& sbp_sig_conf,
-                            SbpSignatureList* filtered_sbp_sig_list) {
-  for (const auto& sbp_sigature : sbp_sig_list.sbp_signature()) {
-    if (IsSbpSignatureContaining(sbp_sigature, sbp_sig_conf)) {
-      *filtered_sbp_sig_list->mutable_sbp_signature()->Add() = sbp_sigature;
+void FilterSbpSignatureList(
+    const std::vector<std::shared_ptr<const SbpSignature>>& sbp_sig_list,
+    const SbpSignature& sbp_sig_conf,
+    std::vector<std::shared_ptr<const SbpSignature>>* filtered_sbp_sig_list) {
+  for (const auto& sbp_signature : sbp_sig_list) {
+    if (IsSbpSignatureContaining(*sbp_signature, sbp_sig_conf)) {
+      filtered_sbp_sig_list->emplace_back(sbp_signature);
     }
   }
 }
@@ -123,11 +125,11 @@ double ComputeIbnCopyCost4SbpSig(
 std::function<double(const SbpSignature*)> MakeGetterIbnCopyCost4SbpSig(
     const PbRpf<std::string>& ibns,
     const std::function<Maybe<const SbpInferHint*>(const std::string&)>& SbpInferHint4Ibn,
-    const SbpSignatureList& sbp_sig_list) {
+    const std::vector<std::shared_ptr<const SbpSignature>>& sbp_sig_list) {
   auto sbp_sig2ibn_copy_cast = std::make_shared<HashMap<const SbpSignature*, double>>();
-  for (const auto& sbp_signature : sbp_sig_list.sbp_signature()) {
-    double cost = ComputeIbnCopyCost4SbpSig(ibns, SbpInferHint4Ibn, sbp_signature);
-    CHECK(sbp_sig2ibn_copy_cast->emplace(&sbp_signature, cost).second);
+  for (const auto& sbp_signature : sbp_sig_list) {
+    double cost = ComputeIbnCopyCost4SbpSig(ibns, SbpInferHint4Ibn, *sbp_signature);
+    CHECK(sbp_sig2ibn_copy_cast->emplace(sbp_signature.get(), cost).second);
   }
   return [sbp_sig2ibn_copy_cast](const SbpSignature* sbp_sig) -> double {
     return sbp_sig2ibn_copy_cast->at(sbp_sig);
@@ -135,11 +137,11 @@ std::function<double(const SbpSignature*)> MakeGetterIbnCopyCost4SbpSig(
 }
 
 std::function<int32_t(const SbpSignature* sbp_sig)> MakeGetterOrderValue4SbpSig(
-    const SbpSignatureList& sbp_sig_list,
+    const std::vector<std::shared_ptr<const SbpSignature>>& sbp_sig_list,
     const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig) {
   auto sbp_sig2order_value = std::make_shared<HashMap<const SbpSignature*, int32_t>>();
-  for (const SbpSignature& sbp_signature : sbp_sig_list.sbp_signature()) {
-    sbp_sig2order_value->emplace(&sbp_signature, CalcOrderValue4SbpSig(sbp_signature));
+  for (const auto& sbp_signature : sbp_sig_list) {
+    sbp_sig2order_value->emplace(sbp_signature.get(), CalcOrderValue4SbpSig(*sbp_signature));
   }
   return [sbp_sig2order_value](const SbpSignature* sbp_sig) {
     return sbp_sig2order_value->at(sbp_sig);
@@ -147,15 +149,14 @@ std::function<int32_t(const SbpSignature* sbp_sig)> MakeGetterOrderValue4SbpSig(
 }
 
 void SortSbpSignatureListByCopyCost(
-    const SbpSignatureList& sbp_sig_list, const PbRpf<std::string>& ibns,
+    const std::vector<std::shared_ptr<const SbpSignature>>& sbp_sig_list,
+    const PbRpf<std::string>& ibns,
     const std::function<Maybe<const SbpInferHint*>(const std::string&)>& SbpInferHint4Ibn,
     const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
-    std::vector<const SbpSignature*>* sorted_sbp_signatures) {
+    std::vector<std::shared_ptr<const SbpSignature>>* sorted_sbp_signatures) {
   auto OrderValue4SbpSig = MakeGetterOrderValue4SbpSig(sbp_sig_list, CalcOrderValue4SbpSig);
   auto IbnCopyCost4SbpSig = MakeGetterIbnCopyCost4SbpSig(ibns, SbpInferHint4Ibn, sbp_sig_list);
-  for (const auto& sbp_signature : sbp_sig_list.sbp_signature()) {
-    sorted_sbp_signatures->push_back(&sbp_signature);
-  }
+  *sorted_sbp_signatures = sbp_sig_list;
   std::sort(sorted_sbp_signatures->begin(), sorted_sbp_signatures->end(),
             [&](const SbpSignature* lhs, const SbpSignature* rhs) {
               if (OrderValue4SbpSig(lhs) < OrderValue4SbpSig(rhs)) { return true; }

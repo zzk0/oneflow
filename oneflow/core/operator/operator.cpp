@@ -470,6 +470,19 @@ Maybe<void> Operator::GetSbpSignaturesIf(
   return Maybe<void>::Ok();
 }
 
+Maybe<void> Operator::GetSbpSignaturesIf(
+    const std::function<Maybe<const BlobDesc&>(const std::string&)>& LogicalBlobDesc4Ibn,
+    const ParallelDesc& parallel_desc,
+    std::vector<std::shared_ptr<const SbpSignature>>* sbp_sig_list) const {
+  SbpSignatureList list;
+  GetSbpSignaturesIf(LogicalBlobDesc4Ibn, parallel_desc, &list);
+  sbp_sig_list->reserve(list.sbp_signature_size());
+  for (const SbpSignature& signature : list.sbp_signature()) {
+    sbp_sig_list->emplace_back(std::make_shared<const SbpSignature>(signature));
+  }
+  return Maybe<void>::Ok();
+}
+
 void Operator::ForEachBnInOp(std::function<void(const std::string&)> Handler) const {
   for (const std::string& bn_in_op : input_bns()) { Handler(bn_in_op); }
   for (const std::string& bn_in_op : output_bns()) { Handler(bn_in_op); }
@@ -588,9 +601,10 @@ Maybe<void> Operator::InferSbpSignature(
 }
 
 Maybe<void> Operator::FilterAndCheckValidSbpSignatureListByLogicalShape(
-    const SbpSignatureList& total_sbp_sig_list,
+    const std::vector<std::shared_ptr<const SbpSignature>>& total_sbp_sig_list,
     std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
-    const ParallelDesc& parallel_desc, SbpSignatureList* valid_sbp_sig_list) const {
+    const ParallelDesc& parallel_desc,
+    std::vector<std::shared_ptr<const SbpSignature>>* valid_sbp_sig_list) const {
   auto GetOpDebugShapeStr = [&]() -> std::string {
     std::string ret = "";
     if (op_conf().has_user_conf()) {
@@ -603,12 +617,12 @@ Maybe<void> Operator::FilterAndCheckValidSbpSignatureListByLogicalShape(
     }
     return ret;
   };
-  for (const auto& sbp_signature : total_sbp_sig_list.sbp_signature()) {
+  for (const auto& sbp_signature : total_sbp_sig_list) {
     bool is_valid = true;
 
     for (const auto& ibn : input_bns()) {
-      const auto& sbp_parallel_it = sbp_signature.bn_in_op2sbp_parallel().find(ibn);
-      CHECK_OR_RETURN(sbp_parallel_it != sbp_signature.bn_in_op2sbp_parallel().end());
+      const auto& sbp_parallel_it = sbp_signature->bn_in_op2sbp_parallel().find(ibn);
+      CHECK_OR_RETURN(sbp_parallel_it != sbp_signature->bn_in_op2sbp_parallel().end());
       const SbpParallel& sbp_parallel = sbp_parallel_it->second;
       const SbpInferHint* hint = JUST(SbpInferHint4Ibn(ibn));
       const Shape& logical_shape = hint->logical_blob_desc().shape();
@@ -627,7 +641,7 @@ Maybe<void> Operator::FilterAndCheckValidSbpSignatureListByLogicalShape(
         }
       }
     }
-    if (is_valid) { *valid_sbp_sig_list->mutable_sbp_signature()->Add() = sbp_signature; }
+    if (is_valid) { valid_sbp_sig_list->emplace_back(sbp_signature); }
   }
   return Maybe<void>::Ok();
 }
@@ -642,27 +656,27 @@ Maybe<void> Operator::InferSbpSignature(
     const SbpInferHint* sbp_infer_hint = JUST(SbpInferHint4Ibn(ibn));
     return Maybe<const BlobDesc&>(sbp_infer_hint->logical_blob_desc());
   };
-  SbpSignatureList valid_sbp_sig_list;
+  std::vector<std::shared_ptr<const SbpSignature>> valid_sbp_sig_list;
   {
-    SbpSignatureList total_sbp_sig_list;
+    std::vector<std::shared_ptr<const SbpSignature>> total_sbp_sig_list;
     JUST(GetSbpSignaturesIf(LogicalBlobDesc4Ibn, parallel_desc, &total_sbp_sig_list));
     // filter sbp signatures by logical shape
     JUST(FilterAndCheckValidSbpSignatureListByLogicalShape(total_sbp_sig_list, SbpInferHint4Ibn,
                                                            parallel_desc, &valid_sbp_sig_list));
   }
   // filter sbp signatures by sbp signature conf
-  SbpSignatureList filtered_sbp_sigs_by_conf;
+  std::vector<std::shared_ptr<const SbpSignature>> filtered_sbp_sigs_by_conf;
   FilterSbpSignatureList(valid_sbp_sig_list, sbp_sig_conf, &filtered_sbp_sigs_by_conf);
-  CHECK_GT_OR_RETURN(filtered_sbp_sigs_by_conf.sbp_signature_size(), 0);
-  if (filtered_sbp_sigs_by_conf.sbp_signature_size() == 1) {
-    *sbp_signature = *filtered_sbp_sigs_by_conf.sbp_signature().begin();
+  CHECK_GT_OR_RETURN(filtered_sbp_sigs_by_conf.size(), 0);
+  if (filtered_sbp_sigs_by_conf.size() == 1) {
+    *sbp_signature = *filtered_sbp_sigs_by_conf.front();
     return Maybe<void>::Ok();
   }
   // sort sbp signatures by copy cost, then return the one with least cost
-  HashMap<std::string, const SbpParallel*> ibn2producer_sbp_parallel;
-  for (const auto& ibn : input_bns()) {
-    ibn2producer_sbp_parallel[ibn] = &(JUST(SbpInferHint4Ibn(ibn))->sbp_parallel());
-  }
+  //  HashMap<std::string, const SbpParallel*> ibn2producer_sbp_parallel;
+  //  for (const auto& ibn : input_bns()) {
+  //    ibn2producer_sbp_parallel[ibn] = &(JUST(SbpInferHint4Ibn(ibn))->sbp_parallel());
+  //  }
   std::vector<const SbpSignature*> sorted_sbp_signatures;
   SortSbpSignatureListByCopyCost(filtered_sbp_sigs_by_conf, input_bns(), SbpInferHint4Ibn,
                                  CalcOrderValue4SbpSig, &sorted_sbp_signatures);

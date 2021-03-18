@@ -173,6 +173,10 @@ class Operator {
   Maybe<void> GetSbpSignaturesIf(
       const std::function<Maybe<const BlobDesc&>(const std::string&)>& LogicalBlobDesc4Ibn,
       const ParallelDesc& parallel_desc, SbpSignatureList* sbp_sig_list) const;
+  Maybe<void> GetSbpSignaturesIf(
+      const std::function<Maybe<const BlobDesc&>(const std::string&)>& LogicalBlobDesc4Ibn,
+      const ParallelDesc& parallel_desc,
+      std::vector<std::shared_ptr<const SbpSignature>>* sbp_sig_list) const;
 
   void ForEachBnInOp(std::function<void(const std::string&)>) const;
 
@@ -283,9 +287,10 @@ class Operator {
     kOutputBlobName,
   };
   Maybe<void> FilterAndCheckValidSbpSignatureListByLogicalShape(
-      const SbpSignatureList& total_sbp_sig_list,
+      const std::vector<std::shared_ptr<const SbpSignature>>& total_sbp_sig_list,
       std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
-      const ParallelDesc& parallel_desc, SbpSignatureList* valid_sbp_sig_list) const;
+      const ParallelDesc& parallel_desc,
+      std::vector<std::shared_ptr<const SbpSignature>>* valid_sbp_sig_list) const;
 
   LogicalBlobId tbn2lbi(const std::string& data_tmp_bn) const;
   std::string Bn2ConfName(const std::string& bn) const;
