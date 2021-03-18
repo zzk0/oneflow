@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#include <oneflow/core/profiler/profiler.h>
 #include "oneflow/core/framework/infer_util.h"
 #include "oneflow/core/framework/sbp_context.h"
 #include "oneflow/core/framework/tensor_desc.h"
@@ -534,13 +535,18 @@ Maybe<void> UserOp::InferSbpSignature(
 Maybe<void> UserOp::GetSbpSignatures(
     const std::function<Maybe<const BlobDesc&>(const std::string&)>& LogicalBlobDesc4Ibn,
     const ParallelDesc& parallel_desc, SbpSignatureList* sbp_sig_list) const {
+  OF_PROFILER_RANGE_PUSH("UserOp::GetSbpSignatures");
   CHECK_OR_RETURN(val_ != nullptr)
       << "cannot find op_type: " << op_conf().user_conf().op_type_name() << " in op registry!";
+  OF_PROFILER_RANGE_PUSH(" UserOpSbpContext sbp_ctx");
   UserOpSbpContext sbp_ctx(this, sbp_sig_list, LogicalBlobDesc4Ibn);
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("get_sbp_fn");
   JUST(val_->get_sbp_fn(&sbp_ctx));
+  OF_PROFILER_RANGE_POP();
   // Add Broadcast for source user op tick input
-  std::string tick_bn = GenRepeatedBn(user_op::kUserSourceOpTickInputArgName, 0);
   if (val_->op_def.input_size() == 0 && input_bns().size() == 1) {
+    std::string tick_bn = GenRepeatedBn(user_op::kUserSourceOpTickInputArgName, 0);
     CHECK_OR_RETURN(input_bns().Get(0) == tick_bn)
         << "user op_name: " << op_conf().name()
         << " op_type_name: " << op_conf().user_conf().op_type_name()
@@ -572,6 +578,7 @@ Maybe<void> UserOp::GetSbpSignatures(
           << " have NOT set sbp signature";
     }
   }
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
