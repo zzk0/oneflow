@@ -677,7 +677,7 @@ Maybe<void> Operator::InferSbpSignature(
   //  for (const auto& ibn : input_bns()) {
   //    ibn2producer_sbp_parallel[ibn] = &(JUST(SbpInferHint4Ibn(ibn))->sbp_parallel());
   //  }
-  std::vector<const SbpSignature*> sorted_sbp_signatures;
+  std::vector<std::shared_ptr<const SbpSignature>> sorted_sbp_signatures;
   SortSbpSignatureListByCopyCost(filtered_sbp_sigs_by_conf, input_bns(), SbpInferHint4Ibn,
                                  CalcOrderValue4SbpSig, &sorted_sbp_signatures);
   *sbp_signature = *sorted_sbp_signatures.at(0);

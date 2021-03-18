@@ -158,10 +158,11 @@ void SortSbpSignatureListByCopyCost(
   auto IbnCopyCost4SbpSig = MakeGetterIbnCopyCost4SbpSig(ibns, SbpInferHint4Ibn, sbp_sig_list);
   *sorted_sbp_signatures = sbp_sig_list;
   std::sort(sorted_sbp_signatures->begin(), sorted_sbp_signatures->end(),
-            [&](const SbpSignature* lhs, const SbpSignature* rhs) {
-              if (OrderValue4SbpSig(lhs) < OrderValue4SbpSig(rhs)) { return true; }
-              if (OrderValue4SbpSig(lhs) > OrderValue4SbpSig(rhs)) { return false; }
-              return IbnCopyCost4SbpSig(lhs) < IbnCopyCost4SbpSig(rhs);
+            [&](const std::shared_ptr<const SbpSignature>& lhs,
+                const std::shared_ptr<const SbpSignature>& rhs) {
+              if (OrderValue4SbpSig(lhs.get()) < OrderValue4SbpSig(rhs.get())) { return true; }
+              if (OrderValue4SbpSig(lhs.get()) > OrderValue4SbpSig(rhs.get())) { return false; }
+              return IbnCopyCost4SbpSig(lhs.get()) < IbnCopyCost4SbpSig(rhs.get());
             });
 }
 
