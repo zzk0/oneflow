@@ -409,6 +409,7 @@ Maybe<void> OpGraph::InferLogicalBlobDesc(const Job& job) const {
     oba2sbp_identical_obas[pair.second()].push_back(pair.first());
   }
   JUST(TopoForEachNodeWithErrorCaptured([&](OpNode* op_node) -> Maybe<void> {
+    OF_PROFILER_RANGE_PUSH("TopoForEachNodeWithErrorCaptured");
     auto LogicalBlobDesc4InputIndex = [&](int32_t index) -> Maybe<const BlobDesc> {
       CHECK_LT_OR_RETURN(index, op_node->input_index2producer_and_output_index_.size());
       const auto& producer_info = op_node->input_index2producer_and_output_index_.at(index);
@@ -418,6 +419,7 @@ Maybe<void> OpGraph::InferLogicalBlobDesc(const Job& job) const {
     // Infer ParallelSignature
     JUST(op_node->mut_op()->InferParallelSignatureIf());
     // Infer mirrored_signature
+    OF_PROFILER_RANGE_PUSH("InferOpNodeMirroredSignature");
     bool is_mirrored_conf = false;
     {
       const auto& op_name2is_mirrored = job_parallel_view_conf.op_name2is_mirrored_parallel_view();
@@ -425,6 +427,7 @@ Maybe<void> OpGraph::InferLogicalBlobDesc(const Job& job) const {
       if (iter != op_name2is_mirrored.end()) { is_mirrored_conf = iter->second; }
     }
     JUST(InferOpNodeMirroredSignature(op_node, is_mirrored_conf));
+    OF_PROFILER_RANGE_POP();
     ParallelDistributionSignature parallel_distribution_sig_conf;
     {
       const auto& op_name2parallel_distribution_sig_conf =
@@ -445,7 +448,10 @@ Maybe<void> OpGraph::InferLogicalBlobDesc(const Job& job) const {
     }
     InferOpNodeParallelDistributionSignature(op_node, parallel_distribution_sig_conf);
     UpdateJobParallelViewConf(*op_node, oba2sbp_identical_obas, &job_parallel_view_conf);
+    OF_PROFILER_RANGE_PUSH("InferLogicalOutBlobDescsIf");
     JUST(op_node->mut_op()->InferLogicalOutBlobDescsIf());
+    OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_POP();
     return Maybe<void>::Ok();
   }));
   OF_PROFILER_RANGE_POP();
