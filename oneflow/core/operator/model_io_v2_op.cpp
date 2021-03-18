@@ -50,10 +50,6 @@ void GenModelIoV2KernelConf(const VariableOpConf& variable_conf,
                                 / parallel_desc.hierarchy()->Count(j + 1);
     if (seed_shape.At(j) != 1) { seed_id += parallel_id * seed_shape.Count(j + 1); }
   }
-  LOG(ERROR) << "parallel_distribution " << parallel_distribution.DebugString();
-  LOG(ERROR) << " parallel_id: " << parallel_ctx.parallel_id()
-             << " parallel_hierarchy: " << parallel_desc.hierarchy()->DebugStr();
-  LOG(ERROR) << " seed_id: " << seed_id << " seed_shape: " << seed_shape.DebugStr();
 
   const std::vector<TensorSliceView> slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
       *parallel_desc.hierarchy(), parallel_distribution, blob_desc);
@@ -61,8 +57,8 @@ void GenModelIoV2KernelConf(const VariableOpConf& variable_conf,
     slice.ToProto(kernel_conf->mutable_model_io_v2_conf()->mutable_slice_view()->Add());
   }
   *kernel_conf->mutable_model_io_v2_conf()->mutable_parallel_ctx() = parallel_ctx;
-  *kernel_conf->mutable_model_io_v2_conf()->mutable_seed_id() = seed_id;
-  *kernel_conf->mutable_model_io_v2_conf()->mutable_seed_num() = seed_num;
+  //*kernel_conf->mutable_model_io_v2_conf()->mutable_seed_id() = seed_id;
+  //*kernel_conf->mutable_model_io_v2_conf()->mutable_seed_num() = seed_num;
 }
 
 }  // namespace

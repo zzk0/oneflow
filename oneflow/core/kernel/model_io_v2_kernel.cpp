@@ -17,6 +17,7 @@ limitations under the License.
 #include "oneflow/core/kernel/kernel.h"
 #include "oneflow/core/register/tensor_slice_copier.h"
 #include "oneflow/core/device/cpu_device_context.h"
+#include "oneflow/core/common/nd_index_offset_helper.h"
 
 namespace oneflow {
 
@@ -291,35 +292,86 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
     const ParallelContext& parallel_ctx = this->kernel_conf().model_io_v2_conf().parallel_ctx();
     const VariableOpConf& original_variable_conf = conf.original_variable_conf();
     const Shape logical_blob_shape(original_variable_conf.shape());
-    const bool is_broadcast = ShapeView(logical_blob_shape) == in_blob->shape();
     const DataType data_type = original_variable_conf.data_type();
-    if (is_broadcast && parallel_ctx.parallel_id() != 0) { return; }
+
+    const auto& parallel_desc = ParallelDesc(
+        this->kernel_conf().op_attribute().parallel_conf_signature().op_parallel_conf());
+    const auto& hierarchy = parallel_desc.hierarchy();
+
+    std::vector<int64_t> parallel_rank(5);
+    NdIndexOffsetHelper<int64_t, 5> hierarchy_helper(hierarchy->dim_vec().data(),
+                                                     hierarchy->NumAxes());
+    hierarchy_helper.OffsetToNdIndex(parallel_ctx.parallel_id(), parallel_rank.data());
+    DimVector seed_vec;
+    std::vector<int64_t> seed_rank;
+    const auto& map = this->kernel_conf()
+                          .op_attribute()
+                          .parallel_distribution_signature()
+                          .bn_in_op2parallel_distribution();
+    const auto it = map.find("in");
+    CHECK(it != map.end());
+    ParallelDistribution in_parallel_distribution = it->second;
+    for (int64_t i = 0; i < hierarchy->NumAxes(); ++i) {
+      SbpParallel sbp_parallel = in_parallel_distribution.sbp_parallel(i);
+      CHECK(sbp_parallel.has_split_parallel() || sbp_parallel.has_broadcast_parallel());
+      if (sbp_parallel.has_split_parallel()) {
+        seed_vec.push_back(hierarchy->At(i));
+        seed_rank.push_back(parallel_rank.at(i));
+      }
+    }
+    NdIndexOffsetHelper<int64_t, 5> seed_helper(seed_vec.data(), seed_vec.size());
+    const int64_t seed_id = seed_helper.NdIndexToOffset(seed_rank.data(), seed_rank.size());
+    const int64_t seed_num = Shape(seed_vec).elem_cnt();
+
+    LOG(ERROR) << "parallel_distribution " << in_parallel_distribution.DebugString();
+    LOG(ERROR) << " parallel_id: " << parallel_ctx.parallel_id() << " seed_id: " << seed_id
+               << " seed_num: " << seed_num;
+
+    for (int64_t i = 0; i < hierarchy->NumAxes(); ++i) {
+      SbpParallel sbp_parallel = in_parallel_distribution.sbp_parallel(i);
+      if (sbp_parallel.has_broadcast_parallel()) {
+        if (parallel_rank.at(i) != 0) { return; }
+      }
+    }
     const std::string snapshot_path =
         SyncReadStringFromBlob<device_type>(ctx.device_ctx, path_blob);
+    LOG(ERROR) << parallel_ctx.parallel_id() << " do save " << snapshot_path;
     AutoSyncBlobAccessor<device_type> in_accessor(ctx.device_ctx, in_blob, true, false);
     SnapshotWriter writer(snapshot_path);
     const std::string var_lbn =
         GenLogicalBlobName(conf.variable_op_name(), original_variable_conf.out());
-    const std::string key = is_broadcast ? var_lbn : GetTmpPartKey(var_lbn, parallel_ctx);
+    const std::string key = GetTmpPartKey(var_lbn, parallel_ctx);
     writer.Write(key, in_accessor.host_blob());
-    if (!is_broadcast) {
-      const int64_t parallel_num = parallel_ctx.parallel_num();
-      int32_t counter = Global<CtrlClient>::Get()->IncreaseCount(
-          snapshot_path + "-" + var_lbn + "-Counter-" + std::to_string(*counter_));
-      if (counter < parallel_ctx.parallel_num()) { return; }
-      TensorSliceView total_slice(logical_blob_shape);
-      OnDemandHostBlob total_blob(logical_blob_shape, data_type);
-      SnapshotReader reader(snapshot_path);
-      FOR_RANGE(int64_t, i, 0, parallel_num) {
-        const TensorSliceView part_slice = GetPartSlice(this->kernel_conf(), i);
-        const std::string part_key = GetTmpPartKey(var_lbn, i, parallel_num);
-        OnDemandHostBlob part_blob(part_slice.shape(), data_type);
-        reader.Read(part_key, part_blob.blob());
-        HostSliceCopy(total_blob.blob(), total_slice, part_blob.blob(), part_slice);
-        SnapshotFS()->RecursivelyDeleteDir(Dirname(JoinPath(snapshot_path, part_key)));
+    const int64_t parallel_num = parallel_ctx.parallel_num();
+    int32_t counter = Global<CtrlClient>::Get()->IncreaseCount(
+        snapshot_path + "-" + var_lbn + "-Counter-" + std::to_string(*counter_));
+    if (counter < seed_num) { return; }
+    TensorSliceView total_slice(logical_blob_shape);
+    OnDemandHostBlob total_blob(logical_blob_shape, data_type);
+    SnapshotReader reader(snapshot_path);
+    FOR_RANGE(int64_t, i, 0, parallel_num) {
+      bool skip = false;
+      FOR_RANGE(int64_t, j, 0, hierarchy->NumAxes()) {
+        SbpParallel sbp_parallel = in_parallel_distribution.sbp_parallel(j);
+        const int64_t rank_id = (i % hierarchy->Count(j)) / hierarchy->Count(j + 1);
+        if (sbp_parallel.has_broadcast_parallel() && rank_id != 0) {
+          skip = true;
+          break;
+        }
       }
-      writer.Write(var_lbn, total_blob.blob());
+      if (skip) {
+        LOG(ERROR) << "skip " << i;
+        continue;
+      }
+      const TensorSliceView part_slice = GetPartSlice(this->kernel_conf(), i);
+      const std::string part_key = GetTmpPartKey(var_lbn, i, parallel_num);
+      LOG(ERROR) << parallel_ctx.parallel_id() << " read " << part_key;
+      OnDemandHostBlob part_blob(part_slice.shape(), data_type);
+      reader.Read(part_key, part_blob.blob());
+      HostSliceCopy(total_blob.blob(), total_slice, part_blob.blob(), part_slice);
+      SnapshotFS()->RecursivelyDeleteDir(Dirname(JoinPath(snapshot_path, part_key)));
     }
+    writer.Write(var_lbn, total_blob.blob());
   }
   std::unique_ptr<int64_t> counter_;
 };
