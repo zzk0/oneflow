@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#include <oneflow/core/profiler/profiler.h>
 #include "oneflow/core/common/balanced_splitter.h"
 #include "oneflow/core/vm/symbol_storage.h"
 #include "oneflow/core/framework/to_string.h"
@@ -666,10 +667,12 @@ Maybe<void> Operator::InferParallelDistributionSignatureIf(
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
+  OF_PROFILER_RANGE_PUSH("Operator::InferParallelDistributionSignatureIf");
   ParallelDistributionSignature signature;
   JUST(InferParallelDistributionSignature(&signature, parallel_distribution_sig_constraints,
                                           parallel_desc, ParallelDistributionInferHint4Ibn));
   JUST(FillParallelDistributionSignature(signature));
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 

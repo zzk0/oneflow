@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#include <oneflow/core/profiler/profiler.h>
 #include "oneflow/core/graph/op_graph.h"
 #include "oneflow/core/job/job_builder.h"
 #include "oneflow/core/job/mirrored_sig_infer_hint.h"
@@ -400,6 +401,7 @@ const OpNode* OpGraph::OpNode4OpName(const std::string& op_name) const {
 }
 
 Maybe<void> OpGraph::InferLogicalBlobDesc(const Job& job) const {
+  OF_PROFILER_RANGE_PUSH("OpGraph::InferLogicalBlobDesc");
   JobParallelViewConf job_parallel_view_conf(job.job_parallel_view_conf());
   HashMap<OpBlobArg, std::vector<OpBlobArg>> oba2sbp_identical_obas;
   for (const auto& pair : job.helper().identical_sbp_oba_pairs().pair()) {
@@ -446,6 +448,7 @@ Maybe<void> OpGraph::InferLogicalBlobDesc(const Job& job) const {
     JUST(op_node->mut_op()->InferLogicalOutBlobDescsIf());
     return Maybe<void>::Ok();
   }));
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
