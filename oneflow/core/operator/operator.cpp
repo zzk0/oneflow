@@ -479,19 +479,25 @@ void Operator::ForEachBnInOp(std::function<void(const std::string&)> Handler) co
 Maybe<void> Operator::FillSbpSignature(const SbpSignature& sbp_signature) {
   ParallelDistributionSignature parallel_distribution_signature;
   SbpSignatureToParallelDistributionSignature(sbp_signature, &parallel_distribution_signature);
-  FillParallelDistributionSignature(parallel_distribution_signature);
+  JUST(FillParallelDistributionSignature(parallel_distribution_signature));
   return Maybe<void>::Ok();
 }
 
 Maybe<void> Operator::FillParallelDistributionSignature(
     const ParallelDistributionSignature& signature) {
+  return FillParallelDistributionSignature(
+      std::make_shared<const ParallelDistributionSignature>(signature));
+}
+
+Maybe<void> Operator::FillParallelDistributionSignature(
+    std::shared_ptr<const ParallelDistributionSignature> signature) {
   CHECK_OR_RETURN(!parallel_distribution_signature_);
   CHECK_OR_RETURN(!sbp_signature_);
-  parallel_distribution_signature_.reset(new ParallelDistributionSignature(signature));
+  parallel_distribution_signature_ = std::move(signature);
   CHECK_OR_RETURN(op_parallel_desc_);
   if (op_parallel_desc_->hierarchy()->NumAxes() == 1) {
     SbpSignature sbp_signature;
-    ParallelDistributionSignatureToSbpSignature(signature, &sbp_signature);
+    ParallelDistributionSignatureToSbpSignature(*parallel_distribution_signature_, &sbp_signature);
     sbp_signature_.reset(new SbpSignature(sbp_signature));
   }
   return Maybe<void>::Ok();
@@ -670,8 +676,8 @@ Maybe<void> Operator::InferParallelDistributionSignatureIf(
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
   OF_PROFILER_RANGE_PUSH("Operator::InferParallelDistributionSignatureIf");
-  ParallelDistributionSignature signature;
-  JUST(InferParallelDistributionSignature(&signature, parallel_distribution_sig_constraints,
+  std::shared_ptr<ParallelDistributionSignature> signature(new ParallelDistributionSignature());
+  JUST(InferParallelDistributionSignature(signature.get(), parallel_distribution_sig_constraints,
                                           parallel_desc, ParallelDistributionInferHint4Ibn));
   JUST(FillParallelDistributionSignature(signature));
   OF_PROFILER_RANGE_POP();

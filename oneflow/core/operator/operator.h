@@ -145,6 +145,8 @@ class Operator {
                                 const HashMap<std::string, SbpInferHint>& ibn2sbp_infer_hint);
   Maybe<void> FillSbpSignature(const SbpSignature& sbp_signature);
   Maybe<void> FillParallelDistributionSignature(const ParallelDistributionSignature& signature);
+  Maybe<void> FillParallelDistributionSignature(
+      std::shared_ptr<const ParallelDistributionSignature> signature);
   Maybe<void> InferSbpSignatureIf(
       const SbpSignature& sbp_sig_conf,
       const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
