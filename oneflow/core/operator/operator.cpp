@@ -659,7 +659,9 @@ Maybe<void> Operator::InferSbpSignature(
   std::vector<std::shared_ptr<const SbpSignature>> valid_sbp_sig_list;
   {
     std::vector<std::shared_ptr<const SbpSignature>> total_sbp_sig_list;
+    OF_PROFILER_RANGE_PUSH("GetSbpSignaturesIf");
     JUST(GetSbpSignaturesIf(LogicalBlobDesc4Ibn, parallel_desc, &total_sbp_sig_list));
+    OF_PROFILER_RANGE_POP();
     // filter sbp signatures by logical shape
     JUST(FilterAndCheckValidSbpSignatureListByLogicalShape(total_sbp_sig_list, SbpInferHint4Ibn,
                                                            parallel_desc, &valid_sbp_sig_list));
