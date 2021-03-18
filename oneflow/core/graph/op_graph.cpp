@@ -188,6 +188,7 @@ void OpNode::InitLbi2SourceNode() {
 }
 
 void OpNode::InitLbi2ParallelDistribution() {
+  OF_PROFILER_RANGE_PUSH("InitLbi2ParallelDistribution");
   const auto Update = [&](const PbRpf<std::string>& bns) {
     for (const auto& bn : bns) {
       const LogicalBlobId& lbi = op().BnInOp2Lbi(bn);
@@ -202,6 +203,7 @@ void OpNode::InitLbi2ParallelDistribution() {
   };
   Update(op().input_bns());
   Update(op().output_bns());
+  OF_PROFILER_RANGE_POP();
 }
 
 Maybe<OpGraph> OpGraph::New(const Job& job) {

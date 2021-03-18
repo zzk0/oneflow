@@ -520,6 +520,7 @@ Maybe<void> Operator::InferSbpSignatureIf(
 Maybe<void> Operator::InferSbpSignature(
     SbpSignature* infered_sbp_signature, const SbpSignature& sbp_sig_conf,
     const HashMap<std::string, SbpInferHint>& ibn2sbp_infer_hint) {
+  OF_PROFILER_RANGE_PUSH("InferSbpSignature");
   auto SbpInferHint4Ibn = [&](const std::string& ibn) -> Maybe<const SbpInferHint*> {
     auto it = ibn2sbp_infer_hint.find(ibn);
     if (it == ibn2sbp_infer_hint.end()) {
@@ -576,6 +577,7 @@ Maybe<void> Operator::InferSbpSignature(
   } else {
     UNIMPLEMENTED();
   }
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
