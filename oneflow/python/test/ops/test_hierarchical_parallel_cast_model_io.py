@@ -28,78 +28,29 @@ def _test_train(test_case):
 
     @flow.global_function("train", function_config=func_config)
     def test_fn(x: flow.typing.Numpy.Placeholder((12, 33)),) -> flow.typing.Numpy:
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"],
-        )
-        # v = flow.get_variable(
-        #    name="v",
-        #    shape=(33, 4),
-        #    parallel_hierarchy=(4,),
-        #    parallel_distribution=["S(1)"],
-        #    initializer=flow.ones_initializer(),
-        # )
-        # v = flow.hierarchical_parallel_cast(
-        #    v, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(1)"],
-        # )
-        v = flow.get_variable(
-            name="v",
-            shape=(33, 4),
-            parallel_hierarchy=(2, 2),
-            parallel_distribution=["S(1)", "B"],
-            initializer=flow.ones_initializer(),
-        )
-        x = flow.matmul(x, v)
-        x = flow.math.relu(x)
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[4], parallel_distribution=["S(1)"]
-        )
-        x = flow.math.relu(x)
-        flow.optimizer.SGD(
-            flow.optimizer.PiecewiseConstantScheduler([], [1e-3]), momentum=0
-        ).minimize(x)
-        return x
-
-    check_point = flow.train.CheckPoint()
-    # check_point.init()
-    check_point.load("v_model")
-    x_arr = np.random.rand(12, 33).astype(np.float32)
-    y_arr = test_fn(x_arr)
-
-    print("y_arr (12, 4):", y_arr.shape, y_arr.flatten())
-
-
-def _test_train(test_case):
-    flow.clear_default_session()
-    flow.config.gpu_device_num(4)
-    flow.config.enable_legacy_model_io()
-    # flow.config.enable_model_io_v2(True)
-    func_config = flow.FunctionConfig()
-    func_config.default_data_type(flow.float32)
-
-    @flow.global_function("train", function_config=func_config)
-    def test_fn(x: flow.typing.Numpy.Placeholder((12, 33)),) -> flow.typing.Numpy:
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"],
-        )
-        # v = flow.get_variable(
-        #    name="v",
-        #    shape=(33, 4),
-        #    parallel_hierarchy=(4,),
-        #    parallel_distribution=["S(1)"],
-        #    initializer=flow.ones_initializer(),
-        # )
-        # v = flow.hierarchical_parallel_cast(
-        #    v, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(1)"],
-        # )
-        v = flow.get_variable(
-            name="v",
-            shape=(33, 4),
-            parallel_hierarchy=(2, 2),
-            parallel_distribution=["S(1)", "S(1)"],
-            initializer=flow.ones_initializer(),
-        )
-        x = flow.matmul(x, v)
-        x = flow.math.relu(x)
+        with flow.scope.placement("gpu", "0:0-3", (2, 2)):
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["B", "S(0)"],
+            )
+            # v = flow.get_variable(
+            #    name="v",
+            #    shape=(33, 4),
+            #    parallel_hierarchy=(4,),
+            #    parallel_distribution=["S(1)"],
+            #    initializer=flow.ones_initializer(),
+            # )
+            # v = flow.hierarchical_parallel_cast(
+            #    v, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(1)"],
+            # )
+            v = flow.get_variable(
+                name="v",
+                shape=(33, 4),
+                parallel_hierarchy=(2, 2),
+                parallel_distribution=["S(1)", "B"],
+                initializer=flow.ones_initializer(),
+            )
+            x = flow.matmul(x, v)
+            x = flow.math.relu(x)
         x = flow.hierarchical_parallel_cast(
             x, parallel_hierarchy=[4], parallel_distribution=["S(1)"]
         )

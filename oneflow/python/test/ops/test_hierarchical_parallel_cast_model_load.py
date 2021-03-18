@@ -27,17 +27,18 @@ def _test_train(test_case):
 
     @flow.global_function("train", function_config=func_config)
     def test_fn(x: flow.typing.Numpy.Placeholder((12, 4)),) -> flow.typing.Numpy:
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(0)"],
-        )
-        v = flow.get_variable(
-            name="v",
-            shape=(12, 4),
-            parallel_hierarchy=(2, 2),
-            parallel_distribution=["S(1)", "S(0)"],
-            initializer=flow.ones_initializer(),
-        )
-        x = x + v
+        with flow.scope.placement("gpu", "0:0-3", (2, 2)):
+            x = flow.hierarchical_parallel_cast(
+                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(1)", "S(0)"],
+            )
+            v = flow.get_variable(
+                name="v",
+                shape=(12, 4),
+                parallel_hierarchy=(2, 2),
+                parallel_distribution=["S(1)", "S(0)"],
+                initializer=flow.ones_initializer(),
+            )
+            x = x + v
         x = flow.hierarchical_parallel_cast(
             x, parallel_hierarchy=[4], parallel_distribution=["S(1)"]
         )

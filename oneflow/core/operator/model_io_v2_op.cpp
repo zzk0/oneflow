@@ -23,22 +23,46 @@ namespace oneflow {
 namespace {
 
 void GenModelIoV2KernelConf(const VariableOpConf& variable_conf,
-                            const ParallelContext& parallel_ctx, KernelConf* kernel_conf) {
+                            const ParallelContext& parallel_ctx, const ParallelDesc& parallel_desc,
+                            KernelConf* kernel_conf) {
   const Shape& logical_blob_shape = Shape(variable_conf.shape());
-  SbpParallel sbp_parallel;
-  if (variable_conf.split_axis().has_value()) {
-    sbp_parallel.mutable_split_parallel()->set_axis(variable_conf.split_axis().value());
-  } else {
-    sbp_parallel.mutable_broadcast_parallel();
-  }
+  // SbpParallel sbp_parallel;
+  // if (variable_conf.split_axis().has_value()) {
+  //  sbp_parallel.mutable_split_parallel()->set_axis(variable_conf.split_axis().value());
+  //} else {
+  //  sbp_parallel.mutable_broadcast_parallel();
+  //}
   BlobDesc blob_desc(variable_conf.data_type());
   blob_desc.mut_shape() = Shape(logical_blob_shape);
-  const std::vector<TensorSliceView> slices = SubTskGphBuilderUtil::GetTensorSliceView(
-      parallel_ctx.parallel_num(), sbp_parallel, blob_desc);
+  DimVector seed_dim_vec = parallel_desc.hierarchy()->dim_vec();
+  ParallelDistribution parallel_distribution;
+  for (int64_t i = 0; i < parallel_desc.hierarchy()->NumAxes(); ++i) {
+    SbpParallel sbp_parallel;
+    CHECK(ParseSbpParallelFromString(variable_conf.parallel_distribution(i), &sbp_parallel));
+    CHECK(sbp_parallel.has_split_parallel() || sbp_parallel.has_broadcast_parallel());
+    *parallel_distribution.mutable_sbp_parallel()->Add() = sbp_parallel;
+    if (sbp_parallel.has_broadcast_parallel()) { seed_dim_vec.at(i) = 1; }
+  }
+  Shape seed_shape(seed_dim_vec);
+  int64_t seed_id = 0;
+  FOR_RANGE(int64_t, j, 0, parallel_desc.hierarchy()->NumAxes()) {
+    const int64_t parallel_id = (parallel_ctx.parallel_id() % parallel_desc.hierarchy()->Count(j))
+                                / parallel_desc.hierarchy()->Count(j + 1);
+    if (seed_shape.At(j) != 1) { seed_id += parallel_id * seed_shape.Count(j + 1); }
+  }
+  LOG(ERROR) << "parallel_distribution " << parallel_distribution.DebugString();
+  LOG(ERROR) << " parallel_id: " << parallel_ctx.parallel_id()
+             << " parallel_hierarchy: " << parallel_desc.hierarchy()->DebugStr();
+  LOG(ERROR) << " seed_id: " << seed_id << " seed_shape: " << seed_shape.DebugStr();
+
+  const std::vector<TensorSliceView> slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
+      *parallel_desc.hierarchy(), parallel_distribution, blob_desc);
   for (const auto& slice : slices) {
     slice.ToProto(kernel_conf->mutable_model_io_v2_conf()->mutable_slice_view()->Add());
   }
   *kernel_conf->mutable_model_io_v2_conf()->mutable_parallel_ctx() = parallel_ctx;
+  *kernel_conf->mutable_model_io_v2_conf()->mutable_seed_id() = seed_id;
+  *kernel_conf->mutable_model_io_v2_conf()->mutable_seed_num() = seed_num;
 }
 
 }  // namespace
@@ -71,23 +95,33 @@ class ModelInitV2Op : public Operator {
   }
 
  private:
-  Maybe<void> InferSbpSignature(
-      SbpSignature* sbp_signature, const SbpSignature& sbp_sig_conf,
-      const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
-      std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
-      const ParallelDesc& parallel_desc) const override {
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["ref"] =
-        JUST(SbpInferHint4Ibn("ref"))->sbp_parallel();
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["out"].mutable_split_parallel()->set_axis(0);
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["tick"].mutable_broadcast_parallel();
+  Maybe<void> InferParallelDistributionSignature(
+      ParallelDistributionSignature* signature,
+      const ParallelDistributionSignature& parallel_distribution_sig_constraints,
+      const ParallelDesc& parallel_desc,
+      std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
+          ParallelDistributionInferHint4Ibn) override {
+    (*signature->mutable_bn_in_op2parallel_distribution())["ref"] =
+        JUST(ParallelDistributionInferHint4Ibn("ref"))->parallel_distribution();
+    const auto& hierarchy = parallel_desc.hierarchy();
+    for (int64_t i = 0; i < hierarchy->NumAxes(); ++i) {
+      (*signature->mutable_bn_in_op2parallel_distribution())["out"]
+          .add_sbp_parallel()
+          ->mutable_split_parallel()
+          ->set_axis(0);
+      (*signature->mutable_bn_in_op2parallel_distribution())["tick"]
+          .add_sbp_parallel()
+          ->mutable_broadcast_parallel();
+    }
     return Maybe<void>::Ok();
   }
 
   void VirtualGenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                             const ParallelContext* parallel_ctx,
                             KernelConf* kernel_conf) const override {
+    const auto& parallel_desc = *CHECK_JUST(GetOpParallelDesc());
     GenModelIoV2KernelConf(op_conf().model_init_v2_conf().original_variable_conf(), *parallel_ctx,
-                           kernel_conf);
+                           parallel_desc, kernel_conf);
   }
 };
 
@@ -122,24 +156,36 @@ class ModelLoadV2Op : public Operator {
   }
 
  private:
-  Maybe<void> InferSbpSignature(
-      SbpSignature* sbp_signature, const SbpSignature& sbp_sig_conf,
-      const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
-      std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
-      const ParallelDesc& parallel_desc) const override {
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["ref"] =
-        JUST(SbpInferHint4Ibn("ref"))->sbp_parallel();
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["tick"].mutable_broadcast_parallel();
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["path"].mutable_broadcast_parallel();
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["out"].mutable_split_parallel()->set_axis(0);
+  Maybe<void> InferParallelDistributionSignature(
+      ParallelDistributionSignature* signature,
+      const ParallelDistributionSignature& parallel_distribution_sig_constraints,
+      const ParallelDesc& parallel_desc,
+      std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
+          ParallelDistributionInferHint4Ibn) override {
+    (*signature->mutable_bn_in_op2parallel_distribution())["ref"] =
+        JUST(ParallelDistributionInferHint4Ibn("ref"))->parallel_distribution();
+    const auto& hierarchy = parallel_desc.hierarchy();
+    for (int64_t i = 0; i < hierarchy->NumAxes(); ++i) {
+      (*signature->mutable_bn_in_op2parallel_distribution())["out"]
+          .add_sbp_parallel()
+          ->mutable_split_parallel()
+          ->set_axis(0);
+      (*signature->mutable_bn_in_op2parallel_distribution())["tick"]
+          .add_sbp_parallel()
+          ->mutable_broadcast_parallel();
+      (*signature->mutable_bn_in_op2parallel_distribution())["path"]
+          .add_sbp_parallel()
+          ->mutable_broadcast_parallel();
+    }
     return Maybe<void>::Ok();
   }
 
   void VirtualGenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                             const ParallelContext* parallel_ctx,
                             KernelConf* kernel_conf) const override {
+    const auto& parallel_desc = *CHECK_JUST(GetOpParallelDesc());
     GenModelIoV2KernelConf(op_conf().model_load_v2_conf().original_variable_conf(), *parallel_ctx,
-                           kernel_conf);
+                           parallel_desc, kernel_conf);
   }
 };
 
@@ -178,24 +224,36 @@ class ModelSaveV2Op final : public Operator {
   }
 
  private:
-  Maybe<void> InferSbpSignature(
-      SbpSignature* sbp_signature, const SbpSignature& sbp_sig_conf,
-      const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
-      std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
-      const ParallelDesc& parallel_desc) const override {
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["in"] =
-        JUST(SbpInferHint4Ibn("in"))->sbp_parallel();
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["tick"].mutable_broadcast_parallel();
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["path"].mutable_broadcast_parallel();
-    (*sbp_signature->mutable_bn_in_op2sbp_parallel())["out"].mutable_split_parallel()->set_axis(0);
+  Maybe<void> InferParallelDistributionSignature(
+      ParallelDistributionSignature* signature,
+      const ParallelDistributionSignature& parallel_distribution_sig_constraints,
+      const ParallelDesc& parallel_desc,
+      std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
+          ParallelDistributionInferHint4Ibn) override {
+    (*signature->mutable_bn_in_op2parallel_distribution())["in"] =
+        JUST(ParallelDistributionInferHint4Ibn("in"))->parallel_distribution();
+    const auto& hierarchy = parallel_desc.hierarchy();
+    for (int64_t i = 0; i < hierarchy->NumAxes(); ++i) {
+      (*signature->mutable_bn_in_op2parallel_distribution())["out"]
+          .add_sbp_parallel()
+          ->mutable_split_parallel()
+          ->set_axis(0);
+      (*signature->mutable_bn_in_op2parallel_distribution())["tick"]
+          .add_sbp_parallel()
+          ->mutable_broadcast_parallel();
+      (*signature->mutable_bn_in_op2parallel_distribution())["path"]
+          .add_sbp_parallel()
+          ->mutable_broadcast_parallel();
+    }
     return Maybe<void>::Ok();
   }
 
   void VirtualGenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                             const ParallelContext* parallel_ctx,
                             KernelConf* kernel_conf) const override {
+    const auto& parallel_desc = *CHECK_JUST(GetOpParallelDesc());
     GenModelIoV2KernelConf(op_conf().model_save_v2_conf().original_variable_conf(), *parallel_ctx,
-                           kernel_conf);
+                           parallel_desc, kernel_conf);
   }
 };
 
