@@ -41,7 +41,7 @@ TensorSliceView GetPartSlice(const KernelConf& kernel_conf, const int64_t parall
 }
 
 TensorSliceView GetPartSlice(const KernelConf& kernel_conf) {
-  return GetPartSlice(kernel_conf, kernel_conf.model_io_v2_conf().parallel_ctx().parallel_id());
+  return GetPartSlice(kernel_conf, kernel_conf.parallel_ctx().parallel_id());
 }
 
 class OnDemandHostBlob final {
@@ -200,16 +200,15 @@ class ModelInitV2Kernel final : public KernelIf<device_type> {
 
  private:
   void VirtualKernelInit() override {
+    const auto& op_attribute = this->kernel_conf().op_attribute();
+    const ParallelContext& parallel_ctx = this->kernel_conf().parallel_ctx();
     const auto& hierarchy =
-        ParallelDesc(
-            this->kernel_conf().op_attribute().parallel_conf_signature().op_parallel_conf())
-            .hierarchy();
+        ParallelDesc(op_attribute.parallel_conf_signature().op_parallel_conf()).hierarchy();
 
+    NdIndexOffsetHelper<int64_t, 5> hierarchy_index_helper(hierarchy->dim_vec().data(),
+                                                           hierarchy->NumAxes());
     std::vector<int64_t> parallel_rank(5);
-    NdIndexOffsetHelper<int64_t, 5> hierarchy_helper(hierarchy->dim_vec().data(),
-                                                     hierarchy->NumAxes());
-    const ParallelContext& parallel_ctx = this->kernel_conf().model_io_v2_conf().parallel_ctx();
-    hierarchy_helper.OffsetToNdIndex(parallel_ctx.parallel_id(), parallel_rank.data());
+    hierarchy_index_helper.OffsetToNdIndex(parallel_ctx.parallel_id(), parallel_rank.data());
     DimVector seed_vec;
     std::vector<int64_t> seed_rank;
     const auto& parallel_distribution_map = this->kernel_conf()
@@ -231,8 +230,8 @@ class ModelInitV2Kernel final : public KernelIf<device_type> {
       seed_id_ = 0;
       seed_num_ = 1;
     } else {
-      NdIndexOffsetHelper<int64_t, 5> seed_helper(seed_vec.data(), seed_vec.size());
-      seed_id_ = seed_helper.NdIndexToOffset(seed_rank.data(), seed_rank.size());
+      NdIndexOffsetHelper<int64_t, 5> seed_index_helper(seed_vec.data(), seed_vec.size());
+      seed_id_ = seed_index_helper.NdIndexToOffset(seed_rank.data(), seed_rank.size());
       seed_num_ = Shape(seed_vec).elem_cnt();
     }
   }
@@ -248,9 +247,8 @@ class ModelInitV2Kernel final : public KernelIf<device_type> {
     const VariableOpConf& original_variable_conf = conf.original_variable_conf();
     AutoSyncBlobAccessor<device_type> ref_accessor(ctx.device_ctx, ref, false, true);
     if (original_variable_conf.has_initializer()) {
-      LOG(ERROR) << "id: " << this->kernel_conf().model_io_v2_conf().parallel_ctx().parallel_id()
+      LOG(ERROR) << "id: " << this->kernel_conf().parallel_ctx().parallel_id()
                  << "seed id:" << seed_id_ << " seed_num: " << seed_num_;
-      // std::mt19937 random_seed_gen(original_variable_conf.random_seed());
       std::seed_seq seq{original_variable_conf.random_seed()};
       std::vector<int64_t> seeds(seed_num_);
       seq.generate(seeds.begin(), seeds.end());
@@ -321,24 +319,20 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
  private:
   void VirtualKernelInit() override {
     counter_.reset(new int64_t(0));
-
-    const auto& parallel_desc = ParallelDesc(
-        this->kernel_conf().op_attribute().parallel_conf_signature().op_parallel_conf());
-    const auto& hierarchy = parallel_desc.hierarchy();
-    int64_t seed_num = 1;
-    const auto& map = this->kernel_conf()
-                          .op_attribute()
-                          .parallel_distribution_signature()
-                          .bn_in_op2parallel_distribution();
-    const auto it = map.find("in");
-    CHECK(it != map.end());
-    ParallelDistribution in_parallel_distribution = it->second;
+    const auto& op_attribute = this->kernel_conf().op_attribute();
+    const auto& hierarchy =
+        ParallelDesc(op_attribute.parallel_conf_signature().op_parallel_conf()).hierarchy();
+    int64_t part_num = 1;
+    const auto& parallel_distribution_map =
+        op_attribute.parallel_distribution_signature().bn_in_op2parallel_distribution();
+    const auto it = parallel_distribution_map.find("in");
+    CHECK(it != parallel_distribution_map.end());
     for (int64_t i = 0; i < hierarchy->NumAxes(); ++i) {
-      SbpParallel sbp_parallel = in_parallel_distribution.sbp_parallel(i);
+      const SbpParallel& sbp_parallel = it->second.sbp_parallel(i);
       CHECK(sbp_parallel.has_split_parallel() || sbp_parallel.has_broadcast_parallel());
-      if (sbp_parallel.has_split_parallel()) { seed_num *= hierarchy->At(i); }
+      if (sbp_parallel.has_split_parallel()) { part_num *= hierarchy->At(i); }
     }
-    seed_num_ = seed_num;
+    part_num_ = part_num;
   }
 
   void Forward(const KernelCtx& ctx,
@@ -351,7 +345,7 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
     const ModelSaveV2OpConf& conf = this->op_conf().model_save_v2_conf();
     const Blob* path_blob = BnInOp2Blob("path");
     Blob* in_blob = BnInOp2Blob("in");
-    const ParallelContext& parallel_ctx = this->kernel_conf().model_io_v2_conf().parallel_ctx();
+    const ParallelContext& parallel_ctx = this->kernel_conf().parallel_ctx();
     const VariableOpConf& original_variable_conf = conf.original_variable_conf();
     const Shape logical_blob_shape(original_variable_conf.shape());
     const DataType data_type = original_variable_conf.data_type();
@@ -367,13 +361,17 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
     const auto it = map.find("in");
     CHECK(it != map.end());
     ParallelDistribution in_parallel_distribution = it->second;
-    for (int64_t i = 0; i < hierarchy->NumAxes(); ++i) {
-      SbpParallel sbp_parallel = in_parallel_distribution.sbp_parallel(i);
-      const int64_t rank_id =
-          (parallel_ctx.parallel_id() % hierarchy->Count(i)) / hierarchy->Count(i + 1);
-      if (sbp_parallel.has_broadcast_parallel() && rank_id != 0) { return; }
-    }
-    LOG(ERROR) << "seed_num_ " << seed_num_;
+
+    const auto& SkipRead = [&](int64_t parallel_id) -> bool {
+      FOR_RANGE(int64_t, j, 0, hierarchy->NumAxes()) {
+        SbpParallel sbp_parallel = in_parallel_distribution.sbp_parallel(j);
+        const int64_t rank_id = (parallel_id % hierarchy->Count(j)) / hierarchy->Count(j + 1);
+        if (sbp_parallel.has_broadcast_parallel() && rank_id != 0) { return true; }
+      }
+      return false;
+    };
+    if (SkipRead(parallel_ctx.parallel_id())) { return; }
+    LOG(ERROR) << "part_num_ " << part_num_;
     const std::string snapshot_path =
         SyncReadStringFromBlob<device_type>(ctx.device_ctx, path_blob);
     LOG(ERROR) << parallel_ctx.parallel_id() << " do save " << snapshot_path;
@@ -389,24 +387,13 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
     int32_t counter = Global<CtrlClient>::Get()->IncreaseCount(rpc_key);
 
     LOG(ERROR) << parallel_ctx.parallel_id() << " rpc_key " << rpc_key << " counter " << counter;
-    if (counter < seed_num_) { return; }
+    if (counter < part_num_) { return; }
     TensorSliceView total_slice(logical_blob_shape);
     OnDemandHostBlob total_blob(logical_blob_shape, data_type);
     SnapshotReader reader(snapshot_path);
+
     FOR_RANGE(int64_t, i, 0, parallel_num) {
-      bool skip = false;
-      FOR_RANGE(int64_t, j, 0, hierarchy->NumAxes()) {
-        SbpParallel sbp_parallel = in_parallel_distribution.sbp_parallel(j);
-        const int64_t rank_id = (i % hierarchy->Count(j)) / hierarchy->Count(j + 1);
-        if (sbp_parallel.has_broadcast_parallel() && rank_id != 0) {
-          skip = true;
-          break;
-        }
-      }
-      if (skip) {
-        LOG(ERROR) << "skip " << i;
-        continue;
-      }
+      if (SkipRead(i)) { continue; }
       const TensorSliceView part_slice = GetPartSlice(this->kernel_conf(), i);
       const std::string part_key = GetTmpPartKey(var_lbn, i, parallel_num);
       LOG(ERROR) << parallel_ctx.parallel_id() << " read " << part_key;
@@ -419,7 +406,7 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
     Global<CtrlClient>::Get()->EraseCount(rpc_key);
   }
   std::unique_ptr<int64_t> counter_;
-  int64_t seed_num_;
+  int64_t part_num_;
 };
 
 ADD_DEVICE_TYPE_KERNEL_CREATOR(OperatorConf::kModelSaveV2Conf, ModelSaveV2Kernel);

@@ -20,6 +20,8 @@ from test_util import GenArgList
 import unittest
 from collections import OrderedDict
 from typing import Dict
+import os
+import shutil
 
 
 def _test_model_load_v2(test_case, distribution):
@@ -85,7 +87,7 @@ def _test_model_init_v2(test_case, distribution):
                 shape=(12, 4),
                 parallel_hierarchy=(2, 2),
                 parallel_distribution=distribution,
-                initializer=flow.ones_initializer(),
+                initializer=flow.xavier_uniform_initializer(),
             )
             x = x + v
         x = flow.hierarchical_parallel_cast(
@@ -107,6 +109,8 @@ def _test_model_init_v2(test_case, distribution):
 
 def _test_model_save_v2(test_case, distribution):
     print("_test_model_save_v2")
+    if os.path.exists("v2_save"):
+        shutil.rmtree("v2_save")
     flow.clear_default_session()
     flow.config.gpu_device_num(4)
     flow.config.enable_legacy_model_io()
@@ -165,14 +169,11 @@ class TestHierarchicalParallelCast(flow.unittest.TestCase):
             ["B", "S(1)"],
             ["B", "B"],
         ]
-        # arg_dict["distribution"] = [
-        #    ["S(0)", "S(0)"],
-        # ]
         for arg in GenArgList(arg_dict):
             print(*arg)
-            # _test_model_load_v2(test_case, *arg)
+            _test_model_load_v2(test_case, *arg)
             _test_model_init_v2(test_case, *arg)
-            # _test_model_save_v2(test_case, *arg)
+            _test_model_save_v2(test_case, *arg)
 
 
 if __name__ == "__main__":

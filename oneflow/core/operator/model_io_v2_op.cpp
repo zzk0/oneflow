@@ -26,39 +26,20 @@ void GenModelIoV2KernelConf(const VariableOpConf& variable_conf,
                             const ParallelContext& parallel_ctx, const ParallelDesc& parallel_desc,
                             KernelConf* kernel_conf) {
   const Shape& logical_blob_shape = Shape(variable_conf.shape());
-  // SbpParallel sbp_parallel;
-  // if (variable_conf.split_axis().has_value()) {
-  //  sbp_parallel.mutable_split_parallel()->set_axis(variable_conf.split_axis().value());
-  //} else {
-  //  sbp_parallel.mutable_broadcast_parallel();
-  //}
   BlobDesc blob_desc(variable_conf.data_type());
   blob_desc.mut_shape() = Shape(logical_blob_shape);
-  DimVector seed_dim_vec = parallel_desc.hierarchy()->dim_vec();
   ParallelDistribution parallel_distribution;
   for (int64_t i = 0; i < parallel_desc.hierarchy()->NumAxes(); ++i) {
     SbpParallel sbp_parallel;
     CHECK(ParseSbpParallelFromString(variable_conf.parallel_distribution(i), &sbp_parallel));
     CHECK(sbp_parallel.has_split_parallel() || sbp_parallel.has_broadcast_parallel());
     *parallel_distribution.mutable_sbp_parallel()->Add() = sbp_parallel;
-    if (sbp_parallel.has_broadcast_parallel()) { seed_dim_vec.at(i) = 1; }
   }
-  Shape seed_shape(seed_dim_vec);
-  int64_t seed_id = 0;
-  FOR_RANGE(int64_t, j, 0, parallel_desc.hierarchy()->NumAxes()) {
-    const int64_t parallel_id = (parallel_ctx.parallel_id() % parallel_desc.hierarchy()->Count(j))
-                                / parallel_desc.hierarchy()->Count(j + 1);
-    if (seed_shape.At(j) != 1) { seed_id += parallel_id * seed_shape.Count(j + 1); }
-  }
-
   const std::vector<TensorSliceView> slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
       *parallel_desc.hierarchy(), parallel_distribution, blob_desc);
   for (const auto& slice : slices) {
     slice.ToProto(kernel_conf->mutable_model_io_v2_conf()->mutable_slice_view()->Add());
   }
-  *kernel_conf->mutable_model_io_v2_conf()->mutable_parallel_ctx() = parallel_ctx;
-  //*kernel_conf->mutable_model_io_v2_conf()->mutable_seed_id() = seed_id;
-  //*kernel_conf->mutable_model_io_v2_conf()->mutable_seed_num() = seed_num;
 }
 
 }  // namespace

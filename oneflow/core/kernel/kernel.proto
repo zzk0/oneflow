@@ -23,9 +23,6 @@ message ShapeElemCntKernelConf {
 
 message ModelIoV2KernelConf {
   repeated TensorSliceViewProto slice_view = 1;
-  required ParallelContext parallel_ctx = 2;
-  optional int32 seed_id = 3;
-  optional int32 seed_num = 4;
 }
 
 message UserKernelConf {
