@@ -53,7 +53,6 @@ def api_get_variable(
     trainable: Optional[bool] = None,
     model_name: Optional[str] = None,
     random_seed: Optional[int] = None,
-    parallel_hierarchy: Optional[Sequence[int]] = None,
     parallel_distribution: Optional[
         Union[Sequence[oneflow_api.distribute.Distribute], Sequence[str], str]
     ] = None,
@@ -188,7 +187,6 @@ def api_get_variable(
         trainable=trainable,
         model_name=model_name,
         random_seed=random_seed,
-        parallel_hierarchy=parallel_hierarchy,
         parallel_distribution=parallel_distribution,
         reuse=reuse,
     )
@@ -204,7 +202,6 @@ def get_eager_variable(
     trainable=None,
     model_name=None,
     random_seed=None,
-    parallel_hierarchy=None,
     parallel_distribution=None,
     reuse=True,
 ):
@@ -235,7 +232,6 @@ def get_eager_variable(
             trainable=trainable,
             model_name=model_name,
             random_seed=random_seed,
-            parallel_hierarchy=parallel_hierarchy,
             parallel_distribution=parallel_distribution,
         )
         op_attribute = compile_context.CurJobAddConsistentOp(op_conf)
@@ -267,7 +263,6 @@ def get_lazy_variable(
     trainable=None,
     model_name=None,
     random_seed=None,
-    parallel_hierarchy=None,
     parallel_distribution=None,
     reuse=True,
 ):
@@ -298,7 +293,6 @@ def get_lazy_variable(
             trainable=trainable,
             model_name=model_name,
             random_seed=random_seed,
-            parallel_hierarchy=parallel_hierarchy,
             parallel_distribution=parallel_distribution,
         )
         job_var_blob = _CreateVariableBlob(op_conf)
@@ -324,7 +318,6 @@ def GenerateVariableOpConf(
     trainable=None,
     model_name=None,
     random_seed=None,
-    parallel_hierarchy=None,
     parallel_distribution=None,
 ):
     op_conf = op_conf_util.OperatorConf()
@@ -361,13 +354,6 @@ def GenerateVariableOpConf(
 
     if model_name is not None:
         op_conf.variable_conf.model_name = model_name
-
-    if parallel_hierarchy is not None:
-        print(
-            "WARNING:",
-            "parallel_hierarchy param is deprecated\n",
-            traceback.format_stack()[-4],
-        )
 
     if parallel_distribution is None or len(parallel_distribution) == 0:
         parallel_distribution = ["B"]

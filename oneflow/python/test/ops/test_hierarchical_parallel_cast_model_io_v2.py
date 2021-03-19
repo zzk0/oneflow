@@ -41,7 +41,6 @@ def _test_model_load_v2(test_case, distribution):
             v = flow.get_variable(
                 name="v",
                 shape=(12, 4),
-                parallel_hierarchy=(2, 2),
                 parallel_distribution=distribution,
                 initializer=flow.ones_initializer(),
             )
@@ -55,7 +54,6 @@ def _test_model_load_v2(test_case, distribution):
         return x
 
     check_point = flow.train.CheckPoint()
-    # check_point.init()
     check_point.load("v_model")
     x_arr = np.random.rand(12, 4).astype(np.float32)
     y_arr = test_fn(x_arr)
@@ -85,9 +83,9 @@ def _test_model_init_v2(test_case, distribution):
             v = flow.get_variable(
                 name="v",
                 shape=(12, 4),
-                parallel_hierarchy=(2, 2),
                 parallel_distribution=distribution,
-                initializer=flow.xavier_uniform_initializer(),
+                initializer=flow.ones_initializer(),
+                #initializer=flow.xavier_uniform_initializer(),
             )
             x = x + v
         x = flow.hierarchical_parallel_cast(
@@ -127,7 +125,6 @@ def _test_model_save_v2(test_case, distribution):
             v = flow.get_variable(
                 name="v",
                 shape=(12, 4),
-                parallel_hierarchy=(2, 2),
                 parallel_distribution=distribution,
                 initializer=flow.ones_initializer(),
             )
