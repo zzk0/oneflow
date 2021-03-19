@@ -165,8 +165,6 @@ void MakeModelSaveJob(
   const OperatorConf foreign_input_op_conf = GenForeignInputOpConf(job_name, 65536);
   job_builder.AddOps(master_parallel_conf, {foreign_input_op_conf, tick_op_conf});
   if (var_op_name2op_conf.empty()) { return; }
-  std::string prev_post_model_save_tick_lbn = GenLogicalBlobName(
-      foreign_input_op_conf.name(), foreign_input_op_conf.foreign_input_conf().out());
   for (const auto& pair : var_op_name2op_conf) {
     const auto& var_op_name = pair.first;
     const OperatorConf& variable_op_conf = pair.second;
@@ -180,12 +178,8 @@ void MakeModelSaveJob(
     model_save_conf->set_path(GenLogicalBlobName(foreign_input_op_conf.name(),
                                                  foreign_input_op_conf.foreign_input_conf().out()));
     *model_save_conf->mutable_in() = lbn;
-    *model_save_conf->mutable_tick() = prev_post_model_save_tick_lbn;
-    *model_save_conf->mutable_out() = "out";
     *model_save_conf->mutable_variable_op_name() = var_op_name;
     *model_save_conf->mutable_original_variable_conf() = variable_conf;
-    prev_post_model_save_tick_lbn =
-        GenLogicalBlobName(model_save_op_conf.name(), model_save_conf->out());
     job_builder.AddOps(parallel_blob_conf.parallel_conf(), {new_var_op_conf, model_save_op_conf});
   }
 }

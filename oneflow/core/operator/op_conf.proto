@@ -370,8 +370,6 @@ message ModelSaveV2OpConf {
   required string in = 2;
   required string variable_op_name = 3;
   required VariableOpConf original_variable_conf = 4;
-  required string out = 5;
-  required string tick = 6;
 }
 
 message ConstantLikeOpConf {
