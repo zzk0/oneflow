@@ -36,15 +36,6 @@ struct InitializeWithConfUtil final {
 #undef MAKE_INITIALIZE_SWITCH_ENTRY
 };
 
-TensorSliceView GetPartSlice(const KernelConf& kernel_conf, const int64_t parallel_id) {
-  const ModelIoV2KernelConf& conf = kernel_conf.model_io_v2_conf();
-  return TensorSliceView(conf.slice_view(parallel_id));
-}
-
-TensorSliceView GetPartSlice(const KernelConf& kernel_conf) {
-  return GetPartSlice(kernel_conf, kernel_conf.parallel_ctx().parallel_id());
-}
-
 const ParallelDistribution& GetParallelDistribution(const KernelConf& kernel_conf,
                                                     const std::string name) {
   const auto& parallel_distribution_map =
