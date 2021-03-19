@@ -194,9 +194,9 @@ GpuDecodeHandle::GpuDecodeHandle(int dev) : warmup_done_(false) {
   dev_allocator_.dev_free = &GpuDeviceFree;
   pinned_allocator_.pinned_malloc = &GpuPinnedMalloc;
   pinned_allocator_.pinned_free = &GpuPinnedFree;
-  OF_NVJPEG_CHECK(nvjpegCreateEx(NVJPEG_BACKEND_DEFAULT, &dev_allocator_, &pinned_allocator_, 0,
+  OF_NVJPEG_CHECK(nvjpegCreateEx(NVJPEG_BACKEND_GPU_HYBRID, &dev_allocator_, &pinned_allocator_, 0,
                                  &jpeg_handle_));
-  OF_NVJPEG_CHECK(nvjpegDecoderCreate(jpeg_handle_, NVJPEG_BACKEND_DEFAULT, &jpeg_decoder_));
+  OF_NVJPEG_CHECK(nvjpegDecoderCreate(jpeg_handle_, NVJPEG_BACKEND_GPU_HYBRID, &jpeg_decoder_));
   OF_NVJPEG_CHECK(nvjpegDecoderStateCreate(jpeg_handle_, jpeg_decoder_, &jpeg_state_));
   OF_NVJPEG_CHECK(nvjpegBufferPinnedCreate(jpeg_handle_, &pinned_allocator_, &jpeg_pinned_buffer_));
   OF_NVJPEG_CHECK(nvjpegBufferDeviceCreate(jpeg_handle_, &dev_allocator_, &jpeg_device_buffer_));
