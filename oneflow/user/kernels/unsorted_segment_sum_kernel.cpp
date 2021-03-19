@@ -51,7 +51,8 @@ std::shared_ptr<user_op::OpKernelState> CreateUnsortedSegmentSumOpKernelState(
   const int64_t sum_dim_size = out_logical_desc->shape().At(axis);
   if (parallel_hierarchy.NumAxes() == 1) {
     const SbpParallel& out_sbp = out_parallel_distribution.sbp_parallel(0);
-    if (out_sbp.has_split_parallel() && out_sbp.split_parallel().axis() == axis) {
+    if (out_sbp.has_split_parallel() && out_sbp.split_parallel().axis() == axis
+        && ctx->parallel_ctx().parallel_num() > 1) {
       CHECK(segment_ids_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
       CHECK(data_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
       BalancedSplitter bs(sum_dim_size, ctx->parallel_ctx().parallel_num());
@@ -67,7 +68,8 @@ std::shared_ptr<user_op::OpKernelState> CreateUnsortedSegmentSumOpKernelState(
       const SbpParallel& out_sbp = out_parallel_distribution.sbp_parallel(i);
       const int64_t rank_id =
           (parallel_id % parallel_hierarchy.Count(i)) / parallel_hierarchy.Count(i + 1);
-      if (out_sbp.has_split_parallel() && out_sbp.split_parallel().axis() == axis) {
+      if (out_sbp.has_split_parallel() && out_sbp.split_parallel().axis() == axis
+          && ctx->parallel_ctx().parallel_num() > 1) {
         CHECK(segment_ids_parallel_distribution.sbp_parallel(i).has_broadcast_parallel());
         CHECK(data_parallel_distribution.sbp_parallel(i).has_broadcast_parallel());
         const int64_t range_size = (upper - lower) / parallel_hierarchy.At(i);

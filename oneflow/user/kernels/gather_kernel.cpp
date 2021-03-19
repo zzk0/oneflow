@@ -67,7 +67,8 @@ class GatherKernel final : public user_op::OpKernel {
     const int64_t gather_dim_size = in_logical_desc->shape().At(axis);
     if (parallel_hierarchy.NumAxes() == 1) {
       const SbpParallel& in_sbp = in_parallel_distribution.sbp_parallel(0);
-      if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == axis) {
+      if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == axis
+          && ctx->parallel_ctx().parallel_num() > 1) {
         CHECK(indices_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
         CHECK(out_parallel_distribution.sbp_parallel(0).has_partial_sum_parallel());
         BalancedSplitter bs(gather_dim_size, ctx->parallel_ctx().parallel_num());
@@ -83,7 +84,8 @@ class GatherKernel final : public user_op::OpKernel {
         const SbpParallel& in_sbp = in_parallel_distribution.sbp_parallel(i);
         const int64_t rank_id =
             (parallel_id % parallel_hierarchy.Count(i)) / parallel_hierarchy.Count(i + 1);
-        if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == axis) {
+        if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == axis
+            && ctx->parallel_ctx().parallel_num() > 1) {
           CHECK(indices_parallel_distribution.sbp_parallel(i).has_broadcast_parallel());
           CHECK(out_parallel_distribution.sbp_parallel(i).has_partial_sum_parallel());
           const int64_t range_size = (upper - lower) / parallel_hierarchy.At(i);

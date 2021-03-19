@@ -21,10 +21,6 @@ message ShapeElemCntKernelConf {
   repeated int32 axis = 1;
 }
 
-message ModelIoV2KernelConf {
-  repeated TensorSliceViewProto slice_view = 1;
-}
-
 message UserKernelConf {
   map<string, BlobDescProto> bn_in_op2blob_desc = 1;
 }
@@ -62,7 +58,6 @@ message KernelConf {
 
     VariableKernelConf variable_conf = 407;
     ShapeElemCntKernelConf shape_elem_cnt_conf = 412;
-    ModelIoV2KernelConf model_io_v2_conf = 418;
     BroadcastToCompatibleWithKernelConf broadcast_to_compatible_with_conf = 428;
     ImageDecoderRandomCropResizeKernelConf image_decoder_random_crop_resize_conf = 429;
   }

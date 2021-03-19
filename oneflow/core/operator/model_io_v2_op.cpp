@@ -20,30 +20,6 @@ limitations under the License.
 
 namespace oneflow {
 
-namespace {
-
-void GenModelIoV2KernelConf(const VariableOpConf& variable_conf,
-                            const ParallelContext& parallel_ctx, const ParallelDesc& parallel_desc,
-                            KernelConf* kernel_conf) {
-  const Shape& logical_blob_shape = Shape(variable_conf.shape());
-  BlobDesc blob_desc(variable_conf.data_type());
-  blob_desc.mut_shape() = Shape(logical_blob_shape);
-  ParallelDistribution parallel_distribution;
-  for (int64_t i = 0; i < parallel_desc.hierarchy()->NumAxes(); ++i) {
-    SbpParallel sbp_parallel;
-    CHECK(ParseSbpParallelFromString(variable_conf.parallel_distribution(i), &sbp_parallel));
-    CHECK(sbp_parallel.has_split_parallel() || sbp_parallel.has_broadcast_parallel());
-    *parallel_distribution.mutable_sbp_parallel()->Add() = sbp_parallel;
-  }
-  const std::vector<TensorSliceView> slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
-      *parallel_desc.hierarchy(), parallel_distribution, blob_desc);
-  for (const auto& slice : slices) {
-    slice.ToProto(kernel_conf->mutable_model_io_v2_conf()->mutable_slice_view()->Add());
-  }
-}
-
-}  // namespace
-
 class ModelInitV2Op : public Operator {
  public:
   void InitFromOpConf() override {
@@ -91,14 +67,6 @@ class ModelInitV2Op : public Operator {
           ->mutable_broadcast_parallel();
     }
     return Maybe<void>::Ok();
-  }
-
-  void VirtualGenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-                            const ParallelContext* parallel_ctx,
-                            KernelConf* kernel_conf) const override {
-    const auto& parallel_desc = *CHECK_JUST(GetOpParallelDesc());
-    GenModelIoV2KernelConf(op_conf().model_init_v2_conf().original_variable_conf(), *parallel_ctx,
-                           parallel_desc, kernel_conf);
   }
 };
 
@@ -155,14 +123,6 @@ class ModelLoadV2Op : public Operator {
           ->mutable_broadcast_parallel();
     }
     return Maybe<void>::Ok();
-  }
-
-  void VirtualGenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-                            const ParallelContext* parallel_ctx,
-                            KernelConf* kernel_conf) const override {
-    const auto& parallel_desc = *CHECK_JUST(GetOpParallelDesc());
-    GenModelIoV2KernelConf(op_conf().model_load_v2_conf().original_variable_conf(), *parallel_ctx,
-                           parallel_desc, kernel_conf);
   }
 };
 
@@ -223,14 +183,6 @@ class ModelSaveV2Op final : public Operator {
           ->mutable_broadcast_parallel();
     }
     return Maybe<void>::Ok();
-  }
-
-  void VirtualGenKernelConf(std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
-                            const ParallelContext* parallel_ctx,
-                            KernelConf* kernel_conf) const override {
-    const auto& parallel_desc = *CHECK_JUST(GetOpParallelDesc());
-    GenModelIoV2KernelConf(op_conf().model_save_v2_conf().original_variable_conf(), *parallel_ctx,
-                           parallel_desc, kernel_conf);
   }
 };
 
