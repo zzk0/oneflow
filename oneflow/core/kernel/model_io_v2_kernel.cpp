@@ -247,8 +247,6 @@ class ModelInitV2Kernel final : public KernelIf<device_type> {
     const VariableOpConf& original_variable_conf = conf.original_variable_conf();
     AutoSyncBlobAccessor<device_type> ref_accessor(ctx.device_ctx, ref, false, true);
     if (original_variable_conf.has_initializer()) {
-      LOG(ERROR) << "id: " << this->kernel_conf().parallel_ctx().parallel_id()
-                 << "seed id:" << seed_id_ << " seed_num: " << seed_num_;
       std::seed_seq seq{original_variable_conf.random_seed()};
       std::vector<int64_t> seeds(seed_num_);
       seq.generate(seeds.begin(), seeds.end());
@@ -371,10 +369,8 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
       return false;
     };
     if (SkipRead(parallel_ctx.parallel_id())) { return; }
-    LOG(ERROR) << "part_num_ " << part_num_;
     const std::string snapshot_path =
         SyncReadStringFromBlob<device_type>(ctx.device_ctx, path_blob);
-    LOG(ERROR) << parallel_ctx.parallel_id() << " do save " << snapshot_path;
     AutoSyncBlobAccessor<device_type> in_accessor(ctx.device_ctx, in_blob, true, false);
     SnapshotWriter writer(snapshot_path);
     const std::string var_lbn =
@@ -385,8 +381,6 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
     const std::string rpc_key =
         snapshot_path + "-" + var_lbn + "-Counter-" + std::to_string(*counter_);
     int32_t counter = Global<CtrlClient>::Get()->IncreaseCount(rpc_key);
-
-    LOG(ERROR) << parallel_ctx.parallel_id() << " rpc_key " << rpc_key << " counter " << counter;
     if (counter < part_num_) { return; }
     TensorSliceView total_slice(logical_blob_shape);
     OnDemandHostBlob total_blob(logical_blob_shape, data_type);
@@ -396,7 +390,6 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
       if (SkipRead(i)) { continue; }
       const TensorSliceView part_slice = GetPartSlice(this->kernel_conf(), i);
       const std::string part_key = GetTmpPartKey(var_lbn, i, parallel_num);
-      LOG(ERROR) << parallel_ctx.parallel_id() << " read " << part_key;
       OnDemandHostBlob part_blob(part_slice.shape(), data_type);
       reader.Read(part_key, part_blob.blob());
       HostSliceCopy(total_blob.blob(), total_slice, part_blob.blob(), part_slice);
