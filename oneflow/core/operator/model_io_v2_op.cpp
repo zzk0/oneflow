@@ -60,25 +60,17 @@ class ModelLoadV2Op : public Operator {
     CHECK(op_conf().has_model_load_v2_conf());
     EnrollInputBn("path", false);
     EnrollInputBn("ref", false)->set_is_mutable(true);
-    EnrollOutputBn("out", false);
-    EnrollInputBn("tick", false);
   }
 
   Maybe<void> InferLogicalOutBlobDescs(
       const std::function<BlobDesc*(const std::string&)>& BlobDesc4BnInOp,
       const ParallelDesc& parallel_desc) const override {
-    BlobDesc* out = BlobDesc4BnInOp("out");
-    out->set_data_type(DataType::kFloat);
-    out->mut_shape() = Shape({parallel_desc.parallel_num()});
     return Maybe<void>::Ok();
   }
 
   Maybe<void> InferOutBlobDescs(
       const std::function<BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp,
       const ParallelContext* parallel_ctx) const override {
-    BlobDesc* out = GetBlobDesc4BnInOp("out");
-    out->set_data_type(DataType::kFloat);
-    out->mut_shape() = Shape({1});
     return Maybe<void>::Ok();
   }
 
@@ -93,13 +85,6 @@ class ModelLoadV2Op : public Operator {
         JUST(ParallelDistributionInferHint4Ibn("ref"))->parallel_distribution();
     const auto& hierarchy = parallel_desc.hierarchy();
     for (int64_t i = 0; i < hierarchy->NumAxes(); ++i) {
-      (*signature->mutable_bn_in_op2parallel_distribution())["out"]
-          .add_sbp_parallel()
-          ->mutable_split_parallel()
-          ->set_axis(0);
-      (*signature->mutable_bn_in_op2parallel_distribution())["tick"]
-          .add_sbp_parallel()
-          ->mutable_broadcast_parallel();
       (*signature->mutable_bn_in_op2parallel_distribution())["path"]
           .add_sbp_parallel()
           ->mutable_broadcast_parallel();
