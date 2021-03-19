@@ -27,6 +27,7 @@ namespace one {
   class_type() = default;                      \
   virtual ~class_type() = default;
 
+class OpExprGrad;
 class OpExpr {
  public:
   DEFINE_DEFAULT_CONSTRUCTOR(OpExpr);
@@ -34,6 +35,7 @@ class OpExpr {
   virtual std::string type() const = 0;
   virtual int input_num() const = 0;
   virtual int output_num() const = 0;
+  virtual std::shared_ptr<OpExprGrad> GetOrCreateOpGrad() const = 0;
 };
 
 class BuiltinOpExpr : public OpExpr {
@@ -61,6 +63,7 @@ class BuiltinOpExpr : public OpExpr {
   std::vector<std::string> indexed_ibns_;
   // The indexed output blob names.
   std::vector<std::string> indexed_obns_;
+  mutable std::shared_ptr<OpExprGrad> op_grad_;
 };
 
 #define DEFINE_BUILTIN_OPEXPR_CLASS(_op_name, _op_conf)                         \
@@ -82,6 +85,8 @@ class BuiltinOpExpr : public OpExpr {
       *(op_conf->mutable_name()) = this->op_name_;                              \
       *(op_conf->mutable_##_op_conf##_conf()) = proto_;                         \
     }                                                                           \
+                                                                                \
+    std::shared_ptr<OpExprGrad> GetOrCreateOpGrad() const { return op_grad_; }  \
                                                                                 \
    private:                                                                     \
     _op_name##Conf proto_;                                                      \
