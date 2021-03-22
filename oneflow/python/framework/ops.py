@@ -28,7 +28,6 @@ from oneflow.python.oneflow_export import oneflow_export
 import oneflow
 import oneflow_api
 from typing import Union, Optional, Sequence
-import traceback
 
 
 @oneflow_export("repeat")
@@ -176,20 +175,16 @@ def parallel_cast(input, name=None, distribute=None, gradient_distribute=None):
 @oneflow_export("hierarchical_parallel_cast")
 def api_hierarchical_parallel_cast(
     input: oneflow_api.BlobDesc,
-    parallel_hierarchy: Sequence[int],
     parallel_distribution: Sequence[str],
     grad_mode: Optional[str] = None,
-    grad_parallel_hierarchy: Sequence[int] = None,
     grad_parallel_distribution: Sequence[str] = None,
     name: Optional[str] = None,
 ) -> oneflow_api.BlobDesc:
     func = enable_if.unique([hierarchical_parallel_cast])
     return func(
         input,
-        parallel_hierarchy=parallel_hierarchy,
         parallel_distribution=parallel_distribution,
         grad_mode=grad_mode,
-        grad_parallel_hierarchy=grad_parallel_hierarchy,
         grad_parallel_distribution=grad_parallel_distribution,
         name=name,
     )
@@ -197,13 +192,7 @@ def api_hierarchical_parallel_cast(
 
 @enable_if.condition(hob.in_global_mode & ~hob.eager_execution_enabled)
 def hierarchical_parallel_cast(
-    input,
-    parallel_hierarchy,
-    parallel_distribution,
-    grad_mode,
-    grad_parallel_hierarchy,
-    grad_parallel_distribution,
-    name,
+    input, parallel_distribution, grad_mode, grad_parallel_distribution, name,
 ):
     if name is None:
         name = id_util.UniqueStr("HierarchicalParallelCast_")
@@ -220,11 +209,6 @@ def hierarchical_parallel_cast(
         else:
             raise ValueError("unsupported distribute")
 
-    print(
-        "WARNING:",
-        "parallel_hierarchy and grad_parallel_hierarchy param is deprecated\n",
-        traceback.format_stack()[-3],
-    )
     op = (
         oneflow.user_op_builder(name)
         .Op("hierarchical_parallel_cast")
