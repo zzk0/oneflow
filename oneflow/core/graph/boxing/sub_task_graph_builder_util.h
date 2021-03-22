@@ -36,13 +36,13 @@ struct SubTskGphBuilderUtil {
   static std::vector<TensorSliceView> GetTensorSliceView(
       const Shape& parallel_hierarchy, const ParallelDistribution& parallel_distribution,
       const Shape& logical_shape);
+  static TensorSliceView GetTensorSliceView4ParallelRank(
+      const Shape& parallel_hierarchy, const ParallelDistribution& parallel_distribution,
+      const Shape& logical_shape, const std::vector<int64_t>& parallel_rank);
   static TensorSliceView GetTensorSliceView4ParallelId(
       const Shape& parallel_hierarchy, const ParallelDistribution& parallel_distribution,
       const Shape& logical_shape, int64_t parallel_id);
   static TensorSliceView GetBroadcastTensorSliceView(const BlobDesc& blob_desc);
-  static std::vector<TensorSliceView> GetTensor2DSliceView(
-      const Shape& parallel_hierarchy, const ParallelDistribution& parallel_distribution,
-      const BlobDesc& blob_desc);
   static bool HasEmptySliceIfSplit(int64_t parallel_num, const SbpParallel& sbp_parallel,
                                    const BlobDesc& blob_desc);
   static bool IsOnSameGPU(const TaskNode* lhs, const TaskNode* rhs);

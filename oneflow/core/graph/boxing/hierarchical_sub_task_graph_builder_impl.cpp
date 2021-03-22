@@ -194,10 +194,10 @@ Maybe<SubTskGphBuilderStatus> Build2DSliceBoxingSubTskGph(
     return node;
   };
   LOG(INFO) << "Build2DSliceBoxingSubTskGph";
-  const std::vector<TensorSliceView> in_slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
-      in_parallel_hierarchy, in_parallel_distribution, logical_blob_desc);
-  const std::vector<TensorSliceView> out_slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
-      out_parallel_hierarchy, out_parallel_distribution, logical_blob_desc);
+  const std::vector<TensorSliceView> in_slices = SubTskGphBuilderUtil::GetTensorSliceView(
+      in_parallel_hierarchy, in_parallel_distribution, logical_blob_desc.shape());
+  const std::vector<TensorSliceView> out_slices = SubTskGphBuilderUtil::GetTensorSliceView(
+      out_parallel_hierarchy, out_parallel_distribution, logical_blob_desc.shape());
   const int64_t in_parallel_num = in_parallel_desc.parallel_num();
   const int64_t out_parallel_num = out_parallel_desc.parallel_num();
   FOR_RANGE(int64_t, out_id, 0, out_parallel_num) {
@@ -293,10 +293,10 @@ Maybe<SubTskGphBuilderStatus> BuildSliceBoxingAddSubTskGph(
 
   LOG(INFO) << "Build2DSliceBoxingAddSubTskGph";
   // can not process P, B->B, B, only axis 1 has split
-  const std::vector<TensorSliceView> in_slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
-      in_parallel_hierarchy, in_parallel_distribution, logical_blob_desc);
-  const std::vector<TensorSliceView> out_slices = SubTskGphBuilderUtil::GetTensor2DSliceView(
-      out_parallel_hierarchy, out_parallel_distribution, logical_blob_desc);
+  const std::vector<TensorSliceView> in_slices = SubTskGphBuilderUtil::GetTensorSliceView(
+      in_parallel_hierarchy, in_parallel_distribution, logical_blob_desc.shape());
+  const std::vector<TensorSliceView> out_slices = SubTskGphBuilderUtil::GetTensorSliceView(
+      out_parallel_hierarchy, out_parallel_distribution, logical_blob_desc.shape());
   const int64_t in_parallel_num = in_parallel_desc.parallel_num();
   const int64_t out_parallel_num = out_parallel_desc.parallel_num();
   FOR_RANGE(int64_t, out_id, 0, out_parallel_num) {

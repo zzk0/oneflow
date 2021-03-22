@@ -16,7 +16,6 @@ limitations under the License.
 #include "oneflow/core/operator/operator.h"
 #include "oneflow/core/register/tensor_slice_view.h"
 #include "oneflow/core/common/balanced_splitter.h"
-#include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
 
 namespace oneflow {
 

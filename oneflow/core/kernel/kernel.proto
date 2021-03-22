@@ -5,7 +5,6 @@ import "oneflow/core/common/data_type.proto";
 import "oneflow/core/common/dtype_signature.proto";
 import "oneflow/core/operator/op_attribute.proto";
 import "oneflow/core/job/placement.proto";
-import "oneflow/core/register/tensor_slice_view.proto";
 import "oneflow/core/register/blob_desc.proto";
 
 message DecodeRandomKernelConf {
