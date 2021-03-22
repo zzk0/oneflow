@@ -27,10 +27,6 @@ limitations under the License.
 
 namespace oneflow {
 
-Maybe<void> InferOpSbpSignature(Operator* op, const SbpSignature& sbp_sig_conf,
-                                const ParallelDesc& parallel_desc,
-                                const HashMap<std::string, SbpInferHint>& ibn2sbp_infer_hint);
-
 namespace {
 
 DataType GetDataTypeFromBnInOpVec(
@@ -702,11 +698,11 @@ Maybe<void> Operator::InferParallelDistributionSignature(
     SbpSignatureToParallelDistributionSignature(sbp_signature, parallel_distribution_signature);
     return Maybe<void>::Ok();
   } else {
-    if (parallel_distribution_sig_constraints.bn_in_op2parallel_distribution_size() != 0) {
-      LOG(INFO) << op_name() << " parallel_distribution_sig_constraints: \n"
-                << parallel_distribution_sig_constraints.DebugString();
+    if (parallel_distribution_constraints.bn_in_op2parallel_distribution_size() != 0) {
+      LOG(INFO) << op_name() << " parallel_distribution_constraints: \n"
+                << parallel_distribution_constraints.DebugString();
     }
-    // TODO: process parallel_distribution_sig_constraints
+    // TODO: process parallel_distribution_constraints
     SbpSignatureList list;
     const auto LogicalBlobDesc4Ibn = [&](const std::string& ibn) -> Maybe<const BlobDesc&> {
       return JUST(ParallelDistributionInferHint4Ibn(ibn))->logical_blob_desc();
@@ -719,12 +715,12 @@ Maybe<void> Operator::InferParallelDistributionSignature(
         for (const auto& ibn : input_bns()) {
           ParallelDistribution distribution =
               JUST(ParallelDistributionInferHint4Ibn(ibn))->parallel_distribution();
-          if (parallel_distribution_sig_constraints.bn_in_op2parallel_distribution_size() != 0) {
-            const auto parallel_distribution_sig_constraints_it =
-                parallel_distribution_sig_constraints.bn_in_op2parallel_distribution().find(ibn);
-            if (parallel_distribution_sig_constraints_it
-                != parallel_distribution_sig_constraints.bn_in_op2parallel_distribution().end()) {
-              distribution = parallel_distribution_sig_constraints_it->second;
+          if (parallel_distribution_constraints.bn_in_op2parallel_distribution_size() != 0) {
+            const auto parallel_distribution_constraints_it =
+                parallel_distribution_constraints.bn_in_op2parallel_distribution().find(ibn);
+            if (parallel_distribution_constraints_it
+                != parallel_distribution_constraints.bn_in_op2parallel_distribution().end()) {
+              distribution = parallel_distribution_constraints_it->second;
             }
           }
           LOG(INFO) << op_name() << " hierarchy 2 " << ibn << " lbi: " << lbi4ibn(ibn).DebugString()
@@ -746,16 +742,16 @@ Maybe<void> Operator::InferParallelDistributionSignature(
       }
       CHECK_OR_RETURN(matched_sbp_signature != nullptr) << " op_name " << op_name();
       for (const auto& bn : input_bns()) {
-        *((*signature->mutable_bn_in_op2parallel_distribution())[bn].add_sbp_parallel()) =
-            matched_sbp_signature->bn_in_op2sbp_parallel().at(bn);
+        *((*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())[bn]
+              .add_sbp_parallel()) = matched_sbp_signature->bn_in_op2sbp_parallel().at(bn);
       }
       for (const auto& bn : output_bns()) {
-        *((*signature->mutable_bn_in_op2parallel_distribution())[bn].add_sbp_parallel()) =
-            matched_sbp_signature->bn_in_op2sbp_parallel().at(bn);
+        *((*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())[bn]
+              .add_sbp_parallel()) = matched_sbp_signature->bn_in_op2sbp_parallel().at(bn);
       }
     }
     LOG(INFO) << op_name() << " signature: \n"
-              << signature->DebugString() << "\n hierarchy: \n"
+              << parallel_distribution_signature->DebugString() << "\n hierarchy: \n"
               << parallel_hierarchy->DebugStr();
     return Maybe<void>::Ok();
   }
