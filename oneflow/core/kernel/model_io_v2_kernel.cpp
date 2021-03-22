@@ -233,11 +233,6 @@ class ModelInitV2Kernel final : public KernelIf<device_type> {
     const Shape logical_blob_shape(original_variable_conf.shape());
     tensor_slice_view_ = SubTskGphBuilderUtil::GetTensorSliceView4ParallelId(
         *hierarchy, parallel_distribution, logical_blob_shape, parallel_ctx.parallel_id());
-    LOG(ERROR) << "parallel id: " << parallel_ctx.parallel_id() << " seed_id: " << seed_offset
-               << " seed_num: " << seed_num << " seed: " << seed_;
-    TensorSliceViewProto proto;
-    tensor_slice_view_.ToProto(&proto);
-    LOG(ERROR) << "tensor_slice_view_:\n" << proto.DebugString();
   }
   void Forward(const KernelCtx& ctx,
                std::function<Blob*(const std::string&)> BnInOp2Blob) const override {
@@ -358,7 +353,6 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
         part_id2slice_views_.emplace_back(SubTskGphBuilderUtil::GetTensorSliceView4ParallelRank(
             *hierarchy, parallel_distribution, logical_blob_shape, parallel_rank));
       }
-      LOG(ERROR) << "parallel id: " << i << " cur_i_need_do_save: " << cur_i_need_do_save;
     }
   }
 
@@ -387,8 +381,6 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
     const std::string key =
         is_broadcast ? var_lbn : GetTmpPartKey(var_lbn, part_id_, part_id2slice_views_.size());
     writer.Write(key, in_accessor.host_blob());
-    LOG(ERROR) << "parallelid: " << this->kernel_conf().parallel_ctx().parallel_id() << " do save "
-               << key;
     if (!is_broadcast) {
       const std::string rpc_key =
           snapshot_path + "-" + var_lbn + "-Counter-" + std::to_string(*counter_);
@@ -403,12 +395,6 @@ class ModelSaveV2Kernel final : public KernelIf<device_type> {
         const std::string part_key = GetTmpPartKey(var_lbn, i, part_id2slice_views_.size());
         OnDemandHostBlob part_blob(part_slice.shape(), data_type);
         reader.Read(part_key, part_blob.blob());
-
-        TensorSliceViewProto proto;
-        part_slice.ToProto(&proto);
-        LOG(ERROR) << "parallel id: " << this->kernel_conf().parallel_ctx().parallel_id()
-                   << " do total, read " << part_key << " part_slice:\n"
-                   << proto.DebugString();
         HostSliceCopy(total_blob.blob(), total_slice, part_blob.blob(), part_slice);
         SnapshotFS()->RecursivelyDeleteDir(Dirname(JoinPath(snapshot_path, part_key)));
       }
