@@ -74,18 +74,15 @@ Maybe<void> InputOp::InferParallelDistributionSignature(
   LOG(INFO) << "InputOp blob_conf" << blob_conf.DebugString();
   ParallelDistribution& in_parallel_distribution =
       (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["tick"];
-  ParallelDistribution& out_parallel_distribution =
-      (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["out"];
-  if (blob_conf.has_parallel_distribution()) {
-    out_parallel_distribution = blob_conf.parallel_distribution();
-  } else {
-    FOR_RANGE(int64_t, i, 0, parallel_hierarchy->NumAxes()) {
-      out_parallel_distribution.mutable_sbp_parallel()->Add()->mutable_broadcast_parallel();
-    }
-  }
+  in_parallel_distribution.clear_sbp_parallel();
   FOR_RANGE(int64_t, i, 0, parallel_hierarchy->NumAxes()) {
     in_parallel_distribution.mutable_sbp_parallel()->Add()->mutable_broadcast_parallel();
   }
+  ParallelDistribution& out_parallel_distribution =
+      (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["out"];
+  InterfaceOpUtil::ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc,
+                                                         &out_parallel_distribution);
+
   LOG(INFO) << "input op InferParallelDistributionSignature in:\n"
             << in_parallel_distribution.DebugString() << "\nout:\n"
             << out_parallel_distribution.DebugString();

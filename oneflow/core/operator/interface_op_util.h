@@ -39,6 +39,10 @@ struct InterfaceOpUtil final {
                                                  SbpSignature* sbp_signature);
   static Maybe<void> InitBlobConf(InterfaceBlobConf* blob_conf,
                                   const ParallelBlobConf& parallel_blob_conf);
+
+  static Maybe<void> ParseParallelDistributionFromBlobConf(
+      const InterfaceBlobConf& blob_conf, const ParallelDesc& parallel_desc,
+      ParallelDistribution* parallel_distribution);
 };
 
 }  // namespace oneflow

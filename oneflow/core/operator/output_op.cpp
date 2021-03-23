@@ -72,8 +72,10 @@ Maybe<void> OutputOp::InferParallelDistributionSignature(
       (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["in"];
   ParallelDistribution& out_parallel_distribution =
       (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["out"];
-  in_parallel_distribution = blob_conf.parallel_distribution();
-  out_parallel_distribution = blob_conf.parallel_distribution();
+  InterfaceOpUtil::ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc,
+                                                         &in_parallel_distribution);
+  InterfaceOpUtil::ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc,
+                                                         &out_parallel_distribution);
   LOG(INFO) << "OutputOp op InferParallelDistributionSignature in:\n"
             << in_parallel_distribution.DebugString() << "\nout:\n"
             << out_parallel_distribution.DebugString();
