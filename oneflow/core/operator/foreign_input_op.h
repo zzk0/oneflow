@@ -36,12 +36,6 @@ class ForeignInputOp final : public Operator {
 
  private:
   Maybe<void> GetSbpSignatures(SbpSignatureList* sbp_sig_list) const override;
-  Maybe<void> InferParallelDistributionSignature(
-      ParallelDistributionSignature* parallel_distribution_signature,
-      const ParallelDistributionSignature& parallel_distribution_constraints,
-      const ParallelDesc& parallel_desc,
-      std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-          ParallelDistributionInferHint4Ibn) const override;
 };
 
 }  // namespace oneflow
