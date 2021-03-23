@@ -43,7 +43,7 @@ Maybe<void> OutputOp::InferOutBlobDescs(
     *out_blob_desc = *in_blob_desc;
   } else {
     InterfaceOpUtil::InferOutBlobDesc(op_conf().output_conf().blob_conf(), out_blob_desc,
-                                      parallel_ctx);
+                                      parallel_ctx, *JUST(GetOpParallelDesc()));
     LOG(INFO) << "output op in_blob_desc" << in_blob_desc->shape().DebugStr();
     LOG(INFO) << "output op out_blob_desc" << out_blob_desc->shape().DebugStr();
     CHECK_OR_RETURN(*out_blob_desc == *in_blob_desc);

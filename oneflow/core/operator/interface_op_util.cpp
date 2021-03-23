@@ -27,13 +27,17 @@ void CheckShape(const Shape& shape) {
 Maybe<void> GetSbpSignature(const InterfaceBlobConf& blob_conf, const PbRpf<std::string>& input_bns,
                             const PbRpf<std::string>& output_bns, SbpSignature* sbp_signature,
                             bool is_for_input_op) {
-  if (blob_conf.split_axis().has_value()) {
+  if (!blob_conf.has_parallel_distribution()) {
+    SbpSignatureBuilder().Broadcast(input_bns).Broadcast(output_bns).Build(sbp_signature);
+    return Maybe<void>::Ok();
+  }
+  CHECK_EQ_OR_RETURN(blob_conf.parallel_distribution().sbp_parallel_size(), 1);
+  const auto& sbp_parallel = blob_conf.parallel_distribution().sbp_parallel(0);
+  if (sbp_parallel.has_split_parallel()) {
     int64_t num_axes = blob_conf.shape().dim_size();
-    int64_t split_axis = blob_conf.split_axis().value();
-    if (split_axis < 0) { split_axis += num_axes; }
+    int64_t split_axis = sbp_parallel.split_parallel().axis();
     CHECK_GE_OR_RETURN(split_axis, 0);
     CHECK_LT_OR_RETURN(split_axis, num_axes);
-
     SbpSignatureBuilder sbp_signature_builder;
     if (is_for_input_op) {
       // broadcast tick args for InputOp
@@ -52,47 +56,17 @@ Maybe<void> GetSbpSignature(const InterfaceBlobConf& blob_conf, const PbRpf<std:
 
 Maybe<void> InterfaceOpUtil::InferOutBlobDesc(const InterfaceBlobConf& blob_conf,
                                               BlobDesc* out_blob_desc,
-                                              const ParallelContext* parallel_ctx) {
+                                              const ParallelContext* parallel_ctx,
+                                              const ParallelDesc& parallel_desc) {
   out_blob_desc->mut_shape() = Shape(blob_conf.shape());
   CheckShape(out_blob_desc->shape());
   CHECK_GT(out_blob_desc->mut_shape().At(0), 0);
   out_blob_desc->set_data_type(blob_conf.data_type());
   out_blob_desc->set_is_dynamic(blob_conf.is_dynamic());
-  // if (blob_conf.split_axis().has_value()) {
-  //  int64_t split_axis = blob_conf.split_axis().value();
-  //  BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_ctx->parallel_num());
-  //  out_blob_desc->mut_shape().Set(split_axis, bs.At(parallel_ctx->parallel_id()).size());
-  //}
   if (blob_conf.has_parallel_distribution()) {
-    const Shape& parallel_hierarchy = Shape(blob_conf.parallel_hierarchy());
-    if (parallel_hierarchy.NumAxes() == 1
-        || (blob_conf.parallel_distribution().sbp_parallel(0)
-            == blob_conf.parallel_distribution().sbp_parallel(1))) {
-      if (blob_conf.parallel_distribution().sbp_parallel(0).has_split_parallel()) {
-        int64_t split_axis =
-            blob_conf.parallel_distribution().sbp_parallel(0).split_parallel().axis();
-        BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_ctx->parallel_num());
-        out_blob_desc->mut_shape().Set(split_axis, bs.At(parallel_ctx->parallel_id()).size());
-      }
-    } else {
-      CHECK_EQ_OR_RETURN(parallel_hierarchy.NumAxes(), 2);
-      int64_t rank_id_0 = parallel_ctx->parallel_id() / parallel_hierarchy.At(1);
-      int64_t rank_id_1 = parallel_ctx->parallel_id() % parallel_hierarchy.At(1);
-      if (blob_conf.parallel_distribution().sbp_parallel(0).has_split_parallel()) {
-        int64_t split_axis =
-            blob_conf.parallel_distribution().sbp_parallel(0).split_parallel().axis();
-        BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_hierarchy.At(0));
-        out_blob_desc->mut_shape().Set(split_axis, bs.At(rank_id_0).size());
-      }
-      if (blob_conf.parallel_distribution().sbp_parallel(1).has_split_parallel()) {
-        int64_t split_axis =
-            blob_conf.parallel_distribution().sbp_parallel(1).split_parallel().axis();
-        BalancedSplitter bs(out_blob_desc->shape().At(split_axis), parallel_hierarchy.At(1));
-        out_blob_desc->mut_shape().Set(split_axis, bs.At(rank_id_1).size());
-      }
-    }
+    out_blob_desc->mut_shape() = *JUST(GetPhysicalShape(
+        out_blob_desc->shape(), blob_conf.parallel_distribution(), parallel_desc, *parallel_ctx));
   }
-  LOG(INFO) << "out_blob_desc " << out_blob_desc->shape().ToString();
   return Maybe<void>::Ok();
 }
 
@@ -130,21 +104,7 @@ Maybe<void> InterfaceOpUtil::InitBlobConf(InterfaceBlobConf* blob_conf,
   blob_desc.shape().ToProto(blob_conf->mutable_shape());
   blob_conf->set_data_type(blob_desc.data_type());
   blob_conf->set_is_dynamic(blob_desc.is_dynamic());
-  // TODO(liujuncheng): fully support
-  // CHECK_EQ_OR_RETURN(parallel_blob_conf.parallel_distribution().sbp_parallel_size(), 1);
-  const SbpParallel& sbp_parallel = parallel_blob_conf.parallel_distribution().sbp_parallel(0);
-  if (sbp_parallel.has_split_parallel()) {
-    int64_t axis = sbp_parallel.split_parallel().axis();
-    blob_conf->mutable_split_axis()->set_value(axis);
-  } else if (sbp_parallel.has_broadcast_parallel()) {
-    blob_conf->mutable_split_axis()->clear_value();
-  } else {
-    OF_UNIMPLEMENTED();
-  }
   *blob_conf->mutable_parallel_distribution() = parallel_blob_conf.parallel_distribution();
-  ParallelDesc(parallel_blob_conf.parallel_conf())
-      .hierarchy()
-      ->ToProto(blob_conf->mutable_parallel_hierarchy());
   LOG(INFO) << "InterfaceBlobConf " << blob_conf->DebugString();
   return Maybe<void>::Ok();
 }
