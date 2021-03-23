@@ -35,9 +35,7 @@ def _test_model_load_v2(test_case, distribution):
     @flow.global_function("train", function_config=func_config)
     def test_fn(x: flow.typing.Numpy.Placeholder((12, 4)),) -> flow.typing.Numpy:
         with flow.scope.placement("gpu", "0:0-3", (2, 2)):
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=distribution,
-            )
+            x = flow.hierarchical_parallel_cast(x, parallel_distribution=distribution,)
             v = flow.get_variable(
                 name="v",
                 shape=(12, 4),
@@ -45,9 +43,7 @@ def _test_model_load_v2(test_case, distribution):
                 initializer=flow.ones_initializer(),
             )
             x = x + v
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[4], parallel_distribution=["S(1)"]
-        )
+        x = flow.hierarchical_parallel_cast(x, parallel_distribution=["S(1)"])
         flow.optimizer.SGD(
             flow.optimizer.PiecewiseConstantScheduler([], [1e-3]), momentum=0
         ).minimize(x)
@@ -77,20 +73,15 @@ def _test_model_init_v2(test_case, distribution):
     @flow.global_function("train", function_config=func_config)
     def test_fn(x: flow.typing.Numpy.Placeholder((12, 4)),) -> flow.typing.Numpy:
         with flow.scope.placement("gpu", "0:0-3", (2, 2)):
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=distribution,
-            )
+            x = flow.hierarchical_parallel_cast(x, parallel_distribution=distribution,)
             v = flow.get_variable(
                 name="v",
                 shape=(12, 4),
                 parallel_distribution=distribution,
-                initializer=flow.ones_initializer(),
-                #initializer=flow.xavier_uniform_initializer(),
+                initializer=flow.xavier_uniform_initializer(),
             )
             x = x + v
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[4], parallel_distribution=["S(1)"]
-        )
+        x = flow.hierarchical_parallel_cast(x, parallel_distribution=["S(1)"])
         flow.optimizer.SGD(
             flow.optimizer.PiecewiseConstantScheduler([], [1e-3]), momentum=0
         ).minimize(x)
@@ -98,7 +89,6 @@ def _test_model_init_v2(test_case, distribution):
 
     check_point = flow.train.CheckPoint()
     check_point.init()
-    # x_arr = np.random.rand(12, 4).astype(np.float32)
     x_arr = np.zeros((12, 4)).astype(np.float32)
     y_arr = test_fn(x_arr)
 
@@ -119,9 +109,7 @@ def _test_model_save_v2(test_case, distribution):
     @flow.global_function("train", function_config=func_config)
     def test_fn(x: flow.typing.Numpy.Placeholder((12, 4)),) -> flow.typing.Numpy:
         with flow.scope.placement("gpu", "0:0-3", (2, 2)):
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=distribution,
-            )
+            x = flow.hierarchical_parallel_cast(x, parallel_distribution=distribution,)
             v = flow.get_variable(
                 name="v",
                 shape=(12, 4),
@@ -129,9 +117,7 @@ def _test_model_save_v2(test_case, distribution):
                 initializer=flow.ones_initializer(),
             )
             x = x + v
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[4], parallel_distribution=["S(1)"]
-        )
+        x = flow.hierarchical_parallel_cast(x, parallel_distribution=["S(1)"])
         flow.optimizer.SGD(
             flow.optimizer.PiecewiseConstantScheduler([], [1e-3]), momentum=0
         ).minimize(x)
@@ -140,7 +126,6 @@ def _test_model_save_v2(test_case, distribution):
     check_point = flow.train.CheckPoint()
     check_point.load("v_model")
     check_point.save("v2_save")
-    # x_arr = np.random.rand(12, 4).astype(np.float32)
     x_arr = np.zeros((12, 4)).astype(np.float32)
     y_arr = test_fn(x_arr)
 
