@@ -147,7 +147,6 @@ message VariableOpConf {
     InitializeWithSnapshotConf initialize_with_snapshot = 6;
   }
   optional string model_name = 7 [default = "weight"];
-  optional OptInt64 split_axis = 8;
   optional int64 random_seed = 9;
   optional RegularizerConf regularizer = 10;
   optional bool trainable = 11 [default = true];
