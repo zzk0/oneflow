@@ -61,19 +61,19 @@ Maybe<void> ForeignInputOp::GetSbpSignatures(SbpSignatureList* sbp_sig_list) con
 }
 
 Maybe<void> ForeignInputOp::InferParallelDistributionSignature(
-    ParallelDistributionSignature* signature,
-    const ParallelDistributionSignature& parallel_distribution_sig_conf,
+    ParallelDistributionSignature* parallel_distribution_signature,
+    const ParallelDistributionSignature& parallel_distribution_constraints,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-        ParallelDistributionInferHint4Ibn) {
+        ParallelDistributionInferHint4Ibn) const {
   const auto& parallel_hierarchy = parallel_desc.hierarchy();
   const InterfaceBlobConf& blob_conf = op_conf().foreign_input_conf().blob_conf();
   LOG(INFO) << "ForeignInputOp blob_conf" << blob_conf.DebugString();
 
   ParallelDistribution& in_parallel_distribution =
-      (*signature->mutable_bn_in_op2parallel_distribution())["tick"];
+      (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["tick"];
   ParallelDistribution& out_parallel_distribution =
-      (*signature->mutable_bn_in_op2parallel_distribution())["out"];
+      (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["out"];
   if (blob_conf.has_parallel_distribution()) {
     out_parallel_distribution = blob_conf.parallel_distribution();
   } else {

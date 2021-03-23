@@ -62,16 +62,16 @@ Maybe<void> OutputOp::InferSbpSignature(
 }
 
 Maybe<void> OutputOp::InferParallelDistributionSignature(
-    ParallelDistributionSignature* signature,
-    const ParallelDistributionSignature& parallel_distribution_sig_conf,
+    ParallelDistributionSignature* parallel_distribution_signature,
+    const ParallelDistributionSignature& parallel_distribution_constraints,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-        ParallelDistributionInferHint4Ibn) {
+        ParallelDistributionInferHint4Ibn) const {
   const InterfaceBlobConf& blob_conf = op_conf().output_conf().blob_conf();
   ParallelDistribution& in_parallel_distribution =
-      (*signature->mutable_bn_in_op2parallel_distribution())["in"];
+      (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["in"];
   ParallelDistribution& out_parallel_distribution =
-      (*signature->mutable_bn_in_op2parallel_distribution())["out"];
+      (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["out"];
   in_parallel_distribution = blob_conf.parallel_distribution();
   out_parallel_distribution = blob_conf.parallel_distribution();
   LOG(INFO) << "OutputOp op InferParallelDistributionSignature in:\n"

@@ -111,7 +111,7 @@ Maybe<void> VariableOp::InferParallelDistributionSignature(
     const ParallelDistributionSignature& parallel_distribution_sig_conf,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-        ParallelDistributionInferHint4Ibn) {
+        ParallelDistributionInferHint4Ibn) const {
   const auto& parallel_hierarchy = parallel_desc.hierarchy();
   const VariableOpConf& conf = this->op_conf().variable_conf();
   CHECK_EQ_OR_RETURN(conf.parallel_distribution_size(), parallel_hierarchy->NumAxes());
