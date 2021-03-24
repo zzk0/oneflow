@@ -675,13 +675,102 @@ class FlatSubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
   std::unique_ptr<SubTskGphBuilder> sub_tsk_gph_builder_;
 };
 
+class IntraGroupSubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(IntraGroupSubTskGphBuilder);
+  IntraGroupSubTskGphBuilder() {
+    std::vector<std::shared_ptr<SubTskGphBuilder>> builders;
+    builders.emplace_back(new OneToOneSubTskGphBuilder());
+    builders.emplace_back(new B21SubTskGphBuilder());
+    if (!Global<ResourceDesc, ForSession>::Get()->nccl_use_compute_stream()) {
+      builders.emplace_back(new CollectiveBoxingSubTskGphBuilder());
+    }
+    builders.emplace_back(new SliceBoxingSubTskGphBuilder());
+    builders.emplace_back(new NaiveB2BSubTskGphBuilder());
+    builders.emplace_back(new NaiveB2PSubTskGphBuilder());
+    sub_tsk_gph_builder_.reset(new ChainSubTskGphBuilder(builders));
+  }
+  ~IntraGroupSubTskGphBuilder() = default;
+
+  Maybe<SubTskGphBuilderStatus> Build(SubTskGphBuilderCtx* ctx,
+                                      const std::vector<TaskNode*>& sorted_in_tasks,
+                                      std::vector<TaskNode*>* sorted_out_tasks,
+                                      std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks,
+                                      const ParallelDesc& in_parallel_desc,
+                                      const ParallelDesc& out_parallel_desc,
+                                      const LogicalBlobId& lbi, const BlobDesc& logical_blob_desc,
+                                      const ParallelDistribution& in_parallel_distribution,
+                                      const ParallelDistribution& out_parallel_distribution,
+                                      const Shape& time_shape) const override {
+    CHECK_EQ(*in_parallel_desc.hierarchy(), *out_parallel_desc.hierarchy());
+    const auto& hierarchy = in_parallel_desc.hierarchy();
+    CHECK_EQ(hierarchy->NumAxes(), 2);
+    std::vector<SubTskGphBuilderStatus> status;
+    const int64_t num_groups = hierarchy->At(0);
+    const int64_t group_size = hierarchy->At(1);
+    sorted_ctrl_tasks->resize(out_parallel_desc.parallel_num());
+    sorted_out_tasks->resize(out_parallel_desc.parallel_num());
+    FOR_RANGE(int64_t, i, 0, num_groups) {
+      LOG(ERROR) << "IntraGroupSubTskGphBuilder " << i;
+      std::vector<TaskNode*> in_tasks;
+      std::vector<TaskNode*> out_tasks;
+      std::vector<std::vector<TaskNode*>> ctrl_tasks;
+      ParallelConf in_parallel_conf;
+      in_parallel_conf.set_device_tag(in_parallel_desc.device_tag());
+      in_parallel_conf.mutable_hierarchy()->add_dim(group_size);
+      ParallelConf out_parallel_conf;
+      out_parallel_conf.set_device_tag(out_parallel_desc.device_tag());
+      out_parallel_conf.mutable_hierarchy()->add_dim(group_size);
+      FOR_RANGE(int64_t, j, 0, group_size) {
+        const int64_t parallel_id = i * group_size + j;
+        in_tasks.push_back(sorted_in_tasks.at(parallel_id));
+        in_parallel_conf.add_device_name(
+            std::to_string(CHECK_JUST(in_parallel_desc.MachineId4ParallelId(parallel_id))) + ":"
+            + std::to_string(CHECK_JUST(in_parallel_desc.DeviceId4ParallelId(parallel_id))));
+        out_parallel_conf.add_device_name(
+            std::to_string(CHECK_JUST(out_parallel_desc.MachineId4ParallelId(parallel_id))) + ":"
+            + std::to_string(CHECK_JUST(out_parallel_desc.DeviceId4ParallelId(parallel_id))));
+      }
+      DimVector dim_vec = logical_blob_desc.shape().dim_vec();
+      if (in_parallel_distribution.sbp_parallel(0).has_split_parallel()) {
+        const int64_t axis = in_parallel_distribution.sbp_parallel(0).split_parallel().axis();
+        dim_vec.at(axis) /= hierarchy->At(0);
+      }
+      BlobDesc new_blob_desc(Shape(dim_vec), logical_blob_desc.data_type());
+      Maybe<SubTskGphBuilderStatus> boxing_builder_status = JUST(sub_tsk_gph_builder_->Build(
+          ctx, in_tasks, &out_tasks, &ctrl_tasks, ParallelDesc(in_parallel_conf),
+          ParallelDesc(out_parallel_conf), lbi, new_blob_desc,
+          in_parallel_distribution.sbp_parallel(1), out_parallel_distribution.sbp_parallel(1),
+          time_shape));
+      status.push_back(*CHECK_JUST(boxing_builder_status));
+      CHECK_EQ_OR_RETURN(out_tasks.size(), group_size);
+      FOR_RANGE(int64_t, j, 0, group_size) {
+        const int64_t parallel_id = i * group_size + j;
+        sorted_out_tasks->at(parallel_id) = out_tasks.at(j);
+        if (!ctrl_tasks.empty()) {
+          for (TaskNode* ctrl_node : ctrl_tasks.at(j)) {
+            sorted_ctrl_tasks->at(parallel_id).push_back(ctrl_node);
+          }
+        }
+      }
+    }
+    Maybe<SubTskGphBuilderStatus> composed_status = MakeComposedSubTskGphBuilderStatus(status);
+    return composed_status;
+  }
+
+ private:
+  std::unique_ptr<SubTskGphBuilder> sub_tsk_gph_builder_;
+};
+
 struct DispatchHierarchicalSubTskGphBuilder::Impl {
   Impl();
   std::unique_ptr<FlatSubTskGphBuilder> flat_sub_tsk_gph_builder_;
+  std::unique_ptr<IntraGroupSubTskGphBuilder> intra_group_sub_tsk_gph_builder_;
 };
 
 DispatchHierarchicalSubTskGphBuilder::Impl::Impl() {
   flat_sub_tsk_gph_builder_.reset(new FlatSubTskGphBuilder());
+  intra_group_sub_tsk_gph_builder_.reset(new IntraGroupSubTskGphBuilder());
 }
 
 DispatchHierarchicalSubTskGphBuilder::DispatchHierarchicalSubTskGphBuilder() {
@@ -725,13 +814,21 @@ Maybe<SubTskGphBuilderStatus> DispatchHierarchicalSubTskGphBuilder::Build(
         reduced_out_parallel_desc, lbi, logical_blob_desc, reduced_in_parallel_distribution,
         reduced_out_parallel_distribution, time_shape);
   } else if (reduced_in_parallel_hierarchy == reduced_out_parallel_hierarchy) {
-    //(2, 3)[s0, s1]->(2, 3)[B, B]
-    LOG(INFO) << "reduced_in_parallel_hierarchy == reduced_out_parallel_hierarchy";
-    return BuildSameParallelHierarchySubTskGph(
-        ctx, sub_tsk_gph_builder_, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks,
-        in_parallel_desc, out_parallel_desc, lbi, logical_blob_desc, reduced_in_parallel_hierarchy,
-        reduced_out_parallel_hierarchy, reduced_in_parallel_distribution,
-        reduced_out_parallel_distribution, time_shape);
+    if (reduced_in_parallel_distribution.sbp_parallel(0)
+        == reduced_out_parallel_distribution.sbp_parallel(0)) {
+      return impl_->intra_group_sub_tsk_gph_builder_->Build(
+          ctx, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks, reduced_in_parallel_desc,
+          reduced_out_parallel_desc, lbi, logical_blob_desc, reduced_in_parallel_distribution,
+          reduced_out_parallel_distribution, time_shape);
+    } else {
+      //(2, 3)[s0, s1]->(2, 3)[B, B]
+      LOG(INFO) << "reduced_in_parallel_hierarchy == reduced_out_parallel_hierarchy";
+      return BuildSameParallelHierarchySubTskGph(
+          ctx, sub_tsk_gph_builder_, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks,
+          in_parallel_desc, out_parallel_desc, lbi, logical_blob_desc,
+          reduced_in_parallel_hierarchy, reduced_out_parallel_hierarchy,
+          reduced_in_parallel_distribution, reduced_out_parallel_distribution, time_shape);
+    }
   } else if (reduced_in_parallel_hierarchy.elem_cnt()
              == reduced_out_parallel_hierarchy.elem_cnt()) {
     //(2, 3)[s0, s1]->(3,2)[B, B]
