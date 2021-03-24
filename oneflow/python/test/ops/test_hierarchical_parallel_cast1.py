@@ -34,32 +34,27 @@ def _test_gather_train(test_case):
         x = flow.identity(x)
         with flow.scope.placement("gpu", "0:0-3", (2, 2)):
             x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
+                x, parallel_distribution=["S(0)", "S(0)"]
             )
             v = flow.get_variable(
                 name="v",
                 shape=(1024, 4),
-                parallel_hierarchy=(2, 2),
                 parallel_distribution=["S(0)", "S(0)"],
                 initializer=flow.zeros_initializer(),
             )
             x = x + v
             indices = flow.hierarchical_parallel_cast(
-                indices, parallel_hierarchy=[2, 2], parallel_distribution=["B", "B"]
+                indices, parallel_distribution=["B", "B"]
             )
             x = flow.gather(x, indices)
             x = flow.hierarchical_parallel_cast(
                 x,
-                parallel_hierarchy=[2, 2],
                 parallel_distribution=["B", "S(1)"],
                 grad_mode="manual",
-                grad_parallel_hierarchy=[2, 2],
                 grad_parallel_distribution=["B", "B"],
             )
             x = flow.math.relu(x)
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[4], parallel_distribution=["B"]
-        )
+        x = flow.hierarchical_parallel_cast(x, parallel_distribution=["B"])
         flow.optimizer.SGD(
             flow.optimizer.PiecewiseConstantScheduler([], [1e-3]), momentum=0
         ).minimize(x)
@@ -87,13 +82,11 @@ def _test_slice(test_case):
         x = flow.identity(x)
         with flow.scope.placement("gpu", "0:0-3", (2, 2)):
             x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "S(0)"]
+                x, parallel_distribution=["S(0)", "S(0)"]
             )
             x = flow.slice(x, begin=(None, 1), size=(None, x.shape[1] - 1))
             x = flow.math.relu(x)
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[4], parallel_distribution=["B"]
-        )
+        x = flow.hierarchical_parallel_cast(x, parallel_distribution=["B"])
         return x
 
     x_arr = np.random.rand(1024, 1024).astype(np.float32)
@@ -114,14 +107,10 @@ def _test_reshape(test_case):
     def test_fn(x: flow.typing.Numpy.Placeholder((1024, 1024)),) -> flow.typing.Numpy:
         x = flow.identity(x)
         with flow.scope.placement("gpu", "0:0-3", (2, 2)):
-            x = flow.hierarchical_parallel_cast(
-                x, parallel_hierarchy=[2, 2], parallel_distribution=["S(0)", "B"]
-            )
+            x = flow.hierarchical_parallel_cast(x, parallel_distribution=["S(0)", "B"])
             x = flow.reshape(x, (512, 2048))
             x = flow.math.relu(x)
-        x = flow.hierarchical_parallel_cast(
-            x, parallel_hierarchy=[4], parallel_distribution=["B"]
-        )
+        x = flow.hierarchical_parallel_cast(x, parallel_distribution=["B"])
         return x
 
     x_arr = np.random.rand(1024, 1024).astype(np.float32)

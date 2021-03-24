@@ -15,7 +15,6 @@ limitations under the License.
 */
 #include "oneflow/core/operator/foreign_input_op.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
-#include "oneflow/core/operator/interface_op_util.h"
 
 namespace oneflow {
 

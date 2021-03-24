@@ -115,10 +115,12 @@ class UserKernelInitContext final : public user_op::KernelInitContext {
           user_op::UserOpConfWrapper(kernel_conf.op_attribute().op_conf())),
         device_ctx_(device_ctx),
         base_ctx_(UserKernelBaseContext(kernel_conf, job_desc)),
-        // sbp_signature_(&(kernel_conf.op_attribute().sbp_signature())),
         parallel_desc_(kernel_conf.op_attribute().parallel_conf_signature().op_parallel_conf()),
         parallel_distribution_signature_(
             &(kernel_conf.op_attribute().parallel_distribution_signature())) {
+    if (kernel_conf.op_attribute().has_sbp_signature()) {
+      sbp_signature_ = &kernel_conf.op_attribute().sbp_signature();
+    }
     for (const auto& pair :
          kernel_conf.op_attribute().logical_blob_desc_signature().bn_in_op2blob_desc()) {
       arg2logical_tensor_desc_.emplace(GenUnRepeatedBn(pair.first),
@@ -146,6 +148,7 @@ class UserKernelInitContext final : public user_op::KernelInitContext {
   }
   const SbpParallel& SbpParallel4ArgNameAndIndex(const std::string& arg_name,
                                                  int32_t index) const override {
+    CHECK_EQ(parallel_desc_.hierarchy()->NumAxes(), 1);
     const auto& bn2sbp = sbp_signature_->bn_in_op2sbp_parallel();
     std::string bn = GenRepeatedBn(arg_name, index);
     auto it = bn2sbp.find(bn);
@@ -162,8 +165,6 @@ class UserKernelInitContext final : public user_op::KernelInitContext {
     CHECK(it != bn2parallel_distribution.end());
     return it->second;
   }
-
-  const Shape& ParallelHierarchy() const override { return *parallel_desc_.hierarchy(); }
 
   const ArgVec& inputs() const override { return base_ctx_.inputs(); }
   const ArgVec& outputs() const override { return base_ctx_.outputs(); }

@@ -15,7 +15,7 @@ limitations under the License.
 */
 #include "oneflow/core/framework/framework.h"
 #include "oneflow/core/kernel/gather_kernel_util.h"
-#include "oneflow/core/common/balanced_splitter.h"
+#include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
 
 namespace oneflow {
 
@@ -53,50 +53,20 @@ class GatherKernel final : public user_op::OpKernel {
     const auto axis = ctx->Attr<int64_t>("axis");
     const ParallelDistribution& in_parallel_distribution =
         ctx->ParallelDistribution4ArgNameAndIndex("in", 0);
-    const ParallelDistribution& indices_parallel_distribution =
-        ctx->ParallelDistribution4ArgNameAndIndex("indices", 0);
-    const ParallelDistribution& out_parallel_distribution =
-        ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
-    LOG(INFO) << "in_parallel_distribution:\n " << in_parallel_distribution.DebugString();
-    const Shape& parallel_hierarchy = ctx->ParallelHierarchy();
-    CHECK_EQ(parallel_hierarchy.NumAxes(), in_parallel_distribution.sbp_parallel_size());
-    CHECK_EQ(parallel_hierarchy.NumAxes(), indices_parallel_distribution.sbp_parallel_size());
-    CHECK_EQ(parallel_hierarchy.NumAxes(), out_parallel_distribution.sbp_parallel_size());
-    const int64_t parallel_id = ctx->parallel_ctx().parallel_id();
+    // const ParallelDistribution& indices_parallel_distribution =
+    //    ctx->ParallelDistribution4ArgNameAndIndex("indices", 0);
+    // const ParallelDistribution& out_parallel_distribution =
+    //    ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
+
     const TensorDesc* in_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("in", 0);
-    const int64_t gather_dim_size = in_logical_desc->shape().At(axis);
-    if (parallel_hierarchy.NumAxes() == 1) {
-      const SbpParallel& in_sbp = in_parallel_distribution.sbp_parallel(0);
-      if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == axis
-          && ctx->parallel_ctx().parallel_num() > 1) {
-        CHECK(indices_parallel_distribution.sbp_parallel(0).has_broadcast_parallel());
-        CHECK(out_parallel_distribution.sbp_parallel(0).has_partial_sum_parallel());
-        BalancedSplitter bs(gather_dim_size, ctx->parallel_ctx().parallel_num());
-        return std::make_shared<GatherOpKernelState>(bs.At(parallel_id).begin(),
-                                                     bs.At(parallel_id).end());
-      } else {
-        return std::shared_ptr<OpKernelState>(nullptr);
-      }
-    } else {
-      int64_t lower = 0;
-      int64_t upper = gather_dim_size;
-      FOR_RANGE(int64_t, i, 0, parallel_hierarchy.NumAxes()) {
-        const SbpParallel& in_sbp = in_parallel_distribution.sbp_parallel(i);
-        const int64_t rank_id =
-            (parallel_id % parallel_hierarchy.Count(i)) / parallel_hierarchy.Count(i + 1);
-        if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == axis
-            && ctx->parallel_ctx().parallel_num() > 1) {
-          CHECK(indices_parallel_distribution.sbp_parallel(i).has_broadcast_parallel());
-          CHECK(out_parallel_distribution.sbp_parallel(i).has_partial_sum_parallel());
-          const int64_t range_size = (upper - lower) / parallel_hierarchy.At(i);
-          lower = lower + rank_id * range_size;
-          upper = lower + range_size;
-        }
-      }
-      LOG(INFO) << " gather parallel_id: " << parallel_id << "  lower: " << lower
-                << " upper: " << upper;
-      return std::make_shared<GatherOpKernelState>(lower, upper);
-    }
+    TensorSliceView view = SubTskGphBuilderUtil::GetTensorSliceView4ParallelId(
+        *ctx->parallel_desc().hierarchy(), in_parallel_distribution, in_logical_desc->shape(),
+        ctx->parallel_ctx().parallel_id());
+
+    LOG(INFO) << "in_parallel_distribution:\n " << in_parallel_distribution.DebugString();
+    LOG(INFO) << " gather parallel_id: " << ctx->parallel_ctx().parallel_id()
+              << "  lower: " << view.At(axis).begin() << " upper: " << view.At(axis).end();
+    return std::make_shared<GatherOpKernelState>(view.At(axis).begin(), view.At(axis).end());
   }
 
  private:
