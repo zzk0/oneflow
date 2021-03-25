@@ -27,62 +27,6 @@ limitations under the License.
 
 namespace oneflow {
 namespace one {
-namespace {
-Maybe<void> GetUserOpGradConf(const UserOpExpr* fw_op_expr, std::vector<OperatorConf>* bw_op_confs) {
-  OperatorConf op_conf;
-  fw_op_expr->BuildOpConf(&op_conf);
-
-  UserOp op_adapter;
-  op_conf.set_device_tag("cpu");
-  op_adapter.Init(op_conf);
-
-  std::cout << "fw_op_expr op_name " << fw_op_expr->op_name() << std::endl;
-  for (const auto& in_bn : fw_op_expr->indexed_ibns()) {
-    std::cout << "fw_op_expr ibn " << in_bn << std::endl;
-  }
-  for (const auto& out_bn : fw_op_expr->indexed_obns()) {
-    std::cout << "fw_op_expr obn " << out_bn << std::endl;
-  }
-  HashMap<std::string, LogicalBlobId> in_rbn2diff_lbi;
-  HashMap<std::string, LogicalBlobId> out_rbn2diff_lbi;
-  auto DiffLbi4BnInOp = [&](const std::string& rbn) -> LogicalBlobId* {
-    if (std::find(fw_op_expr->indexed_ibns().begin(), fw_op_expr->indexed_ibns().end(), rbn)
-        != fw_op_expr->indexed_ibns().end()) {
-      return &in_rbn2diff_lbi[rbn];
-    } else if (std::find(fw_op_expr->indexed_obns().begin(), fw_op_expr->indexed_obns().end(), rbn)
-               != fw_op_expr->indexed_obns().end()) {
-      auto find_iter = out_rbn2diff_lbi.find(rbn);
-      if (find_iter == out_rbn2diff_lbi.end()) {
-        LogicalBlobId lbi;
-        lbi.set_op_name("_");
-        lbi.set_blob_name(rbn);
-        out_rbn2diff_lbi.emplace(rbn, lbi);
-      }
-      return &out_rbn2diff_lbi[rbn];
-    } else {
-      return nullptr;
-    }
-  };
-
-  const auto& dummy_blob_desc = BlobDesc(Shape(), DataType::kInvalidDataType);
-  auto LogicalBlobDesc4BnInOp = [&](const std::string& bn) -> const BlobDesc& {
-    return dummy_blob_desc;
-  };
-
-  const auto& op_type_case = op_conf.op_type_case();
-  CHECK_OR_RETURN((IsClassRegistered<int32_t, GenerateBackwardOpConfWrapperStruct>(op_type_case)));
-  std::unique_ptr<GenerateBackwardOpConfWrapperStruct> obj;
-  obj.reset(NewObj<int32_t, GenerateBackwardOpConfWrapperStruct>(op_type_case));
-  JUST(obj->Call(op_adapter, bw_op_confs, DiffLbi4BnInOp, LogicalBlobDesc4BnInOp));
-  for(const auto& pair : in_rbn2diff_lbi) {
-    std::cout << "in bn " << pair.first << " diff lib " << pair.second.DebugString() << std::endl;
-  }
-  for(const auto& pair : out_rbn2diff_lbi) {
-    std::cout << "out bn " << pair.first << " diff lib " << pair.second.DebugString() << std::endl;
-  }
-  return Maybe<void>::Ok();
-}
-}  // namespace
 
 class UserOpExprGrad : public OpExprGrad {
  public:
@@ -99,15 +43,65 @@ class UserOpExprGrad : public OpExprGrad {
   }
 
   Maybe<void> Capture(OpExprInterpState* ctx, const TensorTuple& inputs,
-                      const TensorTuple& outputs) const override {}
+                      const TensorTuple& outputs) const override {
+    return Maybe<void>::Ok();
+  }
 
   Maybe<void> DoBackward(const OpExprInterpState* ctx, const TensorTuple& out_grads,
-                         TensorTuple* in_grads) const override {}
+                         TensorTuple* in_grads) const override {
+    return Maybe<void>::Ok();
+  }
+
+  Maybe<void> GetUserOpGradConf(const UserOpExpr* fw_op_expr,
+                                std::vector<OperatorConf>* bw_op_confs);
 
  private:
   std::vector<std::shared_ptr<OpExpr>> backward_ops_;
+
+  HashMap<std::string, LogicalBlobId> in_bn2diff_lbi_;
+  HashMap<std::string, LogicalBlobId> out_bn2diff_lbi_;
 };
 
-REGISTER_OP_EXPR_GRAD("UserOp", UserOpExprGrad);
+Maybe<void> UserOpExprGrad::GetUserOpGradConf(const UserOpExpr* fw_op_expr,
+                                              std::vector<OperatorConf>* bw_op_confs) {
+  OperatorConf op_conf;
+  fw_op_expr->BuildOpConf(&op_conf);
+  op_conf.set_device_tag("cpu");
+  UserOp op_adapter;
+  op_adapter.Init(op_conf);
+
+  auto DiffLbi4BnInOp = [&](const std::string& bn) -> LogicalBlobId* {
+    if (std::find(fw_op_expr->indexed_ibns().begin(), fw_op_expr->indexed_ibns().end(), bn)
+        != fw_op_expr->indexed_ibns().end()) {
+      return &in_bn2diff_lbi_[bn];
+    } else if (std::find(fw_op_expr->indexed_obns().begin(), fw_op_expr->indexed_obns().end(), bn)
+               != fw_op_expr->indexed_obns().end()) {
+      auto it = out_bn2diff_lbi_.find(bn);
+      if (it == out_bn2diff_lbi_.end()) {
+        LogicalBlobId lbi;
+        lbi.set_op_name("_");
+        lbi.set_blob_name(bn);
+        it = out_bn2diff_lbi_.emplace(bn, lbi).first;
+      }
+      return &(it->second);
+    } else {
+      LOG(FATAL) << "diff lbi for bn in op not found, bn: " << fw_op_expr->op_name() << "/" << bn;
+    }
+    return nullptr;
+  };
+  const auto& dummy_blob_desc = BlobDesc(Shape(), DataType::kInvalidDataType);
+  auto LogicalBlobDesc4BnInOp = [&](const std::string& bn) -> const BlobDesc& {
+    return dummy_blob_desc;
+  };
+
+  const auto& op_type_case = op_conf.op_type_case();
+  CHECK_OR_RETURN((IsClassRegistered<int32_t, GenerateBackwardOpConfWrapperStruct>(op_type_case)));
+  std::unique_ptr<GenerateBackwardOpConfWrapperStruct> obj;
+  obj.reset(NewObj<int32_t, GenerateBackwardOpConfWrapperStruct>(op_type_case));
+  JUST(obj->Call(op_adapter, bw_op_confs, DiffLbi4BnInOp, LogicalBlobDesc4BnInOp));
+  return Maybe<void>::Ok();
+}
+
+REGISTER_OP_EXPR_GRAD("matmul", UserOpExprGrad);
 }  // namespace one
 }  // namespace oneflow
