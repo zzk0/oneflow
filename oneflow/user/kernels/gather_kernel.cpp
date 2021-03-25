@@ -18,6 +18,7 @@ limitations under the License.
 #include "oneflow/core/job/parallel_distribution_util.h"
 
 namespace oneflow {
+
 namespace user_op {
 
 namespace {
@@ -94,8 +95,6 @@ class GatherKernel final : public user_op::OpKernel {
       CHECK_NOTNULL(gather_state);
       CHECK_EQ(in->shape().At(axis), gather_state->upper() - gather_state->lower());
       offset = gather_state->lower();
-      LOG(INFO) << "id: " << ctx->parallel_ctx().parallel_id() << "lower: " << gather_state->lower()
-                << "upper" << gather_state->upper();
     }
 
     GatherKernelUtilImpl<device_type, T, K>::Forward(

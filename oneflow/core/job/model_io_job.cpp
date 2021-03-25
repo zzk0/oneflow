@@ -231,12 +231,12 @@ void MakeModelIoJobs(const std::vector<std::shared_ptr<Job>>& jobs,
                      var_op_name2parallel_blob_conf);
     Handler(&model_load_job);
   }
-  //{
-  //  Job model_save_job;
-  //  MakeModelSaveJob("System-ModelSave", &model_save_job, var_op_name2op_conf,
-  //                   var_op_name2parallel_blob_conf);
-  //  Handler(&model_save_job);
-  //}
+  {
+    Job model_save_job;
+    MakeModelSaveJob("System-ModelSave", &model_save_job, var_op_name2op_conf,
+                     var_op_name2parallel_blob_conf);
+    Handler(&model_save_job);
+  }
 }
 
 }  // namespace oneflow

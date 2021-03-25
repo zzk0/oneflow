@@ -510,7 +510,6 @@ void GetMemSharingOpBlobInfo(const JobBuilder& job_builder, const std::string& o
                                                     .at(op_name)
                                                     .bn_in_op2parallel_distribution()
                                                     .at(obn);
-  LOG(INFO) << "op " << op_name << " " << lbn << " blob_conf:\n" << blob_conf->DebugString();
 }
 
 void FilterOpName2ParallelBlobConf(

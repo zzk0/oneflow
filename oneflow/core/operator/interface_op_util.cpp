@@ -99,7 +99,6 @@ Maybe<void> InterfaceOpUtil::GetOutputLikeOpSbpSignature(const InterfaceBlobConf
 
 Maybe<void> InterfaceOpUtil::InitBlobConf(InterfaceBlobConf* blob_conf,
                                           const ParallelBlobConf& parallel_blob_conf) {
-  LOG(INFO) << "parallel_blob_conf " << parallel_blob_conf.DebugString();
   BlobDesc blob_desc(parallel_blob_conf.logical_blob_desc_conf());
   blob_desc.shape().ToProto(blob_conf->mutable_shape());
   blob_conf->set_data_type(blob_desc.data_type());
