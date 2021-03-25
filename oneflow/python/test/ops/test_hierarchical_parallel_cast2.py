@@ -223,10 +223,6 @@ class TestHierarchicalParallelCast(flow.unittest.TestCase):
             ["S(1)"],
             ["B"],
         ]
-        arg_dict["src"] = [
-            "(P, S0)",
-        ]
-        arg_dict["dst"] = [["S(0)", "S(0)"]]
         for arg in GenArgList(arg_dict):
             print(*arg)
             _test_gather(test_case, *arg)

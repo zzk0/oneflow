@@ -29,8 +29,8 @@ Maybe<void> OutputOp::InferLogicalOutBlobDescs(
     const std::function<BlobDesc*(const std::string&)>& BlobDesc4BnInOp,
     const ParallelDesc& parallel_desc) const {
   BlobDesc* out_blob_desc = BlobDesc4BnInOp("out");
-  InterfaceOpUtil::InferLogicalOutBlobDesc(op_conf().output_conf().blob_conf(), out_blob_desc,
-                                           parallel_desc);
+  JUST(InterfaceOpUtil::InferLogicalOutBlobDesc(op_conf().output_conf().blob_conf(), out_blob_desc,
+                                                parallel_desc));
   return Maybe<void>::Ok();
 }
 
@@ -42,10 +42,8 @@ Maybe<void> OutputOp::InferOutBlobDescs(
   if (in_blob_desc->is_dynamic()) {
     *out_blob_desc = *in_blob_desc;
   } else {
-    InterfaceOpUtil::InferOutBlobDesc(op_conf().output_conf().blob_conf(), out_blob_desc,
-                                      parallel_ctx, *JUST(GetOpParallelDesc()));
-    LOG(INFO) << "output op in_blob_desc" << in_blob_desc->shape().DebugStr();
-    LOG(INFO) << "output op out_blob_desc" << out_blob_desc->shape().DebugStr();
+    JUST(InterfaceOpUtil::InferOutBlobDesc(op_conf().output_conf().blob_conf(), out_blob_desc,
+                                           parallel_ctx, *JUST(GetOpParallelDesc())));
     CHECK_OR_RETURN(*out_blob_desc == *in_blob_desc);
   }
   return Maybe<void>::Ok();
@@ -56,8 +54,8 @@ Maybe<void> OutputOp::InferSbpSignature(
     const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
     std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
     const ParallelDesc& parallel_desc) const {
-  InterfaceOpUtil::GetOutputLikeOpSbpSignature(op_conf().output_conf().blob_conf(), input_bns(),
-                                               output_bns(), sbp_signature);
+  JUST(InterfaceOpUtil::GetOutputLikeOpSbpSignature(op_conf().output_conf().blob_conf(),
+                                                    input_bns(), output_bns(), sbp_signature));
   return Maybe<void>::Ok();
 }
 
@@ -72,13 +70,10 @@ Maybe<void> OutputOp::InferParallelDistributionSignature(
       (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["in"];
   ParallelDistribution& out_parallel_distribution =
       (*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())["out"];
-  InterfaceOpUtil::ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc,
-                                                         &in_parallel_distribution);
-  InterfaceOpUtil::ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc,
-                                                         &out_parallel_distribution);
-  LOG(INFO) << "OutputOp op InferParallelDistributionSignature in:\n"
-            << in_parallel_distribution.DebugString() << "\nout:\n"
-            << out_parallel_distribution.DebugString();
+  JUST(InterfaceOpUtil::ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc,
+                                                              &in_parallel_distribution));
+  JUST(InterfaceOpUtil::ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc,
+                                                              &out_parallel_distribution));
 
   return Maybe<void>::Ok();
 }

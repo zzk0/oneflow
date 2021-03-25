@@ -15,10 +15,9 @@ limitations under the License.
 */
 #include "oneflow/core/framework/framework.h"
 #include "oneflow/core/kernel/gather_kernel_util.h"
-#include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
+#include "oneflow/core/job/parallel_distribution_util.h"
 
 namespace oneflow {
-
 namespace user_op {
 
 namespace {
@@ -40,6 +39,23 @@ class GatherOpKernelState final : public user_op::OpKernelState {
   const int64_t upper_;
 };
 
+void CheckParallelDistribution(const Shape& hierarchy, int64_t gather_axis,
+                               const ParallelDistribution& in_parallel_distribution,
+                               const ParallelDistribution& indices_parallel_distribution,
+                               const ParallelDistribution& out_parallel_distribution) {
+  CHECK_EQ(hierarchy.NumAxes(), in_parallel_distribution.sbp_parallel_size());
+  CHECK_EQ(hierarchy.NumAxes(), indices_parallel_distribution.sbp_parallel_size());
+  CHECK_EQ(hierarchy.NumAxes(), in_parallel_distribution.sbp_parallel_size());
+  if (hierarchy.elem_cnt() == 1) { return; }
+  FOR_RANGE(int64_t, i, 0, hierarchy.NumAxes()) {
+    const auto& in_sbp = in_parallel_distribution.sbp_parallel(i);
+    if (in_sbp.has_split_parallel() && in_sbp.split_parallel().axis() == gather_axis) {
+      CHECK(indices_parallel_distribution.sbp_parallel(i).has_broadcast_parallel());
+      CHECK(out_parallel_distribution.sbp_parallel(i).has_partial_sum_parallel());
+    }
+  }
+}
+
 }  // namespace
 
 template<DeviceType device_type, typename T, typename K>
@@ -53,19 +69,14 @@ class GatherKernel final : public user_op::OpKernel {
     const auto axis = ctx->Attr<int64_t>("axis");
     const ParallelDistribution& in_parallel_distribution =
         ctx->ParallelDistribution4ArgNameAndIndex("in", 0);
-    // const ParallelDistribution& indices_parallel_distribution =
-    //    ctx->ParallelDistribution4ArgNameAndIndex("indices", 0);
-    // const ParallelDistribution& out_parallel_distribution =
-    //    ctx->ParallelDistribution4ArgNameAndIndex("out", 0);
-
+    const Shape& hierarchy = *ctx->parallel_desc().hierarchy();
+    CheckParallelDistribution(hierarchy, axis, in_parallel_distribution,
+                              ctx->ParallelDistribution4ArgNameAndIndex("indices", 0),
+                              ctx->ParallelDistribution4ArgNameAndIndex("out", 0));
     const TensorDesc* in_logical_desc = ctx->LogicalTensorDesc4ArgNameAndIndex("in", 0);
-    TensorSliceView view = SubTskGphBuilderUtil::GetTensorSliceView4ParallelId(
-        *ctx->parallel_desc().hierarchy(), in_parallel_distribution, in_logical_desc->shape(),
-        ctx->parallel_ctx().parallel_id());
-
-    LOG(INFO) << "in_parallel_distribution:\n " << in_parallel_distribution.DebugString();
-    LOG(INFO) << " gather parallel_id: " << ctx->parallel_ctx().parallel_id()
-              << "  lower: " << view.At(axis).begin() << " upper: " << view.At(axis).end();
+    TensorSliceView view =
+        GetTensorSliceView4ParallelId(hierarchy, in_parallel_distribution, in_logical_desc->shape(),
+                                      ctx->parallel_ctx().parallel_id());
     return std::make_shared<GatherOpKernelState>(view.At(axis).begin(), view.At(axis).end());
   }
 

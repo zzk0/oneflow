@@ -37,7 +37,6 @@ import oneflow
 import oneflow_api.oneflow.core.register.logical_blob_id as lbi_util
 import oneflow_api
 import os
-import traceback
 
 
 blob_register = oneflow_api.GetDefaultBlobRegister()

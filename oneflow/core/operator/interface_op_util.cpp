@@ -59,7 +59,7 @@ Maybe<void> InterfaceOpUtil::InferOutBlobDesc(const InterfaceBlobConf& blob_conf
                                               const ParallelContext* parallel_ctx,
                                               const ParallelDesc& parallel_desc) {
   ParallelDistribution parallel_distribution;
-  ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc, &parallel_distribution);
+  JUST(ParseParallelDistributionFromBlobConf(blob_conf, parallel_desc, &parallel_distribution));
   out_blob_desc->mut_shape() = *JUST(GetPhysicalShape(
       Shape(blob_conf.shape()), parallel_distribution, parallel_desc, *parallel_ctx));
   out_blob_desc->set_data_type(blob_conf.data_type());
@@ -105,7 +105,6 @@ Maybe<void> InterfaceOpUtil::InitBlobConf(InterfaceBlobConf* blob_conf,
   blob_conf->set_data_type(blob_desc.data_type());
   blob_conf->set_is_dynamic(blob_desc.is_dynamic());
   *blob_conf->mutable_parallel_distribution() = parallel_blob_conf.parallel_distribution();
-  LOG(INFO) << "InterfaceBlobConf " << blob_conf->DebugString();
   return Maybe<void>::Ok();
 }
 

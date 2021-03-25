@@ -23,7 +23,7 @@ limitations under the License.
 #include "oneflow/core/graph/boxing/naive_b2p_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/b21_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/one_to_one_sub_task_graph_builder.h"
-#include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
+#include "oneflow/core/job/parallel_distribution_util.h"
 #include "oneflow/core/graph/slice_boxing_task_node.h"
 #include "oneflow/core/common/id_util.h"
 #include "oneflow/core/graph/id_serialization.h"
@@ -150,11 +150,6 @@ Maybe<SubTskGphBuilderStatus> Build2DSliceBoxingSubTskGph(
     const BlobDesc& logical_blob_desc, const Shape& in_parallel_hierarchy,
     const Shape& out_parallel_hierarchy, const ParallelDistribution& in_parallel_distribution,
     const ParallelDistribution& out_parallel_distribution, const Shape& time_shape) {
-  // CHECK_OR_RETURN(in_parallel_distribution.sbp_parallel(0).has_split_parallel());
-  // CHECK_OR_RETURN(in_parallel_distribution.sbp_parallel(1).has_split_parallel());
-  // CHECK_OR_RETURN(out_parallel_distribution.sbp_parallel(0).has_split_parallel());
-  // CHECK_OR_RETURN(out_parallel_distribution.sbp_parallel(1).has_split_parallel());
-
   const auto GetBoxingGpuThrdId = [](int64_t machine_id, int64_t dev_id,
                                      CudaWorkType work_type) -> int64_t {
     int64_t thrd_id = -1;
@@ -204,9 +199,9 @@ Maybe<SubTskGphBuilderStatus> Build2DSliceBoxingSubTskGph(
     return node;
   };
   LOG(INFO) << "Build2DSliceBoxingSubTskGph";
-  const std::vector<TensorSliceView> in_slices = SubTskGphBuilderUtil::GetTensorSliceView(
+  const std::vector<TensorSliceView> in_slices = GetTensorSliceView(
       in_parallel_hierarchy, in_parallel_distribution, logical_blob_desc.shape());
-  const std::vector<TensorSliceView> out_slices = SubTskGphBuilderUtil::GetTensorSliceView(
+  const std::vector<TensorSliceView> out_slices = GetTensorSliceView(
       out_parallel_hierarchy, out_parallel_distribution, logical_blob_desc.shape());
   const int64_t in_parallel_num = in_parallel_desc.parallel_num();
   const int64_t out_parallel_num = out_parallel_desc.parallel_num();
@@ -222,8 +217,8 @@ Maybe<SubTskGphBuilderStatus> Build2DSliceBoxingSubTskGph(
       SliceBoxingTaskNode* in_copy_node =
           CreateBoxingNode121(in_parallel_desc, in_id, intersection, kSliceBoxingTaskModeCopy);
       in_copy_node->ConnectToSrcNodeWithSlice(in_node, NewEdge(), in_slice);
-      TaskNode* proxy_node = ctx->GetProxyNode(in_copy_node, in_copy_node->MemZoneId121(),
-                                               out_node->machine_id(), out_node->MemZoneId121());
+      TaskNode* proxy_node =
+          ctx->task_graph()->GetProxyNode(in_copy_node, lbi, out_parallel_desc, out_id);
       SliceBoxingTaskNode* out_copy_node =
           CreateBoxingNode121(out_parallel_desc, out_id, intersection, kSliceBoxingTaskModeCopy);
       out_copy_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
@@ -303,9 +298,9 @@ Maybe<SubTskGphBuilderStatus> BuildSliceBoxingAddSubTskGph(
 
   LOG(INFO) << "Build2DSliceBoxingAddSubTskGph";
   // can not process P, B->B, B, only axis 1 has split
-  const std::vector<TensorSliceView> in_slices = SubTskGphBuilderUtil::GetTensorSliceView(
+  const std::vector<TensorSliceView> in_slices = GetTensorSliceView(
       in_parallel_hierarchy, in_parallel_distribution, logical_blob_desc.shape());
-  const std::vector<TensorSliceView> out_slices = SubTskGphBuilderUtil::GetTensorSliceView(
+  const std::vector<TensorSliceView> out_slices = GetTensorSliceView(
       out_parallel_hierarchy, out_parallel_distribution, logical_blob_desc.shape());
   const int64_t in_parallel_num = in_parallel_desc.parallel_num();
   const int64_t out_parallel_num = out_parallel_desc.parallel_num();
@@ -325,8 +320,8 @@ Maybe<SubTskGphBuilderStatus> BuildSliceBoxingAddSubTskGph(
       SliceBoxingTaskNode* in_copy_node =
           CreateBoxingNode121(in_parallel_desc, in_id, intersection, kSliceBoxingTaskModeCopy);
       in_copy_node->ConnectToSrcNodeWithSlice(in_node, NewEdge(), in_slice);
-      TaskNode* proxy_node = ctx->GetProxyNode(in_copy_node, in_copy_node->MemZoneId121(),
-                                               out_node->machine_id(), out_node->MemZoneId121());
+      TaskNode* proxy_node =
+          ctx->task_graph()->GetProxyNode(in_copy_node, lbi, out_parallel_desc, out_id);
       add_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
     }
     out_node->ConnectToSrcNodeWithSlice(add_node, NewEdge(), first_intersection);

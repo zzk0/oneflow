@@ -115,7 +115,6 @@ class ArgBlobDef(object):
         interface_blob_conf.is_dynamic = self.is_dynamic
         # NOTE(chengcheng): rm batch_axis, so set split_axis always = 0 for safe. will support
         #     set sbp in future, or will delete in multi-client
-
         sbp_parallel = sbp_parallel_pb.SbpParallel()
         sbp_parallel.split_parallel.axis = 0
         interface_blob_conf.parallel_distribution.sbp_parallel.extend([sbp_parallel])
