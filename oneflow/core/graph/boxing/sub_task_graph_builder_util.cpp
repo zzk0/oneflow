@@ -60,7 +60,6 @@ TensorSliceView SubTskGphBuilderUtil::GetTensorSliceView4ParallelRank(
     ranges[i].mut_end() = logical_shape.At(i);
   }
   if (parallel_hierarchy.NumAxes() == 1) {
-    CHECK_EQ(parallel_rank.size(), 1);
     const SbpParallel& sbp_parallel = parallel_distribution.sbp_parallel(0);
     if (sbp_parallel.has_split_parallel()) {
       const int64_t axis = sbp_parallel.split_parallel().axis();
