@@ -714,7 +714,7 @@ class IntraGroupSubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
       sorted_ctrl_tasks->resize(out_parallel_desc.parallel_num());
       sorted_out_tasks->resize(out_parallel_desc.parallel_num());
       FOR_RANGE(int64_t, i, 0, num_groups) {
-        LOG(ERROR) <<"IntraGroupSubTskGphBuilder "<<i;
+        LOG(INFO) << "IntraGroupSubTskGphBuilder " << i;
         std::vector<TaskNode*> in_tasks;
         std::vector<TaskNode*> out_tasks;
         std::vector<std::vector<TaskNode*>> ctrl_tasks;
@@ -797,7 +797,7 @@ class InterGroupSubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
       sorted_ctrl_tasks->resize(out_parallel_desc.parallel_num());
       sorted_out_tasks->resize(out_parallel_desc.parallel_num());
       FOR_RANGE(int64_t, i, 0, group_size) {
-        LOG(ERROR) <<"InterGroupSubTskGphBuilder "<<i;
+        LOG(INFO) << "InterGroupSubTskGphBuilder " << i;
         std::vector<TaskNode*> in_tasks;
         std::vector<TaskNode*> out_tasks;
         std::vector<std::vector<TaskNode*>> ctrl_tasks;
