@@ -22,6 +22,7 @@ def _test_gather_train(test_case):
     flow.clear_default_session()
     flow.config.gpu_device_num(4)
     flow.config.enable_legacy_model_io(True)
+    flow.config.enable_model_io_v2(True)
     func_config = flow.FunctionConfig()
     func_config.default_data_type(flow.float32)
 

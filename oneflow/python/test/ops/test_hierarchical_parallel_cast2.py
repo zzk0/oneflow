@@ -36,8 +36,6 @@ def _test_gather(test_case, src, dst):
         x: flow.typing.Numpy.Placeholder((1024, 1024)),
         indices: flow.typing.Numpy.Placeholder(shape=(64,), dtype=flow.int32),
     ) -> flow.typing.Numpy:
-        x = flow.identity(x)
-        indices = flow.identity(indices)
         with flow.scope.placement("gpu", "0:0-3", (2, 2)):
             if src == "(S0, S0)":
                 x = flow.hierarchical_parallel_cast(x, parallel_distribution=["B", "B"])
@@ -175,7 +173,6 @@ def _test_gather(test_case, src, dst):
             else:
                 raise NotImplementedError
         x = flow.hierarchical_parallel_cast(x, parallel_distribution=["B"])
-        x = flow.identity(x)
         return x
 
     x_arr = np.random.rand(1024, 1024).astype(np.float32)
