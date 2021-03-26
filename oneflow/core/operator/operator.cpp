@@ -745,11 +745,14 @@ Maybe<void> Operator::InferParallelDistributionSignature(
             in_sbp = distribution.sbp_parallel(i);
           }
           if (sbp_signature.bn_in_op2sbp_parallel().at(ibn) != in_sbp) {
-            LOG(INFO) << op_name() << "  " << ibn << " not match "
-                      << sbp_signature.bn_in_op2sbp_parallel().at(ibn).DebugString() << " "
-                      << in_sbp.DebugString();
-            all_match = false;
-            break;
+            if (!(in_sbp.has_partial_sum_parallel()
+                  && sbp_signature.bn_in_op2sbp_parallel().at(ibn).has_broadcast_parallel())) {
+              LOG(INFO) << op_name() << "  " << ibn << " not match "
+                        << sbp_signature.bn_in_op2sbp_parallel().at(ibn).DebugString() << " "
+                        << in_sbp.DebugString();
+              all_match = false;
+              break;
+            }
           }
         }
         if (all_match) {

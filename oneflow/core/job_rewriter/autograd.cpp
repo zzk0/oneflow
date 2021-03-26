@@ -475,16 +475,18 @@ void CalcOutLbi2OutDiffLbi(const OpGraph& op_graph,
 
 void ForEachAggregatedParamGroup(
     const OpGraph& op_graph, const HashMap<LogicalBlobId, LogicalBlobId>& lbi2diff_lbi,
-    const std::function<void(const ParallelDesc& parallel_desc, const SbpParallel& sbp_parallel,
+    const std::function<void(const ParallelDesc& parallel_desc,
+                             const ParallelDistribution& parallel_distribution,
                              const std::vector<LogicalBlobId>& libs)>& Handler) {
   HashMap<LogicalBlobId, const ParallelDesc*> lbi2parallel_desc;
-  HashMap<std::pair<ParallelDesc, SbpParallel>, std::vector<LogicalBlobId>> group;
+  HashMap<std::pair<ParallelDesc, ParallelDistribution>, std::vector<LogicalBlobId>> group;
   for (auto& pair : lbi2diff_lbi) {
     const LogicalBlobId& lbi = pair.first;
     const OpNode* model_op_node = op_graph.OpNode4OpName(lbi.op_name());
     const ParallelDesc& parallel_desc = model_op_node->parallel_desc();
-    const SbpParallel& sbp_parallel = model_op_node->SbpParallel4Lbi(lbi);
-    group[std::make_pair(parallel_desc, sbp_parallel)].push_back(lbi);
+    const ParallelDistribution& parallel_distribution =
+        model_op_node->ParallelDistribution4Lbi(lbi);
+    group[std::make_pair(parallel_desc, parallel_distribution)].push_back(lbi);
   }
   for (const auto& pair : group) { Handler(pair.first.first, pair.first.second, pair.second); }
 }
@@ -530,7 +532,7 @@ void ClipGradientByGlobalNorm(const OpGraph& op_graph, JobBuilder* job_builder,
   std::vector<std::string> partial_square_sum_lbns;
   ForEachAggregatedParamGroup(
       op_graph, *lbi2diff_lbi,
-      [&](const ParallelDesc& parallel_desc, const SbpParallel& sbp_parallel,
+      [&](const ParallelDesc& parallel_desc, const ParallelDistribution& parallel_distribution,
           const std::vector<LogicalBlobId>& lbis) {
         if (parallel_desc != any_parallel_desc) { all_same_parallel_desc = false; }
         int64_t scope_symbol_id =
@@ -1020,7 +1022,7 @@ Maybe<void> CountNotFiniteIfNeeded(JobPassCtx* ctx, const OpGraph& op_graph,
   std::vector<std::string> partial_count_not_finite_lbns;
   ForEachAggregatedParamGroup(
       op_graph, lbi2diff_lbi,
-      [&](const ParallelDesc& parallel_desc, const SbpParallel& sbp_parallel,
+      [&](const ParallelDesc& parallel_desc, const ParallelDistribution& parallel_distribution,
           const std::vector<LogicalBlobId>& lbis) {
         if (parallel_desc != any_parallel_desc) { all_same_parallel_desc = false; }
         const int64_t scope_symbol_id =
