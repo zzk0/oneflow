@@ -50,7 +50,6 @@ class JobDesc final {
   int64_t concurrency_width() const { return job_conf_.concurrency_width(); }
   const JobConfigProto& job_conf() const { return job_conf_; }
   DataType DefaultDataType() const { return job_conf_.default_data_type(); }
-  bool EnableCudnn() const { return job_conf_.enable_cudnn(); }
   bool IsTrain() const { return job_conf_.has_train_conf(); }
   bool IsPredict() const { return job_conf_.has_predict_conf(); }
   bool use_memory_allocation_algorithm_v2() const {
@@ -64,7 +63,6 @@ class JobDesc final {
   };
   bool prune_parallel_cast_ops() const { return job_conf_.prune_parallel_cast_ops(); }
   bool prune_cast_to_static_shape_ops() const { return job_conf_.prune_cast_to_static_shape_ops(); }
-  int64_t cudnn_buf_limit_mbyte() const { return job_conf_.cudnn_buf_limit_mbyte(); }
 
   bool has_xrt_config() const { return job_conf_.has_xrt_config(); }
   const XrtConfig& xrt_config() const { return job_conf_.xrt_config(); }

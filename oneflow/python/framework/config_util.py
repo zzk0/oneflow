@@ -387,12 +387,123 @@ def api_collect_act_event(val: bool = True) -> None:
     """
     return enable_if.unique([collect_act_event, do_nothing])(val=val)
 
-
 @enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
 def collect_act_event(val=True):
     sess = session_ctx.GetDefaultSession()
     assert type(val) is int
     sess.config_proto.profile_conf.collect_act_event = val
+
+
+@oneflow_export("config.enable_cudnn")
+def api_enable_cudnn(val: bool = True) -> None:
+    r"""Whether use cudnn to accelerate job or not.
+
+    Args:
+        val (bool, optional): True or False. Defaults to True.
+    """
+    return enable_if.unique([enable_cudnn, do_nothing])(val=val)
+
+@enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
+def enable_cudnn(val=True):
+    sess = session_ctx.GetDefaultSession()
+    assert type(val) is bool
+    sess.config_proto.resource.cudnn_conf.enable_cudnn = val
+
+
+@oneflow_export("config.cudnn.buf_limit_mbyte")
+def api_set_cudnn_buf_limit_mbyte(val: int = 1024) -> None:
+    r"""Set cudnn buffer limit, e.g. 1024mb
+
+    Args:
+        val (int): cudnn buffer limit mbyte. Defaults to 1024mb.
+    """
+    return enable_if.unique([set_cudnn_buf_limit_mbyte, do_nothing])(val=val)
+
+@enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
+def set_cudnn_buf_limit_mbyte(val=1024):
+    sess = session_ctx.GetDefaultSession()
+    assert type(val) is int
+    sess.config_proto.resource.cudnn_conf.buf_limit_mbyte = val
+
+
+@oneflow_export("config.cudnn.conv_force_fwd_algo")
+def api_set_cudnn_conv_force_fwd_algo(val : int) -> None:
+    r"""Set value to cudnn conv_force_forward algorithm
+
+    Args:
+        val (int): cudnn conv_force_forward algorithm.
+    """
+    return enable_if.unique([set_cudnn_conv_force_fwd_algo, do_nothing])(val=val)
+
+@enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
+def set_cudnn_conv_force_fwd_algo(val):
+    sess = session_ctx.GetDefaultSession()
+    assert type(val) is int
+    sess.config_proto.resource.cudnn_conf.conv_force_fwd_algo = val
+
+
+@oneflow_export("config.cudnn.conv_force_bwd_data_algo")
+def api_set_cudnn_conv_force_bwd_data_algo(val : int) -> None:
+    r"""Set value to cudnn conv_force_backward_data algorithm
+
+    Args:
+        val (int): cudnn conv_force_backward_data algorithm.
+    """
+    return enable_if.unique([set_cudnn_conv_force_bwd_data_algo, do_nothing])(val=val)
+
+@enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
+def set_cudnn_conv_force_bwd_data_algo(val):
+    sess = session_ctx.GetDefaultSession()
+    assert type(val) is int
+    sess.config_proto.resource.cudnn_conf.conv_force_bwd_data_algo = val
+
+
+@oneflow_export("config.cudnn.conv_force_bwd_filter_algo")
+def api_set_cudnn_conv_force_bwd_filter_algo(val : int) -> None:
+    r"""Set value to cudnn conv_force_backward_filter algorithm
+
+    Args:
+        val (int): cudnn conv_force_backward_filter algorithm.
+    """
+    return enable_if.unique([set_cudnn_conv_force_bwd_filter_algo, do_nothing])(val=val)
+
+@enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
+def set_cudnn_conv_force_bwd_filter_algo(val):
+    sess = session_ctx.GetDefaultSession()
+    assert type(val) is int
+    sess.config_proto.resource.cudnn_conf.conv_force_bwd_filter_algo = val
+
+
+@oneflow_export("config.cudnn.conv_heuristic_search_algo")
+def api_set_cudnn_conv_heuristic_search_algo(val : bool = True) -> None:
+    r"""Set value to cudnn conv_heuristic_search algorithm
+
+    Args:
+        val (bool, optional): Set value to cudnn conv_heuristic_search algorithm. Defaults to True.
+    """
+    return enable_if.unique([set_cudnn_conv_heuristic_search_algo, do_nothing])(val=val)
+
+@enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
+def set_cudnn_conv_heuristic_search_algo(val=True):
+    sess = session_ctx.GetDefaultSession()
+    assert type(val) is bool
+    sess.config_proto.resource.cudnn_conf.conv_heuristic_search_algo = val
+
+
+@oneflow_export("config.cudnn.conv_use_deterministic_algo_only")
+def api_set_cudnn_conv_use_deterministic_algo_only(val : bool = False) -> None:
+    r"""Set value to cudnn conv_use_deterministic_algo_only algorithm
+
+    Args:
+        val (bool, optional): Set value to cudnn conv_use_deterministic_algo_only algorithm. Defaults to False.
+    """
+    return enable_if.unique([set_cudnn_conv_use_deterministic_algo_only, do_nothing])(val=val)
+
+@enable_if.condition(hob.in_normal_mode & ~hob.session_initialized)
+def set_cudnn_conv_use_deterministic_algo_only(val=False):
+    sess = session_ctx.GetDefaultSession()
+    assert type(val) is bool
+    sess.config_proto.resource.cudnn_conf.conv_use_deterministic_algo_only = val
 
 
 @oneflow_export("config.collective_boxing.enable_fusion")

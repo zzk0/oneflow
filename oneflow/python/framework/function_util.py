@@ -383,27 +383,6 @@ def show_static_mem_alloc_algo_white_list(func_desc):
     ]
 
 
-@oneflow_function_config("enable_cudnn")
-def set_enable_cudnn(func_desc, value=True):
-    r"""Whether use cudnn to accelerate job or not.
-
-    Args:
-        func_desc ([type]): [description]
-        value (bool, optional): [description]. Defaults to True.
-    """
-    func_desc.job_config_proto.set_enable_cudnn(value)
-
-
-@oneflow_function_config("cudnn_buf_limit_mbyte")
-def set_cudnn_buf_limit_mbyte(func_desc, value):
-    r"""Set cudnn buffer limit, e.g. 1024mb
-
-    Args:
-        func_desc ([type]): [description]
-        value ([type]): [description]
-    """
-    func_desc.job_config_proto.set_cudnn_buf_limit_mbyte(value)
-
 
 @oneflow_function_config("cudnn_conv_force_fwd_algo")
 def set_cudnn_conv_force_fwd_algo(func_desc, value):

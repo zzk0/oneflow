@@ -74,6 +74,14 @@ CollectiveBoxingConf ResourceDesc::collective_boxing_conf() const {
   }
 }
 
+CudnnConf ResourceDesc::cudnn_conf() const {
+  if (resource_.has_cudnn_conf()) {
+    return resource_.cudnn_conf();
+  } else {
+    return CudnnConf();
+  }
+}
+
 bool ResourceDesc::nccl_use_compute_stream() const {
 #if defined(WITH_CUDA) && NCCL_VERSION_CODE > 2700
   return resource_.nccl_use_compute_stream();
