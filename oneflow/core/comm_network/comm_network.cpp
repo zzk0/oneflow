@@ -65,6 +65,7 @@ void CommNet::ReadDone(void* read_id) {
       item = actor_read_ctx->waiting_list.front();
       actor_read_ctx->waiting_list.pop_front();
     }
+    if (!item.callback) { LOG(FATAL) << (item.debug_flag ? "True" : "False"); }
     CHECK(item.callback);
     ready_cbs_.Send(item.callback);
     if (item.is_read) { break; }
@@ -83,6 +84,7 @@ void CommNet::AddWorkToStream(void* actor_read_id, const std::function<void()>& 
   }
   if (is_read) {
     CommNetItem empty_cb;
+    empty_cb.debug_flag = true;
     actor_read_ctx->waiting_list.push_back(empty_cb);
   }
 }

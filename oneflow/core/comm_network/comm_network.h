@@ -28,8 +28,10 @@ namespace oneflow {
 struct CommNetItem {
   bool is_read;
   std::function<void()> callback;
-  CommNetItem() : CommNetItem(false, nullptr) {}
-  CommNetItem(bool read, const std::function<void()>& cb) : is_read(read), callback(cb) {}
+  bool debug_flag;
+  CommNetItem() : CommNetItem(false, nullptr) { debug_flag = false; }
+  CommNetItem(bool read, const std::function<void()>& cb)
+      : is_read(read), callback(cb), debug_flag(false) {}
 };
 
 class CommNet {
