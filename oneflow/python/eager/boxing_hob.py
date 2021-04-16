@@ -109,6 +109,16 @@ def SingleMachine(ctx):
     return list(blob_device_ids.keys()) == [0] and list(op_arg_device_ids.keys()) == [0]
 
 
+@bool_functor("SingleConsumerDevice")
+def SingleConsumerDevice(ctx):
+    return ctx.consumer_op_arg_parallel_attr.parallel_desc_symbol.parallel_num == 1
+
+
+@bool_functor("SingleProducerDevice")
+def SingleProducerDevice(ctx):
+    return ctx.produced_blob_object.parallel_desc_symbol.parallel_num == 1
+
+
 @bool_functor("MatchDeviceOneToOnePerMachine")
 def MatchDeviceOneToOnePerMachine(ctx):
     blob_device_ids = dict(

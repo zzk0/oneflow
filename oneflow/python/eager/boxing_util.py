@@ -67,8 +67,13 @@ def BoxingTo(builder, produced_blob_object, consumer_op_arg_parallel_attr):
         )
 
     global conditional_function_table
+    global mutli_machine_conditional_function_table
+    conditional_functios = []
+    conditional_functios.extend(conditional_function_table)
+    conditional_functios.extend(mutli_machine_conditional_function_table)
+
     function = enable_if.unique(
-        conditional_function_table,
+        conditional_functios,
         context=BoxingHobContext(produced_blob_object, consumer_op_arg_parallel_attr),
         default=default,
     )
@@ -402,7 +407,8 @@ MatchConcatManyToSplitMany = (
 
 
 MatchNaiveCpuSplitToSplit = (
-    (boxing_hob.producer_parallel_desc.device_tag == "cpu")
+    boxing_hob.SingleMachine
+    & (boxing_hob.producer_parallel_desc.device_tag == "cpu")
     & (boxing_hob.consumer_parallel_desc.device_tag == "cpu")
     & (MatchSplitOneToMany | MatchConcatManyToOne | MatchConcatManyToSplitMany)
 )
@@ -440,6 +446,32 @@ def NaiveCpuPartialSumToSplit(
         consumer_op_arg_parallel_attr,
         get_physical_out_blob_objects=NaiveBoxingToPhysicalBlobObjects,
     )
+
+
+MatchConsumerSingleDevice = boxing_hob.SingleMachine | boxing_hob.SingleConsumerDevice
+
+MatchProducerSingleDevice = boxing_hob.SingleMachine | boxing_hob.SingleProducerDevice
+
+
+@boxing_condition(MatchConsumerSingleDevice)
+def ConsumerSingleDevice(builder, produced_blob_object, consumer_op_arg_parallel_attr):
+    # do nothing
+    return
+
+
+@boxing_condition(MatchProducerSingleDevice)
+def ProducerSingleDevice(builder, produced_blob_object, consumer_op_arg_parallel_attr):
+    # do nothing
+    return
+
+
+MatchSingleDevice = MatchConsumerSingleDevice & MatchProducerSingleDevice
+
+
+@boxing_condition(MatchSingleDevice)
+def SingleDevice(builder, produced_blob_object, consumer_op_arg_parallel_attr):
+    # do nothing
+    return
 
 
 def NaiveCpuRefPhysicalBlobObjectsScope(
@@ -979,6 +1011,119 @@ conditional_function_table = [
             boxing_middle.ConsumerSbpParallel,
         ),
         OptionalBoxing(CopyH2D),
+    ),
+]
+
+mutli_machine_conditional_function_table = [
+    # B -> B
+    Sequential(
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(CopyD2H),
+            boxing_middle.ReplaceProducerDeviceTag("cpu"),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(BroadcastManyToOne),
+            boxing_middle.GetSineleDevice(),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(CpuBroadcastOneToMany),
+            boxing_middle.GetSineleMachineForConsumer(),
+            boxing_middle.ConsumerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(InterNodeOneToOne),
+            boxing_middle.ReplaceConsumerDeviceTag("cpu"),
+            boxing_middle.ConsumerSbpParallel,
+        ),
+        OptionalBoxing(CopyH2D),
+        exclude=(CopyH2D, CopyD2H, ConsumerSingleDevice, ProducerSingleDevice,),
+    ),
+    # S -> B
+    Sequential(
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(CopyD2H),
+            boxing_middle.ReplaceProducerDeviceTag("cpu"),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(InterNodeOneToOne),
+            boxing_middle.GetSineleMachineForProducer(),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(NaiveCpuSplitToSplit),
+            boxing_middle.GetSineleDevice(),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(CpuBroadcastOneToMany),
+            boxing_middle.GetSineleMachineForConsumer(),
+            boxing_middle.ConsumerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(InterNodeOneToOne),
+            boxing_middle.ReplaceConsumerDeviceTag("cpu"),
+            boxing_middle.ConsumerSbpParallel,
+        ),
+        OptionalBoxing(CopyH2D),
+        exclude=(ProducerSingleDevice, ConsumerSingleDevice),
+    ),
+    # B -> S
+    Sequential(
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(CopyD2H),
+            boxing_middle.ReplaceProducerDeviceTag("cpu"),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(BroadcastManyToOne),
+            boxing_middle.GetSineleDevice(),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(NaiveCpuSplitToSplit),
+            boxing_middle.GetSineleMachineForConsumer(),
+            boxing_middle.ConsumerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(InterNodeOneToOne),
+            boxing_middle.ReplaceConsumerDeviceTag("cpu"),
+            boxing_middle.ConsumerSbpParallel,
+        ),
+        OptionalBoxing(CopyH2D),
+        exclude=(CopyD2H, CopyH2D, BroadcastManyToOne, InterNodeOneToOne,),
+    ),
+    # S -> S
+    Sequential(
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(CopyD2H),
+            boxing_middle.ReplaceProducerDeviceTag("cpu"),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(InterNodeOneToOne),
+            boxing_middle.GetSineleMachineForProducer(),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(NaiveCpuSplitToSplit),
+            boxing_middle.GetSineleDevice(),
+            boxing_middle.ProducerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(NaiveCpuSplitToSplit),
+            boxing_middle.GetSineleMachineForConsumer(),
+            boxing_middle.ConsumerSbpParallel,
+        ),
+        boxing_middle.BoxingToMiddle(
+            OptionalBoxing(InterNodeOneToOne),
+            boxing_middle.ReplaceConsumerDeviceTag("cpu"),
+            boxing_middle.ConsumerSbpParallel,
+        ),
+        OptionalBoxing(CopyH2D),
+        exclude=(CopyH2D, ProducerSingleDevice, InterNodeOneToOne,),
     ),
 ]
 

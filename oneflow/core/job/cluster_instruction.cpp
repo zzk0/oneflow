@@ -79,14 +79,15 @@ void OccasionallyClearCtrlKV(const std::string& key) {
   }
 }
 
-void PushClusterInstruction(const ClusterInstructionProto& cluster_instruction) {
-  const std::string& key = GetClusterInstructionKey();
+void PushClusterInstruction(const ClusterInstructionProto& cluster_instruction,
+                            const std::string& key) {
   Global<CtrlClient>::Get()->PushMasterKV(key, cluster_instruction);
   OccasionallyClearCtrlKV(key);
 }
 
 void PullClusterInstruction(ClusterInstructionProto* cluster_instruction) {
   const std::string& key = GetClusterInstructionKey();
+  LOG(INFO) << "PullClusterInstruction: " << key;
   Global<CtrlClient>::Get()->PullMasterKV(key, cluster_instruction);
   OccasionallyClearCtrlKV(key);
 }
@@ -103,28 +104,36 @@ void ClusterInstruction::NewSessionBarrier() {
 void ClusterInstruction::MasterSendSessionStart() {
   ClusterInstructionProto cluster_instruction;
   cluster_instruction.mutable_cluster_ctrl_session_start();
-  PushClusterInstruction(cluster_instruction);
+  const std::string& key = GetClusterInstructionKey();
+  LOG(INFO) << "MasterSendSessionStart: " << key;
+  PushClusterInstruction(cluster_instruction, key);
   NewSessionBarrier();
 }
 
 void ClusterInstruction::MasterSendHalt() {
   ClusterInstructionProto cluster_instruction;
   cluster_instruction.mutable_cluster_ctrl_halt();
-  PushClusterInstruction(cluster_instruction);
+  const std::string& key = GetClusterInstructionKey();
+  LOG(INFO) << "MasterSendHalt: " << key;
+  PushClusterInstruction(cluster_instruction, key);
   HaltBarrier();
 }
 
 void ClusterInstruction::MasterSendAbort() {
-  LOG(ERROR) << "sending abort instruction";
+  LOG(INFO) << "sending abort instruction";
   ClusterInstructionProto cluster_instruction;
   cluster_instruction.mutable_cluster_ctrl_abort();
-  PushClusterInstruction(cluster_instruction);
+  const std::string& key = GetClusterInstructionKey();
+  LOG(ERROR) << "MasterSendAbort: " << key;
+  PushClusterInstruction(cluster_instruction, key);
 }
 
 void ClusterInstruction::MasterSendEagerInstruction(
     const ClusterInstructionProto& cluster_instruction) {
   CHECK(cluster_instruction.has_eager_instruction());
-  PushClusterInstruction(cluster_instruction);
+  const std::string& key = GetClusterInstructionKey();
+  LOG(INFO) << "MasterSendEagerInstruction: " << key;
+  PushClusterInstruction(cluster_instruction, key);
 }
 
 void ClusterInstruction::WorkerReceiveInstruction(ClusterInstructionProto* cluster_instruction) {

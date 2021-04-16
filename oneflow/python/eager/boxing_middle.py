@@ -172,3 +172,55 @@ def RandomParallelIdPerMachine(parallel_desc_symbol, device_tag=None, builder=No
         )
     else:
         return builder.GetParallelDescSymbol(parallel_conf)
+
+
+def GetSineleDevice():
+    def Getter(builder, produced_blob_object, consumer_op_arg_parallel_attr):
+        parallel_desc_sym = (
+            produced_blob_object.op_arg_parallel_attr.parallel_desc_symbol
+        )
+        return SineleDevice(parallel_desc_sym, builder)
+
+    return Getter
+
+
+def SineleDevice(parallel_desc_symbol, builder):
+    parallel_conf = placement_cfg.ParallelConf()
+    parallel_conf.set_device_tag("cpu")
+    parallel_conf.add_device_name("0:0")
+    if builder is None:
+        return oneflow_api.PlacementSymbol(
+            parallel_desc_symbol.symbol_id, parallel_conf
+        )
+    else:
+        return builder.GetParallelDescSymbol(parallel_conf)
+
+
+def GetSineleMachineForProducer():
+    def Getter(builder, produced_blob_object, consumer_op_arg_parallel_attr):
+        parallel_desc_sym = (
+            produced_blob_object.op_arg_parallel_attr.parallel_desc_symbol
+        )
+        return SineleMachine(parallel_desc_sym, builder)
+
+    return Getter
+
+
+def GetSineleMachineForConsumer():
+    def Getter(builder, produced_blob_object, consumer_op_arg_parallel_attr):
+        parallel_desc_sym = consumer_op_arg_parallel_attr.parallel_desc_symbol
+        return SineleMachine(parallel_desc_sym, builder)
+
+    return Getter
+
+
+def SineleMachine(parallel_desc_symbol, builder):
+    parallel_conf = placement_cfg.ParallelConf()
+    parallel_conf.set_device_tag("cpu")
+    parallel_conf.add_device_name("@0:0-%d" % (parallel_desc_symbol.parallel_num - 1))
+    if builder is None:
+        return oneflow_api.PlacementSymbol(
+            parallel_desc_symbol.symbol_id, parallel_conf
+        )
+    else:
+        return builder.GetParallelDescSymbol(parallel_conf)
