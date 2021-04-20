@@ -615,19 +615,24 @@ Graph<NodeType, EdgeType>::MakePredicatorIsReachable(
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachInNode,
     const std::function<void(NodeType*, const std::function<void(NodeType*)>&)>& ForEachOutNode)
     const {
-  auto node2ancestor = std::make_shared<HashMap<const NodeType*, HashSet<const NodeType*>>>();
+  auto node2ancestor = std::make_shared<HashMap<const NodeType*, std::vector<const NodeType*>>>();
   TopoForEachNode(starts, ForEachInNode, ForEachOutNode, [&](NodeType* node) {
-    node2ancestor->emplace(node, HashSet<const NodeType*>());
+    node2ancestor->emplace(node, std::vector<const NodeType*>());
     ForEachInNode(node, [&](NodeType* in_node) {
-      node2ancestor->at(node).insert(in_node);
-      node2ancestor->at(node).insert(node2ancestor->at(in_node).begin(),
-                                     node2ancestor->at(in_node).end());
+      auto& node_ancestors = node2ancestor->at(node);
+      auto& in_node_ancestors = node2ancestor->at(in_node);
+      node_ancestors.push_back(in_node);
+      node_ancestors.insert(node_ancestors.end(), in_node_ancestors.begin(),
+                            in_node_ancestors.end());
     });
   });
   return [node2ancestor](const NodeType* src, const NodeType* dst) -> bool {
     const auto it = node2ancestor->find(dst);
     if (it == node2ancestor->end()) { return false; }
-    return it->second.find(src) != it->second.end();
+    for (auto ancestor : it->second) {
+      if (ancestor == src) { return true; }
+    }
+    return false;
   };
 }
 
