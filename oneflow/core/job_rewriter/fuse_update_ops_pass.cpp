@@ -17,6 +17,21 @@ limitations under the License.
 #include "oneflow/core/register/runtime_blob_desc.h"
 #include "oneflow/core/framework/framework.h"
 
+namespace std {
+
+template<>
+struct hash<std::vector<std::string>> {
+  size_t operator()(const std::vector<std::string>& key) const {
+    size_t hash = 0;
+    for (int i = 0; i < key.size(); ++i) {
+      oneflow::HashCombine(&hash, std::hash<std::string>()(key.at(i)));
+    }
+    return hash;
+  }
+};
+
+}  // namespace std
+
 namespace oneflow {
 
 namespace {
@@ -63,6 +78,33 @@ class FuseUpdateOpsPass final : public JobPass {
 Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_builder) const {
   const auto IsSafeToDelete = MakePredicatorIsSafeToDelete(op_graph);
   std::vector<std::string> del_op_names;
+  HashMap<std::vector<std::string>, std::string> scale_by_tensor_lbns_2_lbn;
+  const auto GetScaleByTensorLbn = [&](const std::vector<std::string>& lbns,
+                                       const ParallelConf& parallel_conf,
+                                       const int64_t scope_symbol_id) -> std::string {
+    CHECK_GT(lbns.size(), 0);
+    if (lbns.size() == 1) { return lbns.front(); }
+    auto it = scale_by_tensor_lbns_2_lbn.find(lbns);
+    if (it != scale_by_tensor_lbns_2_lbn.end()) {
+      return it->second;
+    } else {
+      std::string return_lbn = lbns.at(0);
+      for (int64_t i = 1; i < lbns.size(); ++i) {
+        auto multiply_op =
+            user_op::UserOpConfWrapperBuilder("Fused-Update-Multiply-" + NewUniqueId())
+                .Op("multiply")
+                .Input("x", return_lbn)
+                .Input("y", lbns.at(i))
+                .Output("out")
+                .ScopeSymbolId(scope_symbol_id)
+                .Build();
+        job_builder->AddOps(parallel_conf, {multiply_op.op_conf()});
+        return_lbn = multiply_op.output("out", 0);
+      }
+      return return_lbn;
+    }
+  };
+
   op_graph.ForEachNode([&](const OpNode* op_node) {
     if (!op_node->op().op_conf().has_user_conf()) { return; }
     const user_op::UserOpConfWrapper user_op_conf(op_node->op().op_conf());
@@ -82,7 +124,7 @@ Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_bu
     double scale = 1;
     bool fused = false;
     LogicalBlobId model_diff_lbi = GenLogicalBlobId(user_op_conf.input("model_diff", 0));
-    std::string scale_by_tensor_lbn;
+    std::vector<std::string> scale_by_tensor_lbns;
 
     [&]() {
       do {
@@ -107,10 +149,12 @@ Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_bu
         if (!IsSafeToDelete(producer)) { return; }
         const user_op::UserOpConfWrapper scalar_mul_by_tensor_op_conf(producer->op().op_conf());
         model_diff_lbi = GenLogicalBlobId(scalar_mul_by_tensor_op_conf.input("x", 0));
-        scale_by_tensor_lbn = scalar_mul_by_tensor_op_conf.input("scalar", 0);
+        scale_by_tensor_lbns.push_back(scalar_mul_by_tensor_op_conf.input("scalar", 0));
         del_op_names.push_back(producer->op().op_name());
         fused = true;
-      } while (false);
+      } while (
+          IsUserOpWithTypeName(op_graph.OpNode4OpName(model_diff_lbi.op_name())->op().op_conf(),
+                               "scalar_mul_by_tensor"));
 
       do {
         const OpNode* producer = op_graph.OpNode4OpName(model_diff_lbi.op_name());
@@ -156,7 +200,12 @@ Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_bu
         .Attr<float>("l1", l1)
         .Attr<float>("l2", l2)
         .Attr<float>("weight_decay", user_op_conf.attr<float>("weight_decay"));
-    if (scale_by_tensor_lbn != "") {
+
+    CHECK(user_op_conf.op_conf().has_scope_symbol_id());
+    if (scale_by_tensor_lbns.size() != 0) {
+      std::string scale_by_tensor_lbn =
+          GetScaleByTensorLbn(scale_by_tensor_lbns, op_node->parallel_desc().parallel_conf(),
+                              user_op_conf.op_conf().scope_symbol_id());
       fused_op_builder.Input("scale_by_tensor", scale_by_tensor_lbn);
     }
     if (user_op_conf.has_input("skip_if", 0)) {
@@ -190,7 +239,6 @@ Maybe<void> FuseUpdateOpsPass::Apply(const OpGraph& op_graph, JobBuilder* job_bu
     } else {
       UNIMPLEMENTED();
     }
-    CHECK(user_op_conf.op_conf().has_scope_symbol_id());
     fused_op_builder.ScopeSymbolId(user_op_conf.op_conf().scope_symbol_id());
     OperatorConf new_op_conf = user_op_conf.op_conf();
     *new_op_conf.mutable_user_conf() = fused_op_builder.Build().op_conf().user_conf();
