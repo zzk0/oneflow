@@ -125,9 +125,9 @@ void CublasBatchGemm<float16>(cublasHandle_t handle, char transa, char transb, i
 #endif  // CUDA_VERSION >= 9010
 
 template<typename T>
-void bgemm(DeviceCtx* ctx, char opa, char opb, int64_t m, int64_t n, int64_t k, float alpha,
-           const T* a, int64_t lda, int64_t stridea, const T* b, int64_t ldb, int64_t strideb,
-           float beta, T* c, int64_t ldc, int64_t stridec, int64_t batch_size) {
+void BatchedGemm(DeviceCtx* ctx, char opa, char opb, int64_t m, int64_t n, int64_t k, float alpha,
+                 const T* a, int64_t lda, int64_t stridea, const T* b, int64_t ldb, int64_t strideb,
+                 float beta, T* c, int64_t ldc, int64_t stridec, int64_t batch_size) {
   // swap m and n, a and b to convert from row-major to col-major
   CublasBatchGemm<T>(ctx->cublas_pmh_handle(), opb, opa, n, m, k, static_cast<T>(alpha), b, ldb,
                      strideb, a, lda, stridea, static_cast<T>(beta), c, ldc, stridec, batch_size);
@@ -159,30 +159,15 @@ SliceParams ConstructSliceParams4Value(int64_t seq_len, int64_t batch_size, int6
 }
 
 template<typename T>
-void transpose(DeviceCtx* ctx, const ShapeView& in_shape, const ShapeView& out_shape,
-               const std::vector<int32_t>& perm, const T* in, T* out) {
-  using PackType = int64_t;
-  const size_t pack_size = sizeof(PackType) / sizeof(T);
-  int64_t in_last_dim = in_shape.At(in_shape.NumAxes() - 1);
-  int64_t out_last_dim = out_shape.At(out_shape.NumAxes() - 1);
-  if (pack_size != 1 && perm.back() == perm.size() - 1 && in_last_dim % pack_size == 0) {
-    CHECK_EQ(in_last_dim, out_last_dim);
-    DimVector packed_in_dim_vec;
-    in_shape.ToDimVector(&packed_in_dim_vec);
-    packed_in_dim_vec.back() /= pack_size;
-    const Shape packed_in_shape(packed_in_dim_vec);
-    DimVector packed_out_dim_vec;
-    out_shape.ToDimVector(&packed_out_dim_vec);
-    packed_out_dim_vec.back() /= pack_size;
-    const Shape packed_out_shape(packed_out_dim_vec);
-    NewKernelUtil<DeviceType::kGPU>::Transpose(ctx, packed_in_shape.NumAxes(), packed_in_shape,
-                                               packed_out_shape, perm, packed_in_shape.elem_cnt(),
-                                               reinterpret_cast<const PackType*>(in),
-                                               reinterpret_cast<PackType*>(out));
-  } else {
-    NewKernelUtil<DeviceType::kGPU>::Transpose(ctx, in_shape.NumAxes(), in_shape, out_shape, perm,
-                                               in_shape.elem_cnt(), in, out);
-  }
+void TransposeGpu(DeviceCtx* ctx, const ShapeView& in_shape, const ShapeView& out_shape,
+                  const std::vector<int32_t>& perm, const T* in, T* out) {
+  CHECK_EQ(in_shape.NumAxes(), out_shape.NumAxes());
+  int32_t num_axes = in_shape.NumAxes();
+  CHECK_EQ(num_axes, perm.size());
+  for (int i = 0; i < perm.size(); ++i) { CHECK_EQ(in_shape.At(perm[i]), out_shape.At(i)); }
+  int64_t elem_cnt = in_shape.elem_cnt();
+  NewKernelUtil<DeviceType::kGPU>::Transpose(ctx, num_axes, in_shape, out_shape, perm, elem_cnt, in,
+                                             out);
 }
 
 template<typename T>
@@ -209,9 +194,9 @@ class FusedSelfAttentionQueryMulKeyAndValueGpuKernel final : public user_op::OpK
     user_op::Tensor* qmk_tensor = ctx->Tensor4ArgNameAndIndex("query_mul_key", 0);
     const T* q_dptr = h_tensor->dptr<T>();
     const T* k_dptr = h_tensor->dptr<T>() + k_offset;
-    bgemm<T>(ctx->device_ctx(), 'N', 'T', seq_len, seq_len, head_size, alpha, q_dptr, ld, stride,
-             k_dptr, ld, stride, 0.0f, qmk_tensor->mut_dptr<T>(), seq_len, seq_len * seq_len,
-             batch_size * num_heads);
+    BatchedGemm<T>(ctx->device_ctx(), 'N', 'T', seq_len, seq_len, head_size, alpha, q_dptr, ld,
+                   stride, k_dptr, ld, stride, 0.0f, qmk_tensor->mut_dptr<T>(), seq_len,
+                   seq_len * seq_len, batch_size * num_heads);
 
     // slice v
     user_op::Tensor* tmp_v_tensor = ctx->Tensor4ArgNameAndIndex("tmp_buffer", 0);
@@ -221,8 +206,8 @@ class FusedSelfAttentionQueryMulKeyAndValueGpuKernel final : public user_op::OpK
                                                   tmp_v_tensor->mut_dptr<T>());
     // v from (s, b, n, h) transpose to (b, n, s, h)
     Shape value_shape({seq_len, batch_size, num_heads, head_size});
-    transpose<T>(ctx->device_ctx(), value_shape, v_tensor->shape(), {1, 2, 0, 3},
-                 tmp_v_tensor->dptr<T>(), v_tensor->mut_dptr<T>());
+    TransposeGpu<T>(ctx->device_ctx(), value_shape, v_tensor->shape(), {1, 2, 0, 3},
+                    tmp_v_tensor->dptr<T>(), v_tensor->mut_dptr<T>());
   }
   bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
 };
@@ -253,8 +238,8 @@ class FusedSelfAttentionQueryMulKeyAndValueGradGpuKernel final : public user_op:
 
     // transpose from (b, n, s, h) to (s, b, n, h)
     Shape value_shape({seq_len, batch_size, num_heads, head_size});
-    transpose<T>(ctx->device_ctx(), v_grad_tensor->shape(), value_shape, {2, 0, 1, 3},
-                 v_grad_tensor->dptr<T>(), tmp_v_tensor->mut_dptr<T>());
+    TransposeGpu<T>(ctx->device_ctx(), v_grad_tensor->shape(), value_shape, {2, 0, 1, 3},
+                    v_grad_tensor->dptr<T>(), tmp_v_tensor->mut_dptr<T>());
     // slice v grad
     SliceParams params = ConstructSliceParams4Value(seq_len, batch_size, num_heads, head_size);
     SliceKernelUtil<DeviceType::kGPU, T>::Backward(
@@ -265,16 +250,16 @@ class FusedSelfAttentionQueryMulKeyAndValueGradGpuKernel final : public user_op:
     const T* qmk_grad_dptr = qmk_grad_tensor->dptr<T>();
     const T* k_dptr = h_tensor->dptr<T>() + head_size;
     T* grad_q_dptr = h_grad_tensor->mut_dptr<T>();
-    bgemm<T>(ctx->device_ctx(), 'N', 'N', seq_len, head_size, seq_len, alpha, qmk_grad_dptr,
-             seq_len, seq_len * seq_len, k_dptr, ld, stride, 0.0f, grad_q_dptr, ld, stride,
-             batch_size * num_heads);
+    BatchedGemm<T>(ctx->device_ctx(), 'N', 'N', seq_len, head_size, seq_len, alpha, qmk_grad_dptr,
+                   seq_len, seq_len * seq_len, k_dptr, ld, stride, 0.0f, grad_q_dptr, ld, stride,
+                   batch_size * num_heads);
     // grad_k = grad_qmk * q
     // (b, n, sk, sq) x (b, n, sq, h) -> (b, n, sk, h) <= (s, b, n, h) <= (s, b, n, 3, h)
     const T* q_dptr = h_tensor->dptr<T>();
     T* grad_k_dptr = h_grad_tensor->mut_dptr<T>() + head_size;
-    bgemm<T>(ctx->device_ctx(), 'T', 'N', seq_len, head_size, seq_len, alpha, qmk_grad_dptr,
-             seq_len, seq_len * seq_len, q_dptr, ld, stride, 0.0f, grad_k_dptr, ld, stride,
-             batch_size * num_heads);
+    BatchedGemm<T>(ctx->device_ctx(), 'T', 'N', seq_len, head_size, seq_len, alpha, qmk_grad_dptr,
+                   seq_len, seq_len * seq_len, q_dptr, ld, stride, 0.0f, grad_k_dptr, ld, stride,
+                   batch_size * num_heads);
   }
   bool AlwaysComputeWhenAllOutputsEmpty() const override { return false; }
 };
