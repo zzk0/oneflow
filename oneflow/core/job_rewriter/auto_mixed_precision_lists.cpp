@@ -19,7 +19,7 @@ namespace oneflow {
 
 const AMPList& AutoMixedPrecisionLists::WhiteList() {
   static AMPList white_list = {"matmul", "batch_matmul", "conv2d", "amp_white_identity",
-                               "fused_self_attention_query_mul_key_and_value"};
+                               "fused_self_attention_query_mul_key_and_value", "broadcast_matmul"};
   return white_list;
 }
 
