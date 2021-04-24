@@ -58,13 +58,12 @@ const Scope& Scope4OpNode(const OpNode* op_node) {
   return Scope4ScopeSymbolId(op_conf.scope_symbol_id());
 }
 
-bool IsForwardPassScope(const Scope& scope) {
-  return scope.scope_proto().calculation_pass_name() == kForwardPass;
+bool IsForwardPass(const OpNode* node) {
+  return Scope4OpNode(node).scope_proto().calculation_pass_name() == kForwardPass;
 }
 
-bool IsBackwardPassScope(const Scope& scope) {
-  const std::string& calculation_pass_name = scope.scope_proto().calculation_pass_name();
-  return calculation_pass_name == kBackwardPass;
+bool IsBackwardPass(const OpNode* node) {
+  return Scope4OpNode(node).scope_proto().calculation_pass_name() == kBackwardPass;
 }
 
 bool OpNodeHasScope(const OpNode* node) { return node->op().op_conf().has_scope_symbol_id(); }
@@ -80,6 +79,14 @@ bool IsIdentityBufferOrRepeatOpNode(const OpNode* node) {
 
 int64_t GetStageIdHint(const OpNode* node) {
   return Scope4OpNode(node).Int64("pipeline_stage_id_hint");
+}
+
+int64_t GetBufferNum(const OpNode* node, const int64_t total_stage_num) {
+  if (IsBackwardPass(node)) { return -1; } /* bw buffer_num = -1 */
+  int64_t stage_id = GetStageIdHint(node);
+  CHECK_GE(stage_id, 0);
+  CHECK_LT(stage_id, total_stage_num);
+  return total_stage_num - 1 - stage_id; /* fw buffer_num = total - 1 - stage_id */
 }
 
 Maybe<void> PipelineBufferPass::Apply(const OpGraph& op_graph, JobBuilder* job_builder) const {
@@ -104,18 +111,21 @@ Maybe<void> PipelineBufferPass::Apply(const OpGraph& op_graph, JobBuilder* job_b
 
   op_graph.ForEachNode([&](const OpNode* this_node) {
     if (!OpNodeHasScope(this_node)) { return; /* ignore op without scope */ }
-    if (!IsBackwardPassScope(Scope4OpNode(this_node))) { return; /* ignore fw dst op */ }
+    if (!(IsForwardPass(this_node) || IsBackwardPass(this_node))) { return; /* ignore NOT fw/bw */ }
     const std::string& this_op_name = this_node->op().op_name();
     for (const OpEdge* in_edge : this_node->in_edges()) {
       const OpNode* src_node = in_edge->src_node();
       if (!OpNodeHasScope(src_node)) { return; /* ignore op without scope */ }
-      const int64_t buffer_size = total_stage_num - 1 - GetStageIdHint(src_node);
-      CHECK_GE(buffer_size, 0);
+      if (!(IsForwardPass(src_node) || IsBackwardPass(src_node))) { return; /* ignore NOT fw/bw */ }
+      // if (!IsBackwardPassScope(Scope4OpNode(this_node))) { return; /* ignore fw dst op */ }
+      const int64_t buffer_size =
+          GetBufferNum(src_node, total_stage_num) - GetBufferNum(this_node, total_stage_num) - 1;
       CHECK_LT(buffer_size, total_stage_num);
-      if (buffer_size == 0) { return; /* last stage(loss) does NOT need to insert buffer */ }
+      if (buffer_size <= 0) { continue; /* NOT insert buffer */ }
 
-      if (IsForwardPassScope(Scope4OpNode(src_node))
-          && (!IsIdentityBufferOrRepeatOpNode(src_node))) {
+      // if (IsForwardPassScope(Scope4OpNode(src_node))
+      //     && (!IsIdentityBufferOrRepeatOpNode(src_node))) {
+      if (!IsIdentityBufferOrRepeatOpNode(src_node)) {
         for (const LogicalBlobId& lbi : in_edge->lbis()) {
           std::string lbn = GenLogicalBlobName(lbi);
           std::string buffer_op_name =
@@ -152,18 +162,21 @@ Maybe<void> PipelineBufferPass::Apply(const OpGraph& op_graph, JobBuilder* job_b
           }
 
           LOG(INFO) << " Insert buffer op: [" << buffer_op_name << "](buffer_size:" << buffer_size
-                    << ") from [" << src_node->op().op_name() << "](FwPass) -> ["
-                    << this_node->op().op_name() << "](BwPass) \n";
+                    << ") from [" << src_node->op().op_name() << "] -> ["
+                    << this_node->op().op_name() << "] \n";
         }
       }
     }
     for (const std::string& ctrl_in_op_name : this_node->op().op_conf().ctrl_in_op_name()) {
       const OpNode* src_node = op_graph.OpNode4OpName(ctrl_in_op_name);
       if (!OpNodeHasScope(src_node)) { return; /* ignore op without scope */ }
-      if (IsForwardPassScope(Scope4OpNode(src_node))) {
-        LOG(WARNING) << "CtrlEdge: src_op[FwPass]: " << src_node->op().op_conf().DebugString()
-                     << " dst_op[BwPass]: " << this_node->op().op_conf().DebugString()
-                     << " connected.";
+      if (!(IsForwardPass(src_node) || IsBackwardPass(src_node))) { return; /* ignore NOT fw/bw */ }
+      const int64_t buffer_size =
+          GetBufferNum(src_node, total_stage_num) - GetBufferNum(this_node, total_stage_num) - 1;
+      if (buffer_size > 0) {
+        LOG(WARNING) << "CtrlEdge: src_op: " << src_node->op().op_conf().DebugString()
+                     << " dst_op: " << this_node->op().op_conf().DebugString()
+                     << " connected cross stage need buffer_size = " << buffer_size;
       }
     }
   });
