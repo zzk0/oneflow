@@ -501,7 +501,7 @@ class NDSliceBoxingSubTskGphBuilder final : public HierarchicalSubTskGphBuilder 
         }
         sorted_out_tasks->push_back(out_node);
       }
-      return BuildSubTskGphBuilderStatus("2DSliceBoxingAddSubTskGphBuilder", "P2S");
+      return BuildSubTskGphBuilderStatus("NDSliceBoxingSubTskGphBuilder", slice_boxing_type);
     } else {
       return Error::BoxingNotSupportedError();
     }
