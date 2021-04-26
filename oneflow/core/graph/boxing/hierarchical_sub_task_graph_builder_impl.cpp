@@ -24,6 +24,14 @@ limitations under the License.
 #include "oneflow/core/graph/boxing/b21_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/one_to_one_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
+#include "oneflow/core/job/parallel_distribution_util.h"
+#include "oneflow/core/graph/slice_boxing_task_node.h"
+#include "oneflow/core/common/id_util.h"
+#include "oneflow/core/graph/id_serialization.h"
+#include "oneflow/core/device/cpu_stream_index.h"
+#ifdef WITH_CUDA
+#include "oneflow/core/device/cuda_stream_index.h"
+#endif
 
 namespace oneflow {
 
@@ -116,6 +124,14 @@ bool ParallelDistributionAllSameSplitParallel(const ParallelDistribution& parall
   if (!first_sbp.has_split_parallel()) { return false; }
   FOR_RANGE(int64_t, i, 1, parallel_distribution.sbp_parallel_size()) {
     if (parallel_distribution.sbp_parallel(i) != first_sbp) { return false; }
+  }
+  return true;
+}
+
+bool ParallelDistributionAllSplitParallel(const ParallelDistribution& parallel_distribution) {
+  CHECK_GT(parallel_distribution.sbp_parallel_size(), 0);
+  FOR_RANGE(int64_t, i, 0, parallel_distribution.sbp_parallel_size()) {
+    if (!parallel_distribution.sbp_parallel(i).has_split_parallel()) { return false; }
   }
   return true;
 }
@@ -343,12 +359,159 @@ class InterGroupSubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
   std::shared_ptr<SubTskGphBuilder> sub_tsk_gph_builder_;
 };
 
+class NDSliceBoxingSubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(NDSliceBoxingSubTskGphBuilder);
+  NDSliceBoxingSubTskGphBuilder() {}
+  ~NDSliceBoxingSubTskGphBuilder() override = default;
+
+  Maybe<SubTskGphBuilderStatus> Build(SubTskGphBuilderCtx* ctx,
+                                      const std::vector<TaskNode*>& sorted_in_tasks,
+                                      std::vector<TaskNode*>* sorted_out_tasks,
+                                      std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks,
+                                      const ParallelDesc& in_parallel_desc,
+                                      const ParallelDesc& out_parallel_desc,
+                                      const LogicalBlobId& lbi, const BlobDesc& logical_blob_desc,
+                                      const ParallelDistribution& in_parallel_distribution,
+                                      const ParallelDistribution& out_parallel_distribution,
+                                      const Shape& time_shape) const override {
+    const auto GetBoxingGpuThrdId = [](int64_t machine_id, int64_t dev_id,
+                                       CudaWorkType work_type) -> int64_t {
+      int64_t thrd_id = -1;
+#ifdef WITH_CUDA
+      DeviceId device_id{static_cast<DeviceId::rank_t>(machine_id), DeviceType::kGPU,
+                         static_cast<DeviceId::device_index_t>(dev_id)};
+      auto* generator = dynamic_cast<CudaStreamIndexGenerator*>(
+          Global<IDMgr>::Get()->GetStreamIndexGeneratorManager()->GetGenerator(device_id));
+      CHECK_NOTNULL(generator);
+      StreamId::stream_index_t stream_index = 0;
+      if (work_type == CudaWorkType::kCopyH2D) {
+        stream_index = generator->GenerateH2DStreamIndex();
+      } else if (work_type == CudaWorkType::kCopyD2H) {
+        stream_index = generator->GenerateD2HStreamIndex();
+      } else if (work_type == CudaWorkType::kMix) {
+        stream_index = generator->GenerateMixStreamIndex();
+      } else {
+        UNIMPLEMENTED();
+      }
+      thrd_id = SerializeStreamIdToInt64(StreamId{device_id, stream_index});
+#else
+      UNIMPLEMENTED();
+#endif
+      return thrd_id;
+    };
+    const auto NewEdge = [&ctx]() -> TaskEdge* { return ctx->task_graph()->NewEdge(); };
+    const auto CreateBoxingNode121 = [&ctx, &lbi, &GetBoxingGpuThrdId](
+                                         const ParallelDesc& pd, const int64_t parallel_id,
+                                         const TensorSliceView& slice,
+                                         SliceBoxingTaskMode mode) -> SliceBoxingTaskNode* {
+      SliceBoxingTaskNode* node = ctx->task_graph()->NewNode<SliceBoxingTaskNode>();
+      const int64_t machine_id = CHECK_JUST(pd.MachineId4ParallelId(parallel_id));
+      int64_t thrd_id = -1;
+      if (pd.device_type() == DeviceType::kCPU) {
+        thrd_id = Global<IDMgr>::Get()->PickCpuThrdIdEvenly(machine_id);
+      } else if (pd.device_type() == DeviceType::kGPU) {
+#ifdef WITH_CUDA
+        int64_t dev_id = CHECK_JUST(pd.DeviceId4ParallelId(parallel_id));
+        thrd_id = GetBoxingGpuThrdId(machine_id, dev_id, CudaWorkType::kCopyH2D);
+#else
+        UNIMPLEMENTED();
+#endif
+      } else {
+        UNIMPLEMENTED();
+      }
+      node->Init(lbi, slice, mode, machine_id, thrd_id);
+      return node;
+    };
+    const auto FindFirstNotEmptyInterSection =
+        [](const TensorSliceView& out_slice,
+           const std::vector<TensorSliceView>& in_slices) -> TensorSliceView {
+      FOR_RANGE(int64_t, in_id, 0, in_slices.size()) {
+        const TensorSliceView& intersection = out_slice.Intersect(in_slices.at(in_id));
+        if (intersection.IsEmpty()) { continue; }
+        return intersection;
+      }
+    };
+    if (*in_parallel_desc.hierarchy() == *out_parallel_desc.hierarchy()
+        && in_parallel_desc.hierarchy()->NumAxes() == 2) {
+      if (ParallelDistributionAllSplitParallel(in_parallel_distribution)
+          && ParallelDistributionAllSplitParallel(out_parallel_distribution)) {
+        // pass
+      } else if (in_parallel_distribution.sbp_parallel(1)
+                     == out_parallel_distribution.sbp_parallel(1)
+                 && in_parallel_distribution.sbp_parallel(0)
+                        != out_parallel_distribution.sbp_parallel(0)
+                 && (ParallelDistributionAllSameSplitParallel(in_parallel_distribution)
+                     || ParallelDistributionAllSameSplitParallel(out_parallel_distribution))) {
+        // pass
+      } else {
+        Error::BoxingNotSupportedError();
+      }
+      std::string slice_boxing_type;  //"add" or "copy"
+      if (in_parallel_distribution.sbp_parallel(0).has_partial_sum_parallel()) {
+        slice_boxing_type = "add";
+      } else {
+        slice_boxing_type = "copy";
+      }
+      const std::vector<TensorSliceView> in_slices = GetTensorSliceView(
+          *in_parallel_desc.hierarchy(), in_parallel_distribution, logical_blob_desc.shape());
+      const std::vector<TensorSliceView> out_slices = GetTensorSliceView(
+          *out_parallel_desc.hierarchy(), out_parallel_distribution, logical_blob_desc.shape());
+      const int64_t in_parallel_num = in_parallel_desc.parallel_num();
+      const int64_t out_parallel_num = out_parallel_desc.parallel_num();
+
+      FOR_RANGE(int64_t, out_id, 0, out_parallel_num) {
+        const TensorSliceView& out_slice = out_slices.at(out_id);
+        SliceBoxingTaskNode* out_node =
+            CreateBoxingNode121(out_parallel_desc, out_id, out_slice, kSliceBoxingTaskModeCopy);
+        const TensorSliceView& first_intersection =
+            FindFirstNotEmptyInterSection(out_slice, in_slices);
+        SliceBoxingTaskNode* add_node;
+        if (slice_boxing_type == "add") {
+          add_node = CreateBoxingNode121(out_parallel_desc, out_id, first_intersection,
+                                         kSliceBoxingTaskModeAdd);
+        }
+        FOR_RANGE(int64_t, in_id, 0, in_parallel_num) {
+          const TensorSliceView& in_slice = in_slices.at(in_id);
+          const TensorSliceView& intersection = out_slice.Intersect(in_slice);
+          if (intersection.IsEmpty()) { continue; }
+          if (slice_boxing_type == "add") { CHECK_OR_RETURN(intersection == first_intersection); }
+          TaskNode* in_node = sorted_in_tasks.at(in_id);
+          SliceBoxingTaskNode* in_copy_node =
+              CreateBoxingNode121(in_parallel_desc, in_id, intersection, kSliceBoxingTaskModeCopy);
+          in_copy_node->ConnectToSrcNodeWithSlice(in_node, NewEdge(), in_slice);
+          TaskNode* proxy_node =
+              ctx->task_graph()->GetProxyNode(in_copy_node, lbi, out_parallel_desc, out_id);
+          if (slice_boxing_type == "add") {
+            add_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
+          } else if (slice_boxing_type == "copy") {
+            SliceBoxingTaskNode* out_copy_node = CreateBoxingNode121(
+                out_parallel_desc, out_id, intersection, kSliceBoxingTaskModeCopy);
+            out_copy_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
+            out_node->ConnectToSrcNodeWithSlice(out_copy_node, NewEdge(), intersection);
+          } else {
+            UNIMPLEMENTED();
+          }
+        }
+        if (slice_boxing_type == "add") {
+          out_node->ConnectToSrcNodeWithSlice(add_node, NewEdge(), first_intersection);
+        }
+        sorted_out_tasks->push_back(out_node);
+      }
+      return BuildSubTskGphBuilderStatus("2DSliceBoxingAddSubTskGphBuilder", "P2S");
+    } else {
+      return Error::BoxingNotSupportedError();
+    }
+  }
+};
+
 class Dim0ParallelDistributionMismatchedSubTskGphBuilder final
     : public HierarchicalSubTskGphBuilder {
  public:
   OF_DISALLOW_COPY_AND_MOVE(Dim0ParallelDistributionMismatchedSubTskGphBuilder);
   Dim0ParallelDistributionMismatchedSubTskGphBuilder() {
     inter_group_sub_tsk_gph_builder_.reset(new InterGroupSubTskGphBuilder());
+    nd_slice_boxing_sub_tsk_gph_builder_.reset(new NDSliceBoxingSubTskGphBuilder());
   }
   ~Dim0ParallelDistributionMismatchedSubTskGphBuilder() override = default;
 
@@ -373,7 +536,10 @@ class Dim0ParallelDistributionMismatchedSubTskGphBuilder final
             out_parallel_desc, lbi, logical_blob_desc, in_parallel_distribution,
             out_parallel_distribution, time_shape);
       } else {
-        return Error::BoxingNotSupportedError();
+        return nd_slice_boxing_sub_tsk_gph_builder_->Build(
+            ctx, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks, in_parallel_desc,
+            out_parallel_desc, lbi, logical_blob_desc, in_parallel_distribution,
+            out_parallel_distribution, time_shape);
       }
     } else {
       return Error::BoxingNotSupportedError();
@@ -382,6 +548,7 @@ class Dim0ParallelDistributionMismatchedSubTskGphBuilder final
 
  private:
   std::unique_ptr<InterGroupSubTskGphBuilder> inter_group_sub_tsk_gph_builder_;
+  std::unique_ptr<NDSliceBoxingSubTskGphBuilder> nd_slice_boxing_sub_tsk_gph_builder_;
 };
 
 class Same2DHierarchySubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
@@ -391,6 +558,7 @@ class Same2DHierarchySubTskGphBuilder final : public HierarchicalSubTskGphBuilde
     intra_group_sub_tsk_gph_builder_.reset(new IntraGroupSubTskGphBuilder());
     dim0_parallel_distribution_mismatched_sub_tsk_gph_builder_.reset(
         new Dim0ParallelDistributionMismatchedSubTskGphBuilder());
+    nd_slice_boxing_sub_tsk_gph_builder_.reset(new NDSliceBoxingSubTskGphBuilder());
   }
   ~Same2DHierarchySubTskGphBuilder() override = default;
 
@@ -418,7 +586,37 @@ class Same2DHierarchySubTskGphBuilder final : public HierarchicalSubTskGphBuilde
             out_parallel_desc, lbi, logical_blob_desc, in_parallel_distribution,
             out_parallel_distribution, time_shape);
       } else {
-        return Error::BoxingNotSupportedError();
+        if (ParallelDistributionAllSplitParallel(in_parallel_distribution)
+            && ParallelDistributionAllSplitParallel(out_parallel_distribution)) {
+          return nd_slice_boxing_sub_tsk_gph_builder_->Build(
+              ctx, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks, in_parallel_desc,
+              out_parallel_desc, lbi, logical_blob_desc, in_parallel_distribution,
+              out_parallel_distribution, time_shape);
+        } else {
+          std::vector<SubTskGphBuilderStatus> status;
+          std::vector<TaskNode*> out_tasks;
+          std::vector<std::vector<TaskNode*>> ctrl_tasks;
+          ParallelDistribution intermediate_parallel_distribution;
+          *intermediate_parallel_distribution.add_sbp_parallel() =
+              in_parallel_distribution.sbp_parallel(0);
+          *intermediate_parallel_distribution.add_sbp_parallel() =
+              out_parallel_distribution.sbp_parallel(1);
+          Maybe<SubTskGphBuilderStatus> first_status = intra_group_sub_tsk_gph_builder_->Build(
+              ctx, sorted_in_tasks, &out_tasks, &ctrl_tasks, in_parallel_desc, out_parallel_desc,
+              lbi, logical_blob_desc, in_parallel_distribution, intermediate_parallel_distribution,
+              time_shape);
+          status.push_back(*CHECK_JUST(first_status));
+          // TODO: process ctrl
+          Maybe<SubTskGphBuilderStatus> second_status =
+              dim0_parallel_distribution_mismatched_sub_tsk_gph_builder_->Build(
+                  ctx, out_tasks, sorted_out_tasks, sorted_ctrl_tasks, in_parallel_desc,
+                  out_parallel_desc, lbi, logical_blob_desc, intermediate_parallel_distribution,
+                  out_parallel_distribution, time_shape);
+          status.push_back(*CHECK_JUST(second_status));
+          Maybe<SubTskGphBuilderStatus> composed_status =
+              MakeComposedSubTskGphBuilderStatus(status);
+          return composed_status;
+        }
       }
     } else {
       return Error::BoxingNotSupportedError();
@@ -429,6 +627,7 @@ class Same2DHierarchySubTskGphBuilder final : public HierarchicalSubTskGphBuilde
   std::unique_ptr<IntraGroupSubTskGphBuilder> intra_group_sub_tsk_gph_builder_;
   std::unique_ptr<Dim0ParallelDistributionMismatchedSubTskGphBuilder>
       dim0_parallel_distribution_mismatched_sub_tsk_gph_builder_;
+  std::unique_ptr<NDSliceBoxingSubTskGphBuilder> nd_slice_boxing_sub_tsk_gph_builder_;
 };
 
 class ExpandToSame2DHierarchySubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
