@@ -431,6 +431,7 @@ class NDSliceBoxingSubTskGphBuilder final : public HierarchicalSubTskGphBuilder 
         if (intersection.IsEmpty()) { continue; }
         return intersection;
       }
+      return TensorSliceView();
     };
     if (*in_parallel_desc.hierarchy() == *out_parallel_desc.hierarchy()
         && in_parallel_desc.hierarchy()->NumAxes() == 2) {
@@ -445,7 +446,7 @@ class NDSliceBoxingSubTskGphBuilder final : public HierarchicalSubTskGphBuilder 
                      || ParallelDistributionAllSameSplitParallel(out_parallel_distribution))) {
         // pass
       } else {
-        Error::BoxingNotSupportedError();
+        return Error::BoxingNotSupportedError();
       }
       std::string slice_boxing_type;  //"add" or "copy"
       if (in_parallel_distribution.sbp_parallel(0).has_partial_sum_parallel()) {
@@ -466,7 +467,8 @@ class NDSliceBoxingSubTskGphBuilder final : public HierarchicalSubTskGphBuilder 
             CreateBoxingNode121(out_parallel_desc, out_id, out_slice, kSliceBoxingTaskModeCopy);
         const TensorSliceView& first_intersection =
             FindFirstNotEmptyInterSection(out_slice, in_slices);
-        SliceBoxingTaskNode* slice_node;
+        if (first_intersection.IsEmpty()) { return Error::BoxingNotSupportedError(); }
+        SliceBoxingTaskNode* slice_node = nullptr;
         if (slice_boxing_type == "add") {
           slice_node = CreateBoxingNode121(out_parallel_desc, out_id, first_intersection,
                                            kSliceBoxingTaskModeAdd);
@@ -475,22 +477,23 @@ class NDSliceBoxingSubTskGphBuilder final : public HierarchicalSubTskGphBuilder 
           const TensorSliceView& in_slice = in_slices.at(in_id);
           const TensorSliceView& intersection = out_slice.Intersect(in_slice);
           if (intersection.IsEmpty()) { continue; }
-          if (slice_boxing_type == "add") { CHECK_OR_RETURN(intersection == first_intersection); }
+          if (slice_boxing_type == "add") {
+            CHECK_OR_RETURN(intersection == first_intersection);
+          } else if (slice_boxing_type == "copy") {
+            slice_node = CreateBoxingNode121(out_parallel_desc, out_id, intersection,
+                                             kSliceBoxingTaskModeCopy);
+          } else {
+            UNIMPLEMENTED();
+          }
           TaskNode* in_node = sorted_in_tasks.at(in_id);
           SliceBoxingTaskNode* in_copy_node =
               CreateBoxingNode121(in_parallel_desc, in_id, intersection, kSliceBoxingTaskModeCopy);
           in_copy_node->ConnectToSrcNodeWithSlice(in_node, NewEdge(), in_slice);
           TaskNode* proxy_node =
               ctx->task_graph()->GetProxyNode(in_copy_node, lbi, out_parallel_desc, out_id);
-          if (slice_boxing_type == "add") {
-            slice_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
-          } else if (slice_boxing_type == "copy") {
-            slice_node = CreateBoxingNode121(out_parallel_desc, out_id, intersection,
-                                             kSliceBoxingTaskModeCopy);
-            slice_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
+          slice_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
+          if (slice_boxing_type == "copy") {
             out_node->ConnectToSrcNodeWithSlice(slice_node, NewEdge(), intersection);
-          } else {
-            UNIMPLEMENTED();
           }
         }
         if (slice_boxing_type == "add") {
