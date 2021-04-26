@@ -212,12 +212,14 @@ void TaskNode::ToProto(TaskProto* task_proto) {
   task_proto->mutable_task_set_info()->set_order_in_graph(order_in_graph_);
 
   exec_gph_.ToExecSequence(parallel_ctx(), task_proto->mutable_exec_sequence());
+  exec_gph_.DeleteNode(exec_gph_.SoleNode());
   auto* produced_regst_proto = task_proto->mutable_produced_regst_desc();
   for (auto& pair : produced_regsts_) {
     RegstDescProto regst_desc_proto;
     pair.second->ToProto(&regst_desc_proto);
     CHECK(produced_regst_proto->insert({pair.first, regst_desc_proto}).second);
   }
+  produced_regsts_.clear();
 
   auto* consumed_regst_proto = task_proto->mutable_consumed_regst_desc_id();
   for (const auto& pair : consumed_regsts_) {
@@ -227,6 +229,7 @@ void TaskNode::ToProto(TaskProto* task_proto) {
     }
     CHECK(consumed_regst_proto->insert({pair.first, regst_desc_ids}).second);
   }
+  consumed_regsts_.clear();
 }
 
 int64_t TaskNode::MemZoneId121() const {
