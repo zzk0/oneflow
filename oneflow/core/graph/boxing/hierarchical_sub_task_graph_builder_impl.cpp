@@ -466,10 +466,10 @@ class NDSliceBoxingSubTskGphBuilder final : public HierarchicalSubTskGphBuilder 
             CreateBoxingNode121(out_parallel_desc, out_id, out_slice, kSliceBoxingTaskModeCopy);
         const TensorSliceView& first_intersection =
             FindFirstNotEmptyInterSection(out_slice, in_slices);
-        SliceBoxingTaskNode* add_node;
+        SliceBoxingTaskNode* slice_node;
         if (slice_boxing_type == "add") {
-          add_node = CreateBoxingNode121(out_parallel_desc, out_id, first_intersection,
-                                         kSliceBoxingTaskModeAdd);
+          slice_node = CreateBoxingNode121(out_parallel_desc, out_id, first_intersection,
+                                           kSliceBoxingTaskModeAdd);
         }
         FOR_RANGE(int64_t, in_id, 0, in_parallel_num) {
           const TensorSliceView& in_slice = in_slices.at(in_id);
@@ -483,18 +483,18 @@ class NDSliceBoxingSubTskGphBuilder final : public HierarchicalSubTskGphBuilder 
           TaskNode* proxy_node =
               ctx->task_graph()->GetProxyNode(in_copy_node, lbi, out_parallel_desc, out_id);
           if (slice_boxing_type == "add") {
-            add_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
+            slice_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
           } else if (slice_boxing_type == "copy") {
-            SliceBoxingTaskNode* out_copy_node = CreateBoxingNode121(
-                out_parallel_desc, out_id, intersection, kSliceBoxingTaskModeCopy);
-            out_copy_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
-            out_node->ConnectToSrcNodeWithSlice(out_copy_node, NewEdge(), intersection);
+            slice_node = CreateBoxingNode121(out_parallel_desc, out_id, intersection,
+                                             kSliceBoxingTaskModeCopy);
+            slice_node->ConnectToSrcNodeWithSlice(proxy_node, NewEdge(), intersection);
+            out_node->ConnectToSrcNodeWithSlice(slice_node, NewEdge(), intersection);
           } else {
             UNIMPLEMENTED();
           }
         }
         if (slice_boxing_type == "add") {
-          out_node->ConnectToSrcNodeWithSlice(add_node, NewEdge(), first_intersection);
+          out_node->ConnectToSrcNodeWithSlice(slice_node, NewEdge(), first_intersection);
         }
         sorted_out_tasks->push_back(out_node);
       }
