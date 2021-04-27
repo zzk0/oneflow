@@ -100,14 +100,7 @@ class Module(object):
                     result = (result,)
                 args = result
 
-        res = None
-
-        @global_function_or_identity()
-        def job():
-            nonlocal res
-            res = self.forward(*args)
-
-        job()
+        res = self.forward(*args)
 
         return res
 

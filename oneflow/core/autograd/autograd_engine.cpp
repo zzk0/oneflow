@@ -103,18 +103,6 @@ Maybe<void> StackFunctionNode::AccGrad4LeafTensor(bool create_graph) {
   return Maybe<void>::Ok();
 }
 
-Maybe<void> StackFunctionNode::GetNowGrad(TensorTuple* input_now_grads,
-                                          const HashMap<TensorArg*, size_t>& tensor_arg2idx) const {
-  for (const auto& out_tensor : *outputs_) {
-    const auto& iter = tensor_arg2idx.find(out_tensor->now_grad_arg().get());
-    if (iter != tensor_arg2idx.end()) {
-      input_now_grads->at(iter->second) =
-          JUST(out_tensor->now_grad_arg()->GetAccTensor())->detach();
-    }
-  }
-  return Maybe<void>::Ok();
-}
-
 void StackFunctionNode::ReleaseOutTensorArgs() {
   for (const std::shared_ptr<TensorArg>& tensor_arg : out_grads_) { tensor_arg->Release(); }
 }
@@ -191,9 +179,10 @@ Maybe<TensorTuple> StackAutogradEngine::RunBackwardAndReturnInputsTensorGrad(
     bool retain_graph, bool create_graph) {
   ClearReleasedFunctionNodes();
   std::shared_ptr<TensorTuple> input_now_grads = std::make_shared<TensorTuple>(inputs.size());
-  HashMap<TensorArg*, size_t> tensor_arg2idx;
+  std::vector<bool> ori_retain_grad(inputs.size());
   for (int i = 0; i < inputs.size(); ++i) {
-    tensor_arg2idx.emplace(inputs.at(i)->now_grad_arg().get(), i);
+    ori_retain_grad.at(i) = inputs.at(i)->retain_grad();
+    inputs.at(i)->set_retain_grad(true);
   }
   for (int i = 0; i < outputs.size(); ++i) {
     JUST(outputs.at(i)->now_grad_arg()->PushPartialTensor(out_grads.at(i)));
@@ -204,9 +193,15 @@ Maybe<TensorTuple> StackAutogradEngine::RunBackwardAndReturnInputsTensorGrad(
     if (!func_node) { continue; }
     // CHECK_NOTNULL_OR_RETURN(func_node);
     if (JUST(func_node->Apply(create_graph))) {
-      JUST(func_node->GetNowGrad(input_now_grads.get(), tensor_arg2idx));
       JUST(func_node->AccGrad4RetainGradTensor());
       func_node->ReleaseOutTensorArgs();
+    }
+  }
+  for (int i = 0; i < inputs.size(); ++i) {
+    input_now_grads->at(i) = inputs.at(i)->acc_grad();
+    if (!ori_retain_grad.at(i)) {
+      inputs.at(i)->mut_acc_grad().reset();
+      inputs.at(i)->set_retain_grad(false);
     }
   }
   if (!retain_graph) { ClearEngine(); }
@@ -216,7 +211,7 @@ Maybe<TensorTuple> StackAutogradEngine::RunBackwardAndReturnInputsTensorGrad(
 std::shared_ptr<FunctionNode> StackAutogradEngine::AddBackwardFuncPtr(
     const std::shared_ptr<const std::function<Maybe<void>(const TensorTuple&, TensorTuple*, bool)>>&
         backward_fn,
-    const TensorTuple& inputs, const TensorTuple& outputs) {
+    const TensorTuple& inputs, TensorTuple* outputs) {
   // Firstly push function_node of tensor in stack which is leaf and requires_grad
   for (const std::shared_ptr<Tensor>& in_tensor : inputs) {
     if (in_tensor->is_leaf() && in_tensor->requires_grad()) {
@@ -231,8 +226,8 @@ std::shared_ptr<FunctionNode> StackAutogradEngine::AddBackwardFuncPtr(
   }
 
   std::shared_ptr<StackFunctionNode> func_node =
-      std::make_shared<StackFunctionNode>(backward_fn, inputs, outputs);
-  for (const std::shared_ptr<Tensor>& out_tensor : outputs) {
+      std::make_shared<StackFunctionNode>(backward_fn, inputs, *outputs);
+  for (const std::shared_ptr<Tensor>& out_tensor : *outputs) {
     out_tensor->set_grad_fn_node(func_node);
   }
   func_node->set_is_in_stack(true);

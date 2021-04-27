@@ -34,7 +34,11 @@ class Device final {
   std::string of_type() const;
   int64_t device_id() const { return device_id_; }
   std::string ToString() const;
-  const std::shared_ptr<const ParallelDesc>& parallel_desc_ptr() const { return parallel_desc_; }
+  size_t hash_value() const { return hash_value_; }
+  bool operator==(const Device& device) const {
+    return type_ == device.type() && device_id_ == device.device_id();
+  }
+  const std::shared_ptr<const ParallelDesc>& parallel_desc_ptr() const;
 
   static Maybe<const ParallelDesc> MakeParallelDescByDevice(const Device& device);
   static Maybe<const Device> MakeDeviceByParallelDesc(const ParallelDesc& parallel_desc);
@@ -44,8 +48,16 @@ class Device final {
   std::shared_ptr<const ParallelDesc> parallel_desc_;
   const std::string type_;
   const int64_t device_id_;
+  const size_t hash_value_;
 };
 
 }  // namespace oneflow
+
+namespace std {
+template<>
+struct hash<oneflow::Device> final {
+  size_t operator()(const oneflow::Device& device) const { return device.hash_value(); }
+};
+}  // namespace std
 
 #endif  // ONEFLOW_CORE_FRAMEWORK_DEVICE_H_

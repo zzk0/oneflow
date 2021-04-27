@@ -70,13 +70,10 @@ class TestModule(flow.unittest.TestCase):
 
         ones = np.ones((2, 3), dtype=np.float32)
         m.load_state_dict({"w": ones})
-        y = m()
-        test_case.assertTrue(np.array_equal(y.numpy(), ones))
+        x = flow.Tensor(2, 3)
+        y = m(x).numpy()
 
-        twos_tensor = flow.Tensor(ones * 2)
-        m.load_state_dict({"w": twos_tensor})
-        y = m()
-        test_case.assertTrue(np.array_equal(y.numpy(), twos_tensor.numpy()))
+        test_case.assertTrue(np.array_equal(y, ones))
 
     def test_state_dict(test_case):
         class CustomModule(flow.nn.Module):
