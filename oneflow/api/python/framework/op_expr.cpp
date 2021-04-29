@@ -24,6 +24,7 @@ limitations under the License.
 #include "oneflow/core/framework/tensor.h"
 #include "oneflow/core/framework/tensor_tuple.h"
 #include "oneflow/core/framework/user_op_conf.cfg.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace py = pybind11;
 
@@ -33,6 +34,7 @@ namespace {
 
 Maybe<one::TensorTuple> Interpret(const one::OpExpr& op, const one::TensorTuple& inputs,
                                   const AttrValueMap& attrs) {
+  OF_PROFILER_RANGE_GUARD("Op expr interpret");
   CHECK_EQ_OR_RETURN(op.input_size(), inputs.size())
       << "The operation requires " << op.input_size() << " inputs, but " << inputs.size()
       << " is given.";

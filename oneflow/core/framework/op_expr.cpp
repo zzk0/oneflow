@@ -85,14 +85,15 @@ Maybe<StatefulOpKernel> UserOpExpr::MutKernel4Device(const Device& device) const
   // attrs will be filled when op is being executing
   BuildOpConf(op_conf.get(), {});
   op_conf->set_device_tag(device.of_type());
-  DeviceType dev_type = JUST(DeviceType4DeviceTag(device.of_type()));
+  // DeviceType dev_type = JUST(DeviceType4DeviceTag(device.of_type()));
   // TODO(jianhao): replace them with device.mem_case_ptr() and device.parallel_desc_ptr() after
   // #4670 is merged
-  std::shared_ptr<MemoryCase> mem_case = MemoryCaseUtil::MakeMemCase(dev_type, device.device_id());
-  std::shared_ptr<const ParallelDesc> parallel_desc =
-      JUST(Device::MakeParallelDescByDevice(device));
-  const auto& opkernel = JUST(StatefulOpKernel::New(op_conf, mem_case, parallel_desc,
-                                                    indexed_input_pairs(), indexed_output_pairs()));
+  // std::shared_ptr<MemoryCase> mem_case = MemoryCaseUtil::MakeMemCase(dev_type,
+  // device.device_id()); std::shared_ptr<const ParallelDesc> parallel_desc =
+  //     JUST(Device::MakeParallelDescByDevice(device));
+  const auto& opkernel =
+      JUST(StatefulOpKernel::New(op_conf, device.mem_case_ptr(), device.parallel_desc_ptr(),
+                                 indexed_input_pairs(), indexed_output_pairs()));
   device2kernel_.emplace(device, opkernel);
   return opkernel;
 }

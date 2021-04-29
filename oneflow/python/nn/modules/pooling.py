@@ -85,11 +85,11 @@ class AvgPool2d(Module):
 
         _channel_pos = "channels_first"
         # TODO(yaochi): align with pytorch when padding is asymmetric
-        _padding_type, _pads_list = calc_pool_padding(
+        padding_type, _pads_list = calc_pool_padding(
             padding, get_dhw_offset(_channel_pos), 2
         )
-        _padding_before = [pad[0] for pad in _pads_list]
-        _padding_after = [pad[1] for pad in _pads_list]
+        padding_before = [pad[0] for pad in _pads_list]
+        padding_after = [pad[1] for pad in _pads_list]
 
         self._op = (
             flow.builtin_op("avg_pool_2d", name)
@@ -97,9 +97,9 @@ class AvgPool2d(Module):
             .Attr("pool_size", kernel_size)
             .Attr("strides", stride)
             .Attr("ceil_mode", ceil_mode)
-            .Attr("padding", _padding_type)
-            .Attr("padding_before", _padding_before)
-            .Attr("padding_after", _padding_after)
+            .Attr("padding", padding_type)
+            .Attr("padding_before", padding_before)
+            .Attr("padding_after", padding_after)
             .Input("x")
             .Output("y")
             .Build()
@@ -180,18 +180,18 @@ class MaxPool2d(Module):
         assert dilation == 1, "Only support dilation==1 for now!"
 
         if isinstance(padding, int):
-            _padding = _pair(padding)
+            padding = _pair(padding)
         if len(padding) == 2:
             if _data_format == "NCHW":
-                _padding = (0, 0, padding[0], padding[1])
+                padding = (0, 0, padding[0], padding[1])
             else:
                 raise ValueError("error padding param!")
 
-        _padding_type, _pads_list = calc_pool_padding(
-            _padding, get_dhw_offset(_channel_pos), 2
+        padding_type, _pads_list = calc_pool_padding(
+            padding, get_dhw_offset(_channel_pos), 2
         )
-        _padding_before = [pad[0] for pad in _pads_list]
-        _padding_after = [pad[1] for pad in _pads_list]
+        padding_before = [pad[0] for pad in _pads_list]
+        padding_after = [pad[1] for pad in _pads_list]
 
         self._op = (
             flow.builtin_op("max_pool_2d")
@@ -199,9 +199,9 @@ class MaxPool2d(Module):
             .Attr("pool_size", _kernel_size)
             .Attr("strides", _strides)
             .Attr("ceil_mode", ceil_mode)
-            .Attr("padding", _padding_type)
-            .Attr("padding_before", _padding_before)
-            .Attr("padding_after", _padding_after)
+            .Attr("padding", padding_type)
+            .Attr("padding_before", padding_before)
+            .Attr("padding_after", padding_after)
             .Input("x")
             .Output("y")
             .Build()

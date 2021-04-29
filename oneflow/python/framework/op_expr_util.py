@@ -17,6 +17,10 @@ import oneflow as flow
 import oneflow._oneflow_internal
 from oneflow.python.framework.attr_util import convert_to_user_attr_value
 
+import time
+
+# import config
+
 
 def user_op_expr_call(self, *args, **kwargs):
     args = list(args)
@@ -35,11 +39,16 @@ def user_op_expr_call(self, *args, **kwargs):
         )
 
     results = list(self.apply(args, attrs))
+    start = time.time()
     for i, out in enumerate(results):
         tensor = flow.Tensor(*out.shape)
         tensor._local_or_consistent_tensor = out
         tensor._undetermined_tensor = None
         results[i] = tensor
+    end = time.time()
+
+    # if not config.warming:
+    # config.pytime += end - start
 
     return results
 

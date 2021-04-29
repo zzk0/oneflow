@@ -30,6 +30,7 @@ limitations under the License.
 #include "oneflow/core/operator/operator.h"
 #include "oneflow/user/kernels/stateful_local_opkernel.h"
 #include "oneflow/core/vm/vm_util.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 namespace one {
@@ -48,6 +49,7 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr,
                                output_eager_blob_objects,
                            const AttrValueMap& attrs, const std::shared_ptr<const Device> device,
                            std::shared_ptr<const ParallelDesc> parallel_desc) {
+  OF_PROFILER_RANGE_GUARD("em op ip interpret");
   const auto kernel = JUST(user_op_expr.MutKernel4Device(*device));
   const auto mem_case = kernel->mem_case();
   for (int i = 0; i < output_eager_blob_objects->size(); i++) {
@@ -63,7 +65,9 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr,
                                     attrs, parallel_desc));
     return Maybe<void>::Ok();
   };
+  OF_PROFILER_RANGE_PUSH("PhysicalRun");
   JUST(PhysicalRun(build_instruction));
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
@@ -76,8 +80,8 @@ Maybe<vm::EagerBlobObject> GenerateAllocatedEagerBlobObject(DataType data_type,
       std::make_shared<std::vector<std::shared_ptr<vm::EagerBlobObject>>>(1);
 
   const auto device = JUST(GetDefaultDevice());
-  std::shared_ptr<const ParallelDesc> parallel_desc =
-      JUST(Device::MakeParallelDescByDevice(*device));
+  std::shared_ptr<const ParallelDesc> parallel_desc = device->parallel_desc_ptr();
+  // JUST(Device::MakeParallelDescByDevice(*device));
 
   JUST(NaiveInterpret(*zeros_expr, input_eager_blob_objects, output_eager_blob_objects,
                       AttrValueMap{}, device, parallel_desc));
@@ -93,8 +97,8 @@ static Maybe<void> NaiveInterpret(const BuiltinOpExpr& op_expr, const TensorTupl
     device = inputs.at(0)->device();
     for (int i = 1; i < inputs.size(); i++) { CHECK(*device == *inputs.at(i)->device()); }
   }
-  std::shared_ptr<const ParallelDesc> parallel_desc =
-      JUST(Device::MakeParallelDescByDevice(*device));
+  std::shared_ptr<const ParallelDesc> parallel_desc = device->parallel_desc_ptr();
+  // JUST(Device::MakeParallelDescByDevice(*device));
   const auto& user_op_expr = dynamic_cast<const UserOpExpr&>(op_expr);
   std::shared_ptr<std::vector<std::shared_ptr<vm::EagerBlobObject>>> input_eager_blob_objects =
       std::make_shared<std::vector<std::shared_ptr<vm::EagerBlobObject>>>(inputs.size());

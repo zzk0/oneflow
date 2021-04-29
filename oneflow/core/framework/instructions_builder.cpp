@@ -37,6 +37,7 @@ limitations under the License.
 #include "oneflow/core/vm/release_tensor_arg_phy_instr_operand.h"
 #include "oneflow/core/framework/vm_local_dep_object.h"
 #include "oneflow/core/framework/tensor.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 
@@ -648,11 +649,13 @@ Maybe<void> InstructionsBuilder::LocalCallOpKernel(
     one::EagerBlobObjectList input_eager_blob_objects,
     one::EagerBlobObjectList output_eager_blob_objects, const AttrValueMap& attrs,
     const std::shared_ptr<const ParallelDesc>& parallel_desc_sym) {
+  OF_PROFILER_RANGE_GUARD("local call build instruction");
   ObjectMsgPtr<vm::InstructionMsg> instruction =
       ObjectMsgPtr<vm::InstructionMsg>::New(parallel_desc_sym->device_tag() + ".LocalCallOpKernel");
   auto phy_instr_operand = std::make_shared<vm::LocalCallOpKernelPhyInstrOperand>(
       opkernel, input_eager_blob_objects, output_eager_blob_objects, attrs);
-  instruction->set_parallel_desc_symbol_id(JUST(parallel_desc_sym->symbol_id()));
+  // instruction->set_parallel_desc_symbol_id(JUST(parallel_desc_sym->symbol_id()));
+  *instruction->mut_parallel_desc() = parallel_desc_sym;
   *instruction->mutable_phy_instr_operand() = phy_instr_operand;
   instruction_list_->EmplaceBack(std::move(instruction));
   return Maybe<void>::Ok();
