@@ -649,7 +649,7 @@ Maybe<void> InstructionsBuilder::LocalCallOpKernel(
     one::EagerBlobObjectList input_eager_blob_objects,
     one::EagerBlobObjectList output_eager_blob_objects, const AttrValueMap& attrs,
     const std::shared_ptr<const ParallelDesc>& parallel_desc_sym) {
-  OF_PROFILER_RANGE_GUARD("local call build instruction");
+  OF_PROFILER_RANGE_GUARD_2("local call build instruction");
   ObjectMsgPtr<vm::InstructionMsg> instruction =
       ObjectMsgPtr<vm::InstructionMsg>::New(parallel_desc_sym->device_tag() + ".LocalCallOpKernel");
   auto phy_instr_operand = std::make_shared<vm::LocalCallOpKernelPhyInstrOperand>(

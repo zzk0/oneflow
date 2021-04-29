@@ -146,7 +146,7 @@ Maybe<void> DetermineRequiresGrad(TensorTuple* outputs, const bool& requires_gra
 
 Maybe<void> AutogradInterpreter::Apply(const OpExpr& op_expr, const TensorTuple& inputs,
                                        TensorTuple* outputs, const AttrValueMap& attrs) const {
-  OF_PROFILER_RANGE_GUARD("autograd ip apply");
+  OF_PROFILER_RANGE_GUARD_2("autograd ip apply");
   bool requires_grad = false;
   {
     autograd::AutoGradMode mode(false);

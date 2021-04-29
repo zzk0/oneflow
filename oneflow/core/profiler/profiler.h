@@ -44,6 +44,13 @@ class RangeGuard final {
   std::shared_ptr<RangeGuardCtx> ctx_;
 };
 
+class RangeGuard2 final {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(RangeGuard2);
+  explicit RangeGuard2(const std::string& name) { ::oneflow::profiler::RangePush(name); }
+  ~RangeGuard2() { ::oneflow::profiler::RangePop(); }
+};
+
 #ifdef OF_ENABLE_PROFILER
 #define OF_PROFILER_NAME_THIS_HOST_THREAD(name) ::oneflow::profiler::NameThisHostThread(name)
 #define OF_PROFILER_ONLY_CODE(...) __VA_ARGS__
@@ -51,6 +58,8 @@ class RangeGuard final {
 #define OF_PROFILER_RANGE_POP() ::oneflow::profiler::RangePop()
 #define OF_PROFILER_RANGE_GUARD(name) \
   ::oneflow::profiler::RangeGuard OF_PP_CAT(_of_profiler_range_guard_, __COUNTER__)(name)
+#define OF_PROFILER_RANGE_GUARD_2(name) \
+  ::oneflow::profiler::RangeGuard2 OF_PP_CAT(_of_profiler_range_guard_2_, __COUNTER__)(name)
 #define OF_PROFILER_LOG_HOST_MEMORY_USAGE(name) ::oneflow::profiler::LogHostMemoryUsage(name)
 #else
 #define OF_PROFILER_ONLY_CODE(...)

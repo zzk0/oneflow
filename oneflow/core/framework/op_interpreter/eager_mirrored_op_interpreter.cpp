@@ -49,7 +49,7 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr,
                                output_eager_blob_objects,
                            const AttrValueMap& attrs, const std::shared_ptr<const Device> device,
                            std::shared_ptr<const ParallelDesc> parallel_desc) {
-  OF_PROFILER_RANGE_GUARD("em op ip interpret");
+  OF_PROFILER_RANGE_GUARD_2("em op ip interpret");
   const auto kernel = JUST(user_op_expr.MutKernel4Device(*device));
   const auto mem_case = kernel->mem_case();
   for (int i = 0; i < output_eager_blob_objects->size(); i++) {
@@ -65,9 +65,11 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr,
                                     attrs, parallel_desc));
     return Maybe<void>::Ok();
   };
+  LOG(INFO) << "xx";
   OF_PROFILER_RANGE_PUSH("PhysicalRun");
   JUST(PhysicalRun(build_instruction));
   OF_PROFILER_RANGE_POP();
+  LOG(INFO) << "xx";
   return Maybe<void>::Ok();
 }
 
