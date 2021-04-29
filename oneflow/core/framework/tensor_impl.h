@@ -24,6 +24,7 @@ limitations under the License.
 #include "oneflow/core/framework/object.h"
 #include "oneflow/core/framework/tensor_arg.h"
 #include "oneflow/core/framework/tensor_storage.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 
@@ -126,6 +127,7 @@ class MirroredTensorImpl : public TensorImpl {
   MirroredTensorImpl(const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf,
                      bool retain_grad)
       : TensorImpl(requires_grad, is_leaf, retain_grad) {
+    OF_PROFILER_RANGE_GUARD_2("MirroredTensorImpl contructor impl");
     set_device(device);
   }
 

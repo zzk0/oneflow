@@ -102,6 +102,7 @@ Maybe<void> LazyInterpreter::ApplyImpl(const FunctionOpExpr& op_expr, const Tens
 
 Maybe<void> EagerInterpreter::Apply(const OpExpr& op_expr, const TensorTuple& inputs,
                                     TensorTuple* outputs, const AttrValueMap& attrs) const {
+  OF_PROFILER_RANGE_GUARD_2("ei apply");
 #define APPLY_IF(op_type)                                              \
   if (const auto* op = dynamic_cast<const op_type##Expr*>(&op_expr)) { \
     return ApplyImpl(*op, inputs, outputs, attrs);                     \
@@ -149,6 +150,7 @@ Maybe<void> AutogradInterpreter::Apply(const OpExpr& op_expr, const TensorTuple&
   OF_PROFILER_RANGE_GUARD_2("autograd ip apply");
   bool requires_grad = false;
   {
+    OF_PROFILER_RANGE_GUARD_2("autograd ip apply inner");
     autograd::AutoGradMode mode(false);
     JUST(internal_->Apply(op_expr, inputs, outputs, attrs));
     if (!JUST(op_expr.IsGradDisabled())) {

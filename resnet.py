@@ -29,7 +29,7 @@ def to_cuda(x):
 
 
 if __name__ == "__main__":
-    # resnet50 = lambda: nn.Linear(3*224*224, 100)
+    # resnet50 = lambda: nn.Linear(3 * 224 * 224, 100)
 
     def gf(*args, **kwargs):
         if config.consistent:
@@ -37,18 +37,32 @@ if __name__ == "__main__":
         else:
             return lambda x: x
 
+    def push(name):
+        if test_oneflow:
+            flow.profiler.range_push("full")
+        else:
+            pass
+
+    def pop():
+        if test_oneflow:
+            flow.profiler.range_pop()
+        else:
+            pass
+
     @gf()
     def job():
         m = resnet50()
         m = to_cuda(m)
         m.eval()
         with torch.no_grad():
-            x = to_cuda(torch.Tensor(np.ones((16, 3, 224, 224))))
+            x = to_cuda(torch.Tensor(np.ones((16, 3 * 224 * 224))))
             y = m(x)
             config.warming = False
             start = time.time()
+            push("full")
             for _ in range(10):
                 y = m(x)
+            pop()
             end = time.time()
             print(end - start)
             print(config.pytime)

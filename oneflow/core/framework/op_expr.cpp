@@ -18,6 +18,7 @@ limitations under the License.
 #include "oneflow/core/framework/op_expr_grad_function.h"
 #include "oneflow/core/framework/user_op_registry_manager.h"
 #include "oneflow/user/kernels/stateful_local_opkernel.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 namespace one {
@@ -78,7 +79,9 @@ Maybe<void> BuiltinOpExprImpl<UserOpConf>::BuildOpConf(OperatorConf* op_conf,
 }
 
 Maybe<StatefulOpKernel> UserOpExpr::MutKernel4Device(const Device& device) const {
+  OF_PROFILER_RANGE_PUSH("find");
   const auto& it = device2kernel_.find(device);
+  OF_PROFILER_RANGE_POP();
   if (it != device2kernel_.end()) { return it->second; }
 
   std::shared_ptr<OperatorConf> op_conf = std::make_shared<OperatorConf>();

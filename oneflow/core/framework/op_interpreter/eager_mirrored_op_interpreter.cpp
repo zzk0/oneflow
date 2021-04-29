@@ -50,26 +50,34 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr,
                            const AttrValueMap& attrs, const std::shared_ptr<const Device> device,
                            std::shared_ptr<const ParallelDesc> parallel_desc) {
   OF_PROFILER_RANGE_GUARD_2("em op ip interpret");
+  OF_PROFILER_RANGE_PUSH("MKD");
   const auto kernel = JUST(user_op_expr.MutKernel4Device(*device));
+  OF_PROFILER_RANGE_PUSH("gm");
   const auto mem_case = kernel->mem_case();
+  OF_PROFILER_RANGE_PUSH("cebo");
   for (int i = 0; i < output_eager_blob_objects->size(); i++) {
     auto eager_blob_object = std::make_shared<vm::EagerBlobObject>(
         mem_case, std::make_shared<Shape>(), DataType::kInvalidDataType,
         std::make_shared<vm::TensorBuffer>(), parallel_desc);
     output_eager_blob_objects->at(i) = eager_blob_object;
   }
+  OF_PROFILER_RANGE_PUSH("idt");
   kernel->InferDataType(input_eager_blob_objects, output_eager_blob_objects);
 
+  OF_PROFILER_RANGE_PUSH("bbi");
   auto build_instruction = [&](InstructionsBuilder* builder) -> Maybe<void> {
     JUST(builder->LocalCallOpKernel(kernel, input_eager_blob_objects, output_eager_blob_objects,
                                     attrs, parallel_desc));
     return Maybe<void>::Ok();
   };
-  LOG(INFO) << "xx";
   OF_PROFILER_RANGE_PUSH("PhysicalRun");
   JUST(PhysicalRun(build_instruction));
   OF_PROFILER_RANGE_POP();
-  LOG(INFO) << "xx";
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
@@ -92,6 +100,8 @@ Maybe<vm::EagerBlobObject> GenerateAllocatedEagerBlobObject(DataType data_type,
 
 static Maybe<void> NaiveInterpret(const BuiltinOpExpr& op_expr, const TensorTuple& inputs,
                                   TensorTuple* outputs, const AttrValueMap& attrs) {
+  OF_PROFILER_RANGE_GUARD_2("em op ip interpret outer");
+  OF_PROFILER_RANGE_PUSH("get dev");
   std::shared_ptr<const Device> device;
   if (inputs.empty()) {
     device = JUST(GetDefaultDevice());
@@ -99,22 +109,35 @@ static Maybe<void> NaiveInterpret(const BuiltinOpExpr& op_expr, const TensorTupl
     device = inputs.at(0)->device();
     for (int i = 1; i < inputs.size(); i++) { CHECK(*device == *inputs.at(i)->device()); }
   }
+  OF_PROFILER_RANGE_PUSH("get parallel desc");
   std::shared_ptr<const ParallelDesc> parallel_desc = device->parallel_desc_ptr();
   // JUST(Device::MakeParallelDescByDevice(*device));
+  OF_PROFILER_RANGE_PUSH("get user op expr");
   const auto& user_op_expr = dynamic_cast<const UserOpExpr&>(op_expr);
+  OF_PROFILER_RANGE_PUSH("get iebo");
   std::shared_ptr<std::vector<std::shared_ptr<vm::EagerBlobObject>>> input_eager_blob_objects =
       std::make_shared<std::vector<std::shared_ptr<vm::EagerBlobObject>>>(inputs.size());
   for (int i = 0; i < inputs.size(); i++) {
     input_eager_blob_objects->at(i) = JUST(inputs.at(i)->eager_blob_object());
   }
+  OF_PROFILER_RANGE_PUSH("get oebo");
   std::shared_ptr<std::vector<std::shared_ptr<vm::EagerBlobObject>>> output_eager_blob_objects =
       std::make_shared<std::vector<std::shared_ptr<vm::EagerBlobObject>>>(outputs->size());
+  OF_PROFILER_RANGE_PUSH("interpret");
   NaiveInterpret(user_op_expr, input_eager_blob_objects, output_eager_blob_objects, attrs, device,
                  parallel_desc);
+  OF_PROFILER_RANGE_PUSH("build mt");
   for (int i = 0; i < outputs->size(); ++i) {
     outputs->at(i) = JUST(OpInterpUtil::BuildEagerMirroredTensorFromEagerBlobObject(
         output_eager_blob_objects->at(i), device));
   }
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 
