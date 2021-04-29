@@ -1,12 +1,9 @@
 """
 Copyright 2020 The OneFlow Authors. All rights reserved.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -79,14 +76,11 @@ class Sum(Module):
 def _sum(input, dim, keepdim=False):
     r"""Computes the sum of row of elements in a tensor in the given axis, if the axis is None, sum of all elements will be caculated.
     For example:
-
     .. code-block:: python
-
         #Example
         
         input = flow.Tensor(np.random.randn(4, 5, 6), dtype=flow.float32)
         of_out = flow.sum(input, dim=(2,1))
-
     """
 
     return Sum(dim, keepdim)(input)
@@ -191,7 +185,6 @@ def _mul(x, y):
         y = flow.Tensor(np.random.randn(2,3))
         out = flow.mul(x,y).numpy()
         print(out.shape) # (2,3)
-
     """
 
     if isinstance(x, (int, float)):
@@ -249,9 +242,7 @@ def _mean(input_tensor, dim, keepdim):
     r"""Computes the mean of row of elements in a tensor in the given axis, if the axis is None, mean of all elements will be caculated.
     
     For example:
-
     .. code-block:: python
-
         input = flow.Tensor([[1, 2, 3], [4, 5, 6]])
         out = flow.mean(input) # out: [3.5]
         print(out.numpy())
@@ -259,11 +250,9 @@ def _mean(input_tensor, dim, keepdim):
         input = flow.Tensor([[1, 2, 3], [4, 5, 6]])
         out = flow.mean(input, axis=0) # out: [2.5 3.5 4.5]
         print(out.numpy())
-
         input = flow.Tensor([[1, 2, 3], [4, 5, 6]])
         out = flow.mean(input, axis=1) # out: [ 2. 5.]
         print(out.numpy())
-
     """
 
     return Mean(axis=dim, keepdims=keepdim)(input_tensor)
@@ -335,9 +324,7 @@ def _sub(x, y):
     .. math::
         out = x - y
     For example:
-
     .. code-block:: python
-
         # element-wise subtract
         x = flow.Tensor(np.random.randn(2,3))
         y = flow.Tensor(np.random.randn(2,3))
@@ -353,7 +340,6 @@ def _sub(x, y):
         y = flow.Tensor(np.random.randn(2,3))
         out = flow.sub(x,y).numpy()
         print(out.shape) # (2,3)
-
     """
 
     if isinstance(x, (int, float)):
@@ -414,7 +400,6 @@ def _div(x, y):
         name (Optional[str], optional): The name for the operation. Defaults to None.
     For example:
     .. code-block:: python
-
         # element-wise divide
         x = flow.Tensor(np.random.randn(2,3))
         y = flow.Tensor(np.random.randn(2,3))
@@ -430,7 +415,6 @@ def _div(x, y):
         y = flow.Tensor(np.random.randn(2,3))
         out = flow.div(x,y).numpy()
         print(out.shape) # (2,3)
-
     """
 
     if isinstance(x, (int, float)):
@@ -472,14 +456,12 @@ def _reciprocal(x):
         name (Optional[str], optional): The name for the operation. Defaults to None.
     
     For example: 
-
     .. code-block:: python 
     
         x = flow.Tensor(np.array([[1, 2, 3], [4, 5, 6]]))
         out = flow.reciprocal()(x)
         # out [[1.         0.5        0.33333334]
                [0.25       0.2        0.16666667]]
-
     """
 
     return Reciprocal()(x)
@@ -560,9 +542,7 @@ def _add(x, y):
     .. math::
         out = x + y
     For example:
-
     .. code-block:: python
-
         # Example
         # element-wise add
         x = flow.Tensor(np.random.randn(2,3))
@@ -579,7 +559,6 @@ def _add(x, y):
         y = flow.Tensor(np.random.randn(2,3))
         out = flow.add(x,y).numpy()
         print(out.shape) # (2,3)
-
     """
 
     if isinstance(x, (int, float)):
@@ -594,3 +573,98 @@ def _add(x, y):
         return ScalarAddByTensor()(x, y)
     else:
         return BroadcastAdd()(x, y)
+
+
+class Sin(Module):
+    r"""
+    Returns a new tensor with the sine of the elements of :attr:`input`.
+    .. math::
+        \text{out}_{i} = \sin(\text{input}_{i})
+    Args:
+        input (Tensor)  the input tensor.
+    For example:
+    .. code-block:: python
+        import oneflow as flow
+        import numpy as np
+        arr = np.array([-0.5461,  0.1347, -2.7266, -0.2746])
+        input = flow.Tensor(arr, dtype=flow.float32)
+        output = flow.sin(input)
+        # [-0.51935846  0.13429303 -0.40318328 -0.27116194]
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._op = flow.builtin_op("sin").Input("x").Output("y").Build()
+
+    def forward(self, x):
+        return self._op(x)[0]
+
+
+@oneflow_export("sin")
+@register_tensor_op("sin")
+def sin_op(tensor):
+    return Sin()(tensor)
+
+
+class Cos(Module):
+    r"""
+    Returns a new tensor with the cosine  of the elements of :attr:`input`.
+    .. math::
+        \text{out}_{i} = \cos(\text{input}_{i})
+    Args:
+        input (Tensor)  the input tensor.
+    For example:
+    .. code-block:: python
+        import oneflow as flow
+        import numpy as np
+        arr = np.array([1.4309,  1.2706, -0.8562,  0.9796])
+        input = flow.Tensor(arr, dtype=flow.float32)
+        output = flow.cos(input)
+        # [0.13944048 0.29570782 0.6553126  0.5573547 ]
+        
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._op = flow.builtin_op("cos").Input("x").Output("y").Build()
+
+    def forward(self, x):
+        return self._op(x)[0]
+
+
+@oneflow_export("cos")
+@register_tensor_op("cos")
+def cos_op(tensor):
+    return Cos()(tensor)
+
+
+class Log(Module):
+    r"""
+    Returns a new tensor with the natural logarithm of the elements of :attr:`input`.
+    .. math::
+        y_{i} = \log_{e} (x_{i})
+    Args:
+        input (Tensor)  the input tensor.
+    For example:
+    .. code-block:: python
+        import oneflow as flow
+        import numpy as np
+        arr = np.random.randn(2, 3, 4, 5)
+        input = flow.Tensor(arr, dtype=flow.float32)
+        output = flow.log(input)
+        # equal to np.log(input)
+        
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._op = flow.builtin_op("log").Input("x").Output("y").Build()
+
+    def forward(self, x):
+        return self._op(x)[0]
+
+
+@oneflow_export("log")
+@register_tensor_op("log")
+def log_op(tensor):
+    return Log()(tensor)
