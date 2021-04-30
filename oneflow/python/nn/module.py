@@ -76,12 +76,12 @@ class Module(object):
         raise NotImplementedError()
 
     def __call__(self, *args):
-        for hook in itertools.chain(self._forward_pre_hooks.values()):
-            result = hook(self, args)
-            if result is not None:
-                if not isinstance(result, tuple):
-                    result = (result,)
-                args = result
+        # for hook in itertools.chain(self._forward_pre_hooks.values()):
+        #     result = hook(self, args)
+        #     if result is not None:
+        #         if not isinstance(result, tuple):
+        #             result = (result,)
+        #         args = result
 
         res = self.forward(*args)
 

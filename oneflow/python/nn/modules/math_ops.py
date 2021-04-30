@@ -37,6 +37,7 @@ from oneflow.python.nn.modules.utils import (
     _pair,
     _triple,
     _reverse_repeat_tuple,
+    _singleton,
 )
 from oneflow.python.nn.common_types import _size_1_t, _size_2_t, _size_3_t
 from oneflow.python.ops.nn_ops import calc_pool_padding, get_dhw_offset
@@ -510,6 +511,7 @@ class ScalarAdd(Module):
         return self._op(x)[0]
 
 
+@_singleton
 class ScalarAddByTensor(Module):
     def __init__(self, name=None) -> None:
         super().__init__()
@@ -525,6 +527,7 @@ class ScalarAddByTensor(Module):
         return self._op(x, y)[0]
 
 
+@_singleton
 class ElementwiseAdd(Module):
     def __init__(self, name=None) -> None:
         super().__init__()
@@ -534,6 +537,7 @@ class ElementwiseAdd(Module):
         return self._op(x, y)[0]
 
 
+@_singleton
 class BroadcastAdd(Module):
     def __init__(self, name=None) -> None:
         super().__init__()
@@ -575,6 +579,7 @@ def _add(x, y):
         out = flow.add(x,y).numpy()
         print(out.shape) # (2,3)
     """
+    # return ElementwiseAdd()(x, y)
 
     if isinstance(x, (int, float)):
         return ScalarAdd(x)(y)
@@ -621,6 +626,7 @@ def sin_op(tensor):
     return Sin()(tensor)
 
 
+@_singleton
 class Cos(Module):
     r"""
     Returns a new tensor with the cosine  of the elements of :attr:`input`.

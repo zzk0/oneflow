@@ -27,7 +27,7 @@ class Parameter(Tensor):
         # data.set_is_consistent(True)
         # data.set_placement(flow.placement("gpu", ["0:0"], None))
         self._data = data
-        self._data.requires_grad = requires_grad
+        # self._data.requires_grad = requires_grad
 
     def __getattr__(self, name):
         return getattr(self._data, name)

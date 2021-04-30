@@ -91,6 +91,14 @@ class TensorImpl {
       const std::shared_ptr<compatible_py::BlobObject>& blob_object) = 0;
 
  protected:
+  TensorImpl() = default;
+  void Init(bool requires_grad, bool is_leaf, bool retain_grad) {
+    OF_PROFILER_RANGE_GUARD_2("ti init");
+    requires_grad_ = requires_grad;
+    is_leaf_ = is_leaf;
+    retain_grad_ = retain_grad;
+    now_grad_arg_ = std::shared_ptr<TensorArg>(new TensorArg);
+  }
   TensorImpl(bool requires_grad, bool is_leaf, bool retain_grad)
       : requires_grad_(requires_grad),
         is_leaf_(is_leaf),
@@ -124,6 +132,13 @@ class MirroredTensorImpl : public TensorImpl {
       std::shared_ptr<vm::EagerBlobObject> eager_blob_object) = 0;
 
  protected:
+  MirroredTensorImpl() = default;
+  void Init(const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf,
+      bool retain_grad) {
+    TensorImpl::Init(requires_grad, is_leaf, retain_grad);
+    OF_PROFILER_RANGE_GUARD_2("mti init");
+    set_device(device);
+  }
   MirroredTensorImpl(const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf,
                      bool retain_grad)
       : TensorImpl(requires_grad, is_leaf, retain_grad) {
@@ -211,6 +226,10 @@ class LazyMirroredTensorImpl final : public MirroredTensorImpl {
 class EagerMirroredTensorImpl final : public MirroredTensorImpl {
  public:
   OF_DISALLOW_COPY_AND_MOVE(EagerMirroredTensorImpl);
+  EagerMirroredTensorImpl() = default;
+  void Init(const std::shared_ptr<vm::EagerBlobObject> eager_blob_object,
+                          const std::shared_ptr<const Device>& device, bool requires_grad,
+                          bool is_leaf, bool retain_grad);
   EagerMirroredTensorImpl(const std::shared_ptr<vm::EagerBlobObject> eager_blob_object,
                           const std::shared_ptr<const Device>& device, bool requires_grad,
                           bool is_leaf, bool retain_grad);

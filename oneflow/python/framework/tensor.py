@@ -32,6 +32,17 @@ import oneflow as flow
 from oneflow.python.nn.modules import *
 
 
+def register_local_tensor_op(name=None):
+    def decorator(method):
+        if name is None:
+            op_name = method.__name__
+        else:
+            op_name = name
+        setattr(oneflow._oneflow_internal.LocalTensor, op_name, method)
+        return method
+    return decorator
+
+
 def _access_blob_by_callback(local_tensor, callback, modifier):
     def AsyncAccess(Yield):
         def MakeAccessor(Yield):
@@ -49,6 +60,13 @@ def _access_blob_by_callback(local_tensor, callback, modifier):
         flow._oneflow_internal.deprecated.PhysicalRun(BuildInstruction)
 
     return async_util.Await(1, AsyncAccess)[0]
+
+
+@register_local_tensor_op("numpy")
+def _local_tensor_numpy(tensor):
+    return _access_blob_by_callback(
+        tensor, lambda ofblob: ofblob.CopyToNdarray(), "const"
+    )
 
 
 def _copy_from_numpy_to_eager_local_tensor(eager_local_tensor, np_arr):
@@ -233,12 +251,15 @@ class Tensor:
         else:
             self._undetermined_tensor.requires_grad = requires_grad
 
+    @register_local_tensor_op()
     def size(self):
         return self.shape
 
+    @register_local_tensor_op()
     def dim(self, idx):
         return self.shape[idx]
 
+    @register_local_tensor_op()
     def ndimension(self):
         return self.ndim
 
@@ -278,9 +299,7 @@ class Tensor:
     def numpy(self):
         internal_tensor = self._local_or_consistent_tensor
         if not internal_tensor.is_lazy and not internal_tensor.is_consistent:
-            return _access_blob_by_callback(
-                internal_tensor, lambda ofblob: ofblob.CopyToNdarray(), "const"
-            )
+            return _local_tensor_numpy(internal_tensor)
 
         return remote_blob_util.BlobObjectNumpy(internal_tensor._blob_object)
 
@@ -306,27 +325,35 @@ class Tensor:
     def __deepcopy__(self, memo):
         TODO()
 
+    @register_local_tensor_op()
     def __mul__(self, other):
         return self.mul(other)
 
+    @register_local_tensor_op()
     def __rmul__(self, other):
         return self.mul(other)
 
+    @register_local_tensor_op()
     def __add__(self, other):
         return self.add(other)
 
+    @register_local_tensor_op()
     def __radd__(self, other):
         return self.add(other)
 
+    @register_local_tensor_op()
     def __sub__(self, other):
         return self.sub(other)
 
+    @register_local_tensor_op()
     def __rsub__(self, other):
         return flow.sub(other, self)
 
+    @register_local_tensor_op()
     def __truediv__(self, other):
         return self.div(other)
 
+    @register_local_tensor_op()
     def __rtruediv__(self, other):
         return flow.div(other, self)
 
@@ -729,6 +756,7 @@ def _input_args_is_shape(*args):
 def register_tensor_op(op_name):
     def set_tensor_op(method):
         setattr(Tensor, op_name, method)
+        setattr(oneflow._oneflow_internal.LocalTensor, op_name, method)
         return method
 
     return set_tensor_op

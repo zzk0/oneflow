@@ -47,8 +47,16 @@ class RangeGuard final {
 class RangeGuard2 final {
  public:
   OF_DISALLOW_COPY_AND_MOVE(RangeGuard2);
-  explicit RangeGuard2(const std::string& name) { ::oneflow::profiler::RangePush(name); }
-  ~RangeGuard2() { ::oneflow::profiler::RangePop(); }
+  explicit RangeGuard2(const std::string& name) { 
+#ifdef OF_ENABLE_PROFILER
+    ::oneflow::profiler::RangePush(name); 
+#endif
+  }
+  ~RangeGuard2() { 
+#ifdef OF_ENABLE_PROFILER
+    ::oneflow::profiler::RangePop(); 
+#endif
+  }
 };
 
 #ifdef OF_ENABLE_PROFILER

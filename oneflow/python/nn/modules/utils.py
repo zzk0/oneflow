@@ -53,3 +53,12 @@ def _list_with_default(out_size, defaults):
     return [
         v if v is not None else d for v, d in zip(out_size, defaults[-len(out_size) :])
     ]
+
+
+def _singleton(cls):
+    instances = {}
+    def wrapper():
+        if cls not in instances:
+          instances[cls] = cls()
+        return instances[cls]
+    return wrapper

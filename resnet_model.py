@@ -1,6 +1,22 @@
 import oneflow as flow
 import oneflow.nn as nn
 from typing import Union, Optional, Tuple, List, Callable, Type, Any
+import config
+
+
+def push(name):
+    return
+    if not config.warming:
+        flow.profiler.range_push(name)
+    else:
+        pass
+
+def pop():
+    return
+    if not config.warming:
+        flow.profiler.range_pop()
+    else:
+        pass
 
 
 def conv3x3(
@@ -240,6 +256,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        push("resnet forward")
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -253,6 +270,7 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = x.flatten(1)
         x = self.fc(x)
+        pop()
 
         return x
 

@@ -20,7 +20,14 @@ import oneflow.python.framework.blob_trait as blob_trait
 import oneflow._oneflow_internal
 
 
+@property
+def ndim(tensor):
+    return len(tensor.shape)
+
+
 def RegisterMethod4Class():
+    oneflow._oneflow_internal.LocalTensor.ndim = ndim
+
     op_expr_util.RegisterMethod4UserOpExpr()
 
     eager_blob_util.RegisterMethod4EagerPhysicalBlob()
