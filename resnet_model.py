@@ -188,6 +188,7 @@ class ResNet(nn.Module):
             block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2]
         )
         self.avgpool = nn.AvgPool2d((7, 7))
+        self.flatten = nn.Flatten()
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -268,7 +269,7 @@ class ResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.avgpool(x)
-        x = x.flatten(1)
+        x = self.flatten(x)
         x = self.fc(x)
         pop()
 

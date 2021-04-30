@@ -649,7 +649,6 @@ Maybe<void> InstructionsBuilder::LocalCallOpKernel(
     one::EagerBlobObjectList input_eager_blob_objects,
     one::EagerBlobObjectList output_eager_blob_objects, const AttrValueMap& attrs,
     const std::shared_ptr<const ParallelDesc>& parallel_desc_sym) {
-  OF_PROFILER_RANGE_GUARD_2("local call build instruction");
   ObjectMsgPtr<vm::InstructionMsg> instruction =
       ObjectMsgPtr<vm::InstructionMsg>::New(parallel_desc_sym->device_tag() + ".LocalCallOpKernel");
   auto phy_instr_operand = std::make_shared<vm::LocalCallOpKernelPhyInstrOperand>(
@@ -1570,18 +1569,12 @@ Maybe<void> LogicalRun(const std::function<void(InstructionsBuilder*)>& Build) {
 Maybe<void> PhysicalRun(const std::function<void(InstructionsBuilder*)>& Build) {
   vm::InstructionMsgList instruction_list;
   vm::cfg::EagerSymbolList eager_symbol_list;
-  OF_PROFILER_RANGE_PUSH("build ib");
   InstructionsBuilder instructions_builder(std::shared_ptr<vm::PhysicalIdGenerator>(),
                                            &instruction_list, &eager_symbol_list,
                                            _ReleasePhysicalObject);
-  OF_PROFILER_RANGE_POP();
-  OF_PROFILER_RANGE_PUSH("run build instruction");
   Build(&instructions_builder);
-  OF_PROFILER_RANGE_POP();
-  OF_PROFILER_RANGE_PUSH("run physical instruction");
   JUST(Global<vm::EagerOneflow>::Get()->RunPhysicalInstruction(
       instructions_builder.mut_instruction_list(), instructions_builder.eager_symbol_list()));
-  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 

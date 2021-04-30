@@ -34,7 +34,6 @@ namespace {
 
 Maybe<one::TensorTuple> Interpret(const one::OpExpr& op, const one::TensorTuple& inputs,
                                   const AttrValueMap& attrs) {
-  OF_PROFILER_RANGE_GUARD_2("Op expr interpret");
   CHECK_EQ_OR_RETURN(op.input_size(), inputs.size())
       << "The operation requires " << op.input_size() << " inputs, but " << inputs.size()
       << " is given.";

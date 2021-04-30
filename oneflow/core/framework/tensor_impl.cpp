@@ -75,13 +75,9 @@ void EagerMirroredTensorImpl::Init(const std::shared_ptr<vm::EagerBlobObject> ea
                               bool is_leaf, bool retain_grad) {
   MirroredTensorImpl::Init(device, requires_grad, is_leaf, retain_grad);
   eager_blob_object_ = eager_blob_object;
-  OF_PROFILER_RANGE_GUARD_2("EagerMirroredTensorImpl contructor impl");
   dtype_ = CHECK_JUST(DType::GetDTypeByDataType(eager_blob_object->blob_desc().data_type()));
-  OF_PROFILER_RANGE_PUSH("get tensor storage");
   tensor_storage_ = std::make_shared<TensorStorage>(eager_blob_object->tensor_buffer());
-  OF_PROFILER_RANGE_POP();
   const auto& parallel_desc = this->parallel_desc();
-  OF_PROFILER_RANGE_GUARD_2("set hook");
   tensor_storage_->set_releaser_hook(
       [eager_blob_object, parallel_desc](const std::shared_ptr<vm::TensorBuffer>&) {
         PhysicalRun([&](InstructionsBuilder* builder) {

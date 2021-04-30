@@ -57,7 +57,7 @@ if __name__ == "__main__":
     # times = 100
 
     shape = (16, 3, 224, 224)
-    times = 10
+    times = 5000
 
     def gf(*args, **kwargs):
         if config.consistent:
@@ -94,6 +94,8 @@ if __name__ == "__main__":
         with torch.no_grad():
             x = to_cuda(get_tensor(shape))
             config.warming = False
+            print('sleeping 5s..')
+            time.sleep(5)
             start = time.time()
             # profiler = Profiler()
             # profiler.start()

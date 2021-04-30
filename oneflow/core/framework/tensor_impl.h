@@ -93,7 +93,6 @@ class TensorImpl {
  protected:
   TensorImpl() = default;
   void Init(bool requires_grad, bool is_leaf, bool retain_grad) {
-    OF_PROFILER_RANGE_GUARD_2("ti init");
     requires_grad_ = requires_grad;
     is_leaf_ = is_leaf;
     retain_grad_ = retain_grad;
@@ -136,13 +135,11 @@ class MirroredTensorImpl : public TensorImpl {
   void Init(const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf,
       bool retain_grad) {
     TensorImpl::Init(requires_grad, is_leaf, retain_grad);
-    OF_PROFILER_RANGE_GUARD_2("mti init");
     set_device(device);
   }
   MirroredTensorImpl(const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf,
                      bool retain_grad)
       : TensorImpl(requires_grad, is_leaf, retain_grad) {
-    OF_PROFILER_RANGE_GUARD_2("MirroredTensorImpl contructor impl");
     set_device(device);
   }
 
