@@ -57,8 +57,10 @@ def _list_with_default(out_size, defaults):
 
 def _singleton(cls):
     instances = {}
+
     def wrapper():
         if cls not in instances:
-          instances[cls] = cls()
+            instances[cls] = cls()
         return instances[cls]
+
     return wrapper

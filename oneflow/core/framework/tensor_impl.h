@@ -133,7 +133,7 @@ class MirroredTensorImpl : public TensorImpl {
  protected:
   MirroredTensorImpl() = default;
   void Init(const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf,
-      bool retain_grad) {
+            bool retain_grad) {
     TensorImpl::Init(requires_grad, is_leaf, retain_grad);
     set_device(device);
   }
@@ -225,8 +225,8 @@ class EagerMirroredTensorImpl final : public MirroredTensorImpl {
   OF_DISALLOW_COPY_AND_MOVE(EagerMirroredTensorImpl);
   EagerMirroredTensorImpl() = default;
   void Init(const std::shared_ptr<vm::EagerBlobObject> eager_blob_object,
-                          const std::shared_ptr<const Device>& device, bool requires_grad,
-                          bool is_leaf, bool retain_grad);
+            const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf,
+            bool retain_grad);
   EagerMirroredTensorImpl(const std::shared_ptr<vm::EagerBlobObject> eager_blob_object,
                           const std::shared_ptr<const Device>& device, bool requires_grad,
                           bool is_leaf, bool retain_grad);

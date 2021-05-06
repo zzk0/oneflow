@@ -40,6 +40,7 @@ def register_local_tensor_op(name=None):
             op_name = name
         setattr(oneflow._oneflow_internal.LocalTensor, op_name, method)
         return method
+
     return decorator
 
 

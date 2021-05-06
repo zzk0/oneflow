@@ -11,6 +11,7 @@ def push(name):
     else:
         pass
 
+
 def pop():
     return
     if not config.warming:
@@ -270,6 +271,7 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = self.flatten(x)
+        # x = x.flatten(1)
         x = self.fc(x)
         pop()
 

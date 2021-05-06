@@ -71,8 +71,8 @@ Maybe<void> EagerConsistentTensorImpl::set_blob_object(
 }
 
 void EagerMirroredTensorImpl::Init(const std::shared_ptr<vm::EagerBlobObject> eager_blob_object,
-                              const std::shared_ptr<const Device>& device, bool requires_grad,
-                              bool is_leaf, bool retain_grad) {
+                                   const std::shared_ptr<const Device>& device, bool requires_grad,
+                                   bool is_leaf, bool retain_grad) {
   MirroredTensorImpl::Init(device, requires_grad, is_leaf, retain_grad);
   eager_blob_object_ = eager_blob_object;
   dtype_ = CHECK_JUST(DType::GetDTypeByDataType(eager_blob_object->blob_desc().data_type()));

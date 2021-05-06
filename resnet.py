@@ -34,7 +34,7 @@ def sync(x):
     if test_oneflow:
         return x.numpy()
     else:
-        pass
+        return x.cpu().numpy()
 
 
 def get_tensor(shape):
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     # times = 100
 
     shape = (16, 3, 224, 224)
-    times = 5000
+    times = 500
 
     def gf(*args, **kwargs):
         if config.consistent:
@@ -87,6 +87,7 @@ if __name__ == "__main__":
             for _ in range(5):
                 y = m(x)
                 sync(y)
+
     warmup()
 
     @gf()
@@ -94,7 +95,7 @@ if __name__ == "__main__":
         with torch.no_grad():
             x = to_cuda(get_tensor(shape))
             config.warming = False
-            print('sleeping 5s..')
+            print("sleeping 5s..")
             time.sleep(5)
             start = time.time()
             # profiler = Profiler()
@@ -103,7 +104,7 @@ if __name__ == "__main__":
                 push("full")
                 y = m(x)
                 pop()
-                sync(y)
+                # sync(y)
             # profiler.stop()
             # print(profiler.output_text(unicode=True, color=True, show_all=True))
 

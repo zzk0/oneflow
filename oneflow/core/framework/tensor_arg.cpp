@@ -24,8 +24,8 @@ limitations under the License.
 namespace oneflow {
 namespace one {
 
-// TensorArg::TensorArg() : add2_op_(CHECK_JUST(op_expr_helper::AddNOp(2))) {}
-TensorArg::TensorArg() : add2_op_(nullptr) {}
+TensorArg::TensorArg() : add2_op_(CHECK_JUST(op_expr_helper::AddNOp(2))) {}
+// TensorArg::TensorArg() : add2_op_(nullptr) {}
 
 bool TensorArg::Empty() const { return !acc_tensor_; }
 
