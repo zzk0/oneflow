@@ -443,7 +443,7 @@ Maybe<T*> GetSharedOpKernel(vm::Instruction* instruction, DeviceType device_type
 
 struct LocalCallOpKernelUtil final {
   static inline Maybe<void> Infer(vm::Instruction* instruction) {
-    OF_PROFILER_RANGE_GUARD_2("opkernel util infer");
+    // OF_PROFILER_RANGE_GUARD_2("opkernel util infer");
     auto* operand = JUST(GetLocalCallOpKernelPhyInstrOperand(instruction));
     operand->set_user_opkernel(
         JUST(operand->mut_opkernel()->ChooseOpKernel(operand->inputs(), operand->outputs())));
@@ -457,7 +457,7 @@ struct LocalCallOpKernelUtil final {
   }
 
   static inline Maybe<void> Compute(vm::Instruction* instruction) {
-    OF_PROFILER_RANGE_GUARD_2("opkernel util compute");
+    // OF_PROFILER_RANGE_GUARD_2("opkernel util compute");
     auto* operand = JUST(GetLocalCallOpKernelPhyInstrOperand(instruction));
     DeviceCtx* device_ctx = instruction->stream().device_ctx().get();
     JUST(AllocateOutputBlobsMemory(operand, device_ctx));
@@ -528,27 +528,17 @@ struct LocalCallOpKernelUtil final {
     const auto& InferTmpSizeFn = operand->opkernel().GetInferTmpSizeFn(operand->user_opkernel());
     auto* temp_blob_desc = operand->mut_opkernel()->mut_temp_blob_object()->mut_blob_desc();
     CHECK_OR_RETURN(temp_blob_desc->data_type() == DataType::kChar);
-    JUST(WithOpInferContext(operand, [&](user_op::InferContext* infer_ctx) -> Maybe<void> {
-      size_t temp_size = InferTmpSizeFn(infer_ctx);
-      temp_blob_desc->mut_shape() = Shape({static_cast<int64_t>(temp_size)});
-      temp_blob_desc->set_is_dynamic(true);
-      return Maybe<void>::Ok();
-    }));
+    one::LocalUserOpInferContext* op_infer_ctx = operand->opkernel().user_op_infer_context_1();
+    op_infer_ctx->Update(operand->inputs(), operand->outputs());
+    size_t temp_size = InferTmpSizeFn(op_infer_ctx);
+    temp_blob_desc->mut_shape() = Shape({static_cast<int64_t>(temp_size)});
+    temp_blob_desc->set_is_dynamic(true);
+    op_infer_ctx->Update(nullptr, nullptr);
     return Maybe<void>::Ok();
   }
 
   static inline Maybe<void> ResetTempStorageBlob(LocalCallOpKernelPhyInstrOperand* operand) {
     JUST(operand->mut_opkernel()->mut_temp_blob_object()->InitBlob());
-    return Maybe<void>::Ok();
-  }
-
-  template<typename CallbackT>
-  static inline Maybe<void> WithOpInferContext(LocalCallOpKernelPhyInstrOperand* operand,
-                                               const CallbackT& Callback) {
-    auto* opkernel = operand->mut_opkernel();
-    JUST(Callback(opkernel->UpdateInferContext(operand->inputs(), operand->outputs())));
-    // tensor tuples are not allowed to be hold by StatefulOpKernel
-    opkernel->UpdateInferContext(nullptr, nullptr);
     return Maybe<void>::Ok();
   }
 
@@ -562,10 +552,6 @@ struct LocalCallOpKernelUtil final {
     opkernel->UpdateComputeContext(nullptr, nullptr, nullptr);
     return Maybe<void>::Ok();
   }
-
-  // static inline Maybe<void> InferOutputTensorDescs(LocalCallOpKernelPhyInstrOperand* operand) {
-  //   return WithOpInferContext(operand, operand->opkernel().TensorDescInferFn());
-  // }
 
   static inline void TryInitOpKernelState(LocalCallOpKernelPhyInstrOperand* operand,
                                           DeviceCtx* device_ctx, user_op::OpKernelState** state) {
@@ -595,6 +581,9 @@ struct LocalCallOpKernelUtil final {
                               operand->user_opkernel()->Compute(compute_ctx, state);
                               return Maybe<void>::Ok();
                             }));
+    for (int64_t index : operand->opkernel().output_tuple_indexes4mut2_obns()) {
+      operand->outputs()->at(index)->mark_shape_as_synced();
+    }
     return Maybe<void>::Ok();
   }
 

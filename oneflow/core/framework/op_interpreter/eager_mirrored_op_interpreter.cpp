@@ -49,7 +49,7 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr,
                                output_eager_blob_objects,
                            const AttrValueMap& attrs, const std::shared_ptr<const Device> device,
                            std::shared_ptr<const ParallelDesc> parallel_desc) {
-  OF_PROFILER_RANGE_GUARD_2("NaiveInterpret");
+  // OF_PROFILER_RANGE_GUARD_2("NaiveInterpret");
   OF_PROFILER_RANGE_PUSH("MutKernel4Device");
   const auto kernel = JUST(user_op_expr.MutKernel4Device(*device));
   OF_PROFILER_RANGE_POP();
@@ -63,10 +63,12 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr,
   }
   OF_PROFILER_RANGE_POP();
   OF_PROFILER_RANGE_PUSH("InferDataType");
-  kernel->InferDataType(input_eager_blob_objects, output_eager_blob_objects);
+  kernel->InferDataType(input_eager_blob_objects, output_eager_blob_objects,
+                        kernel->user_op_infer_context_2());
   OF_PROFILER_RANGE_POP();
   OF_PROFILER_RANGE_PUSH("InferTensorDesc");
-  kernel->InferTensorDesc(input_eager_blob_objects, output_eager_blob_objects);
+  kernel->InferTensorDesc(input_eager_blob_objects, output_eager_blob_objects,
+                          kernel->user_op_infer_context_2());
   OF_PROFILER_RANGE_POP();
 
   auto build_instruction = [&](InstructionsBuilder* builder) -> Maybe<void> {

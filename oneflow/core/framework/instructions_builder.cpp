@@ -1572,7 +1572,9 @@ Maybe<void> PhysicalRun(const std::function<void(InstructionsBuilder*)>& Build) 
   InstructionsBuilder instructions_builder(std::shared_ptr<vm::PhysicalIdGenerator>(),
                                            &instruction_list, &eager_symbol_list,
                                            _ReleasePhysicalObject);
+  OF_PROFILER_RANGE_PUSH("PhysicalRun -- Build");
   Build(&instructions_builder);
+  OF_PROFILER_RANGE_POP();
   JUST(Global<vm::EagerOneflow>::Get()->RunPhysicalInstruction(
       instructions_builder.mut_instruction_list(), instructions_builder.eager_symbol_list()));
   return Maybe<void>::Ok();

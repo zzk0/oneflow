@@ -21,6 +21,7 @@ limitations under the License.
 #include "oneflow/core/common/util.h"
 #include "oneflow/core/common/balanced_splitter.h"
 #include "oneflow/core/job/parallel_desc.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 namespace vm {
@@ -574,7 +575,9 @@ void VirtualMachine::__Init__(const VmDesc& vm_desc, ObjectMsgAllocator* allocat
 void VirtualMachine::Receive(InstructionMsgList* compute_instr_msg_list) {
   InstructionMsgList new_instr_msg_list;
   OBJECT_MSG_LIST_FOR_EACH_PTR(compute_instr_msg_list, compute_instr_msg) {
+    OF_PROFILER_RANGE_PUSH("PhysicalRun -- Build");
     new_instr_msg_list.EmplaceBack(compute_instr_msg->MakeInferInstrMsg());
+    OF_PROFILER_RANGE_POP();
     compute_instr_msg_list->MoveToDstBack(compute_instr_msg, &new_instr_msg_list);
   }
   mut_pending_msg_list()->MoveFrom(&new_instr_msg_list);

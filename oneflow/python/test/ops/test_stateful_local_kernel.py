@@ -16,6 +16,7 @@ limitations under the License.
 import unittest
 
 import oneflow as flow
+import numpy as np
 
 
 @unittest.skipIf(
@@ -68,6 +69,12 @@ class TestStatefulLocalKernel(flow.unittest.TestCase):
             x = op2(x, x)[0]
 
         job()
+
+    def test_softmax(test_case):
+        m = flow.nn.Softmax()
+        x = flow.Tensor(np.ones((16, 3, 224, 224)))
+        for _ in range(100):
+            y = m(x)
 
 
 if __name__ == "__main__":

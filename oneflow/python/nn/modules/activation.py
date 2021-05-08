@@ -164,3 +164,16 @@ class GELU(Module):
 @register_tensor_op("gelu")
 def gelu_op(tensor):
     return GELU()(tensor)
+
+
+@oneflow_export("nn.Softmax")
+@oneflow_export("softmax")
+class Softmax(Module):
+    def __init__(self, dim=None):
+        super().__init__()
+        self.axis = -1 if dim is None else dim
+        self._op = flow.builtin_op("softmax").Input("in").Output("out").Build()
+
+    def forward(self, x):
+        res = self._op(x)[0]
+        return res
