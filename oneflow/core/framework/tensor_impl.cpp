@@ -70,22 +70,6 @@ Maybe<void> EagerConsistentTensorImpl::set_blob_object(
   return SyncBlobObject2Attributes(blob_object);
 }
 
-void EagerMirroredTensorImpl::Init(const std::shared_ptr<vm::EagerBlobObject> eager_blob_object,
-                                   const std::shared_ptr<const Device>& device, bool requires_grad,
-                                   bool is_leaf, bool retain_grad) {
-  MirroredTensorImpl::Init(device, requires_grad, is_leaf, retain_grad);
-  eager_blob_object_ = eager_blob_object;
-  dtype_ = CHECK_JUST(DType::GetDTypeByDataType(eager_blob_object->blob_desc().data_type()));
-  tensor_storage_ = std::make_shared<TensorStorage>(eager_blob_object->tensor_buffer());
-  const auto& parallel_desc = this->parallel_desc();
-  tensor_storage_->set_releaser_hook(
-      [eager_blob_object, parallel_desc](const std::shared_ptr<vm::TensorBuffer>&) {
-        PhysicalRun([&](InstructionsBuilder* builder) {
-          builder->ReleaseTensor(eager_blob_object, parallel_desc);
-        });
-      });
-}
-
 EagerMirroredTensorImpl::EagerMirroredTensorImpl(
     const std::shared_ptr<vm::EagerBlobObject> eager_blob_object,
     const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf, bool retain_grad)
@@ -111,6 +95,7 @@ Maybe<VmLocalDepObject> EagerMirroredTensorImpl::compute_local_dep_object() cons
 }
 
 const std::shared_ptr<const Shape>& EagerMirroredTensorImpl::shape() const {
+  if (eager_blob_object_->is_shape_synced()) { return eager_blob_object_->blob_desc().shape_ptr(); }
   const std::shared_ptr<const Shape>* result = nullptr;
   Global<ForeignLockHelper>::Get()->WithScopedRelease([this, &result]() {
     BlockingCounter bc(1);

@@ -339,6 +339,8 @@ Maybe<void> InitTensorTupleIndexes4Bns(const std::shared_ptr<const OperatorConf>
   const std::string& device_tag = op_conf->device_tag();
   opkernel->op_infer_ctx_.reset(new LocalUserOpInferContext(
       opkernel->user_op_conf_.get(), indexed_input_pairs.get(), indexed_output_pairs.get()));
+  opkernel->op_infer_ctx_2_.reset(new LocalUserOpInferContext(
+      opkernel->user_op_conf_.get(), indexed_input_pairs.get(), indexed_output_pairs.get()));
   opkernel->compute_ctx_.reset(new LocalUserKernelComputeContext(
       nullptr, device_tag, opkernel->user_op_conf_.get(), indexed_input_pairs.get(),
       indexed_output_pairs.get(), opkernel->mut_temp_blob_object()));
@@ -418,10 +420,26 @@ user_op::TensorDescInferFn StatefulOpKernel::TensorDescInferFn() const {
 
 user_op::DataTypeInferFn StatefulOpKernel::DataTypeInferFn() const { return data_type_infer_fn_; }
 
+void StatefulOpKernel::InferTensorDesc(EagerBlobObjectList inputs, EagerBlobObjectList outputs) {
+  op_infer_ctx_->Update(inputs, outputs);
+  tensor_desc_infer_fn_(op_infer_ctx_.get());
+  for (int64_t index : output_tuple_indexes4mut_obns_) {
+    outputs->at(index)->set_is_shape_synced(true);
+  }
+  // TODO: mut2 in compute
+  op_infer_ctx_->Update(nullptr, nullptr);
+}
+
+void StatefulOpKernel::InferDataType(EagerBlobObjectList inputs, EagerBlobObjectList outputs) {
+  op_infer_ctx_->Update(inputs, outputs);
+  data_type_infer_fn_(op_infer_ctx_.get());
+  op_infer_ctx_->Update(nullptr, nullptr);
+}
+
 LocalUserOpInferContext* StatefulOpKernel::UpdateInferContext(EagerBlobObjectList inputs,
                                                               EagerBlobObjectList outputs) {
-  op_infer_ctx_->Update(inputs, outputs);
-  return op_infer_ctx_.get();
+  op_infer_ctx_2_->Update(inputs, outputs);
+  return op_infer_ctx_2_.get();
 }
 
 LocalUserKernelComputeContext* StatefulOpKernel::UpdateComputeContext(EagerBlobObjectList inputs,

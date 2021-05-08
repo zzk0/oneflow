@@ -45,9 +45,8 @@ std::shared_ptr<MirroredTensor> MirroredTensor::MakeEagerTensor(
     const std::shared_ptr<vm::EagerBlobObject> eager_blob_object,
     const std::shared_ptr<const Device>& device, bool requires_grad, bool is_leaf,
     bool retain_grad) {
-  EagerMirroredTensorImpl* impl_ptr = new EagerMirroredTensorImpl();
-  impl_ptr->Init(eager_blob_object, device, requires_grad, is_leaf, retain_grad);
-  std::shared_ptr<MirroredTensorImpl> impl = std::shared_ptr<EagerMirroredTensorImpl>(impl_ptr);
+  std::shared_ptr<MirroredTensorImpl> impl = std::make_shared<EagerMirroredTensorImpl>(
+      eager_blob_object, device, requires_grad, is_leaf, retain_grad);
   return std::make_shared<MirroredTensor>(impl);
 }
 

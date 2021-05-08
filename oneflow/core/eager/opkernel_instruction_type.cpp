@@ -40,6 +40,7 @@ limitations under the License.
 #include "oneflow/core/operator/op_conf_symbol.h"
 #include "oneflow/core/framework/tensor_impl.h"
 #include "oneflow/user/kernels/stateful_local_opkernel.h"
+#include "oneflow/core/profiler/profiler.h"
 
 namespace oneflow {
 namespace vm {
@@ -442,12 +443,13 @@ Maybe<T*> GetSharedOpKernel(vm::Instruction* instruction, DeviceType device_type
 
 struct LocalCallOpKernelUtil final {
   static inline Maybe<void> Infer(vm::Instruction* instruction) {
+    OF_PROFILER_RANGE_GUARD_2("opkernel util infer");
     auto* operand = JUST(GetLocalCallOpKernelPhyInstrOperand(instruction));
     operand->set_user_opkernel(
         JUST(operand->mut_opkernel()->ChooseOpKernel(operand->inputs(), operand->outputs())));
     operand->mut_opkernel()->ResetDynamicOpAttrs(operand->attrs());
     JUST(CheckOutputBlobObjectsMemCase(operand, instruction->stream()));
-    JUST(InferOutputTensorDescs(operand));
+    // JUST(InferOutputTensorDescs(operand));
     JUST(InitOutputBlobs(operand));
     JUST(InferTempStorageBlobDesc(operand));
     JUST(ResetTempStorageBlob(operand));
@@ -455,13 +457,16 @@ struct LocalCallOpKernelUtil final {
   }
 
   static inline Maybe<void> Compute(vm::Instruction* instruction) {
+    OF_PROFILER_RANGE_GUARD_2("opkernel util compute");
     auto* operand = JUST(GetLocalCallOpKernelPhyInstrOperand(instruction));
     DeviceCtx* device_ctx = instruction->stream().device_ctx().get();
     JUST(AllocateOutputBlobsMemory(operand, device_ctx));
     JUST(TryAllocateTempStorageBlobMemory(operand, device_ctx));
     user_op::OpKernelState* state;
     TryInitOpKernelState(operand, device_ctx, &state);
+    // OF_PROFILER_RANGE_PUSH("opkernel compute");
     JUST(OpKernelCompute(operand, device_ctx, state));
+    // OF_PROFILER_RANGE_POP();
     JUST(DeallocateTempStorageBlobMemory(operand, device_ctx));
     operand->set_user_opkernel(nullptr);
     return Maybe<void>::Ok();
@@ -558,9 +563,9 @@ struct LocalCallOpKernelUtil final {
     return Maybe<void>::Ok();
   }
 
-  static inline Maybe<void> InferOutputTensorDescs(LocalCallOpKernelPhyInstrOperand* operand) {
-    return WithOpInferContext(operand, operand->opkernel().TensorDescInferFn());
-  }
+  // static inline Maybe<void> InferOutputTensorDescs(LocalCallOpKernelPhyInstrOperand* operand) {
+  //   return WithOpInferContext(operand, operand->opkernel().TensorDescInferFn());
+  // }
 
   static inline void TryInitOpKernelState(LocalCallOpKernelPhyInstrOperand* operand,
                                           DeviceCtx* device_ctx, user_op::OpKernelState** state) {

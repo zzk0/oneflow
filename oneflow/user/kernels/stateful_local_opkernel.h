@@ -273,10 +273,8 @@ class StatefulOpKernel final {
     return compute_local_dep_object_;
   }
 
-  void InferDataType(EagerBlobObjectList inputs, EagerBlobObjectList outputs) {
-    data_type_infer_fn_(UpdateInferContext(inputs, outputs));
-    UpdateInferContext(nullptr, nullptr);
-  }
+  void InferTensorDesc(EagerBlobObjectList inputs, EagerBlobObjectList outputs);
+  void InferDataType(EagerBlobObjectList inputs, EagerBlobObjectList outputs);
 
   void ResetDynamicOpAttrs(const AttrValueMap& attrs);
 
@@ -316,6 +314,7 @@ class StatefulOpKernel final {
   std::unique_ptr<LocalUserKernelRegContext> reg_ctx_;
   std::unique_ptr<LocalUserKernelCreateContext> create_ctx_;
   std::unique_ptr<LocalUserOpInferContext> op_infer_ctx_;
+  std::unique_ptr<LocalUserOpInferContext> op_infer_ctx_2_;
   std::unique_ptr<LocalUserKernelComputeContext> compute_ctx_;
   std::shared_ptr<ArgVec> indexed_input_pairs_;
   std::shared_ptr<ArgVec> indexed_output_pairs_;

@@ -16,6 +16,7 @@ limitations under the License.
 #ifndef ONEFLOW_API_PYTHON_OFBLOB_OFBLOB_E_H_
 #define ONEFLOW_API_PYTHON_OFBLOB_OFBLOB_E_H_
 
+#include "oneflow/api/foreign_lock_helper.h"
 #include "oneflow/core/common/type_traits.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -24,6 +25,21 @@ limitations under the License.
 #include "oneflow/core/common/data_type_seq.h"
 
 namespace py = pybind11;
+
+namespace oneflow {
+template<typename T>
+void OfBlob_CopyToBuffer(uint64_t of_blob_ptr, py::array_t<T> array) {
+  Global<ForeignLockHelper>::Get()->WithScopedAcquire([&of_blob_ptr, &array]() {
+    py::buffer_info buf = array.request();
+    T* buf_ptr = (T*)buf.ptr;
+    size_t size = buf.size;
+    using namespace oneflow;
+    auto* of_blob = reinterpret_cast<OfBlob*>(of_blob_ptr);
+    of_blob->AutoMemCopyTo<T>(buf_ptr, size);
+  });
+}
+
+}  // namespace oneflow
 
 #define DEFINE_COPIER(T, type_proto)                                                  \
   inline void OfBlob_CopyToBuffer_##T(uint64_t of_blob_ptr, py::array_t<T> array) {   \

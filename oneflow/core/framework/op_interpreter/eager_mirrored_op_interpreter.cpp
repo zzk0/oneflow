@@ -49,22 +49,34 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr,
                                output_eager_blob_objects,
                            const AttrValueMap& attrs, const std::shared_ptr<const Device> device,
                            std::shared_ptr<const ParallelDesc> parallel_desc) {
+  OF_PROFILER_RANGE_GUARD_2("NaiveInterpret");
+  OF_PROFILER_RANGE_PUSH("MutKernel4Device");
   const auto kernel = JUST(user_op_expr.MutKernel4Device(*device));
+  OF_PROFILER_RANGE_POP();
   const auto mem_case = kernel->mem_case();
+  OF_PROFILER_RANGE_PUSH("make EagerBlobObject");
   for (int i = 0; i < output_eager_blob_objects->size(); i++) {
     auto eager_blob_object = std::make_shared<vm::EagerBlobObject>(
         mem_case, std::make_shared<Shape>(), DataType::kInvalidDataType,
         std::make_shared<vm::TensorBuffer>(), parallel_desc);
     output_eager_blob_objects->at(i) = eager_blob_object;
   }
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("InferDataType");
   kernel->InferDataType(input_eager_blob_objects, output_eager_blob_objects);
+  OF_PROFILER_RANGE_POP();
+  OF_PROFILER_RANGE_PUSH("InferTensorDesc");
+  kernel->InferTensorDesc(input_eager_blob_objects, output_eager_blob_objects);
+  OF_PROFILER_RANGE_POP();
 
   auto build_instruction = [&](InstructionsBuilder* builder) -> Maybe<void> {
     JUST(builder->LocalCallOpKernel(kernel, input_eager_blob_objects, output_eager_blob_objects,
                                     attrs, parallel_desc));
     return Maybe<void>::Ok();
   };
+  OF_PROFILER_RANGE_PUSH("PhysicalRun");
   JUST(PhysicalRun(build_instruction));
+  OF_PROFILER_RANGE_POP();
   return Maybe<void>::Ok();
 }
 

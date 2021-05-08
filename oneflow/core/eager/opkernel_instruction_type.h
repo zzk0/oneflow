@@ -34,8 +34,6 @@ class LocalCallOpKernelInstructionType : public vm::InstructionType {
   virtual ~LocalCallOpKernelInstructionType() = default;
 
  private:
-  Maybe<void> MaybeInfer(vm::Instruction* instruction) const;
-  Maybe<void> MaybeCompute(vm::Instruction* instruction) const;
   virtual const char* device_tag() const = 0;
 };
 

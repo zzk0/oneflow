@@ -2,6 +2,11 @@ import oneflow as flow
 import oneflow.nn as nn
 from typing import Union, Optional, Tuple, List, Callable, Type, Any
 import config
+import line_profiler
+import atexit
+
+profile = line_profiler.LineProfiler()
+# atexit.register(profile.print_stats)
 
 
 def push(name):
@@ -258,7 +263,6 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        push("resnet forward")
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -273,7 +277,6 @@ class ResNet(nn.Module):
         x = self.flatten(x)
         # x = x.flatten(1)
         x = self.fc(x)
-        pop()
 
         return x
 

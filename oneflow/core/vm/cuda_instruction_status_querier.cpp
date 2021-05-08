@@ -24,9 +24,13 @@ namespace vm {
 bool CudaInstrStatusQuerier::event_completed() const {
   cudaSetDevice(device_id_);
   return cudaEventQuery(event_) == cudaSuccess;
+  // return completed_;
 }
 
 void CudaInstrStatusQuerier::SetLaunched(DeviceCtx* device_ctx) {
+  // cudaLaunchHostFunc(
+  //     device_ctx->cuda_stream(),
+  //     [](void* completed_ptr) { *static_cast<bool*>(completed_ptr) = true; }, &completed_);
   cudaSetDevice(device_id_);
   OF_CUDA_CHECK(cudaEventCreateWithFlags(&event_, cudaEventBlockingSync | cudaEventDisableTiming));
   OF_CUDA_CHECK(cudaEventRecord(event_, device_ctx->cuda_stream()));

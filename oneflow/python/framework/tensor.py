@@ -65,9 +65,14 @@ def _access_blob_by_callback(local_tensor, callback, modifier):
 
 @register_local_tensor_op("numpy")
 def _local_tensor_numpy(tensor):
-    return _access_blob_by_callback(
-        tensor, lambda ofblob: ofblob.CopyToNdarray(), "const"
+    method_name = tensor._get_cast_mirrored_tensor_to_numpy_func_name()
+    copy_to_numpy = getattr(tensor, method_name)
+    ndarray = np.empty(
+        tuple(tensor.shape),
+        dtype=flow.convert_oneflow_dtype_to_numpy_dtype(tensor.dtype),
     )
+    copy_to_numpy(ndarray)
+    return ndarray
 
 
 def _copy_from_numpy_to_eager_local_tensor(eager_local_tensor, np_arr):

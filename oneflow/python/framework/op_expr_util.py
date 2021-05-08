@@ -16,6 +16,11 @@ limitations under the License.
 import oneflow as flow
 import oneflow._oneflow_internal
 from oneflow.python.framework.attr_util import convert_to_user_attr_value
+import line_profiler
+import atexit
+
+# profile = line_profiler.LineProfiler()
+# atexit.register(profile.print_stats)
 
 try:
     import config
@@ -33,9 +38,10 @@ def pop():
         flow.profiler.range_pop()
 
 
+# @profile
 def user_op_expr_call(self, *args, **kwargs):
     push("user_op_expr_call")
-    push("user_op_expr_call -- python tensor determine")
+    # push("user_op_expr_call -- python tensor determine")
     args = list(args)
     for i in range(len(args)):
         arg = args[i]
@@ -43,19 +49,19 @@ def user_op_expr_call(self, *args, **kwargs):
             if not arg.is_determined:
                 arg.determine()
             args[i] = arg._local_or_consistent_tensor
-    pop()
+    # pop()
 
-    push("user_op_expr_call -- init attrs")
+    # push("user_op_expr_call -- init attrs")
     attrs = oneflow._oneflow_internal.AttrValueMap()
-    pop()
+    # pop()
 
-    push("user_op_expr_call -- set attrs")
+    # push("user_op_expr_call -- set attrs")
     for attr_name, attr_value in kwargs.items():
         assert isinstance(attr_name, str)
         attrs[attr_name] = convert_to_user_attr_value(
             self.op_type_name, attr_name, attr_value
         )
-    pop()
+    # pop()
 
     push("user_op_expr_call -- op expr python apply")
     results = self.apply(args, attrs)

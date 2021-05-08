@@ -133,6 +133,10 @@ class _BatchNorm(_NormBase):
         )
 
     def forward(self, x):
+        res = self._testing_op(
+            x, self.running_mean, self.running_var, self.weight, self.bias
+        )[0]
+        return res
         self._check_input_dim(x)
         if self.training:
             res = self._training_op(
