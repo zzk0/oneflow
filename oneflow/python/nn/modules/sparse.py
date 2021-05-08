@@ -81,10 +81,11 @@ class Embedding(Module):
 
     def _fill_padding_idx_with_zero(self) -> None:
         if self.padding_idx is not None:
+            print("Embedding module not support self.weight[self.padding_idx].fill_(0) for now!")
             # TODO:
             # with flow.no_grad():
             # self.weight[self.padding_idx].fill_(0)
-            self.weight[self.padding_idx].fill_(0)
+            # self.weight[self.padding_idx].fill_(0)
 
     def forward(self, indices):
         res = self._gather_op(self.weight, indices)
