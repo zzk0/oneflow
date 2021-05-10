@@ -44,28 +44,9 @@ def register_local_tensor_op(name=None):
     return decorator
 
 
-def _access_blob_by_callback(local_tensor, callback, modifier):
-    def AsyncAccess(Yield):
-        def MakeAccessor(Yield):
-            def AccessOfBlobPtr(ofblob_ptr):
-                ofblob = ofblob_util.OfBlob(ofblob_ptr)
-                Yield(callback(ofblob))
-
-            return AccessOfBlobPtr
-
-        accessor = MakeAccessor(Yield)
-
-        def BuildInstruction(builder):
-            builder.AccessBlobByCallback(local_tensor, accessor, modifier)
-
-        flow._oneflow_internal.deprecated.PhysicalRun(BuildInstruction)
-
-    return async_util.Await(1, AsyncAccess)[0]
-
-
 @register_local_tensor_op("numpy")
 def _local_tensor_numpy(tensor):
-    method_name = tensor._get_cast_mirrored_tensor_to_numpy_func_name()
+    method_name = tensor._get_copy_mirrored_tensor_to_numpy_func_name()
     copy_to_numpy = getattr(tensor, method_name)
     ndarray = np.empty(
         tuple(tensor.shape),
@@ -76,9 +57,13 @@ def _local_tensor_numpy(tensor):
 
 
 def _copy_from_numpy_to_eager_local_tensor(eager_local_tensor, np_arr):
-    _access_blob_by_callback(
-        eager_local_tensor, lambda ofblob: ofblob.CopyFromNdarray(np_arr), "mut"
+    method_name = eager_local_tensor._get_copy_mirrored_tensor_from_numpy_func_name()
+    copy_from_numpy = getattr(eager_local_tensor, method_name)
+    assert np_arr.dtype == flow.convert_oneflow_dtype_to_numpy_dtype(
+        eager_local_tensor.dtype
     )
+    assert np_arr.shape == tuple(eager_local_tensor.shape)
+    copy_from_numpy(np_arr)
 
 
 def _init_eager_local_tensor_by_initializer_conf(
