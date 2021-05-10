@@ -40,7 +40,7 @@ void IBVForkInit() {
 }  // namespace
 
 IBVerbsCommNet::~IBVerbsCommNet() {
-  while (poll_exit_flag_.test_and_set() == true) {}
+  poll_exit_flag_.clear();
   poll_thread_.join();
   for (IBVerbsQP* qp : qp_vec_) {
     if (qp) { delete qp; }
@@ -80,7 +80,8 @@ void IBVerbsCommNet::SendActorMsg(int64_t dst_machine_id, const ActorMsg& msg) {
 IBVerbsCommNet::IBVerbsCommNet()
     : CommNetIf(),
       token2mem_desc_(Global<ResourceDesc, ForEnv>::Get()->process_ranks().size()),
-      poll_exit_flag_(ATOMIC_FLAG_INIT) {
+      poll_exit_flag_{} {
+  poll_exit_flag_.test_and_set();
   ibv_device** device_list = ibv_get_device_list(nullptr);
   PCHECK(device_list);
   ibv_device* device = device_list[0];
@@ -136,8 +137,7 @@ void IBVerbsCommNet::DoRead(void* read_id, int64_t src_machine_id, void* src_tok
 
 void IBVerbsCommNet::PollCQ() {
   std::vector<ibv_wc> wc_vec(max_poll_wc_num_);
-  while (poll_exit_flag_.test_and_set() == false) {
-    poll_exit_flag_.clear();
+  while (poll_exit_flag_.test_and_set()) {
     int32_t found_wc_num = ibv_poll_cq(cq_, max_poll_wc_num_, wc_vec.data());
     CHECK_GE(found_wc_num, 0);
     FOR_RANGE(int32_t, i, 0, found_wc_num) {
