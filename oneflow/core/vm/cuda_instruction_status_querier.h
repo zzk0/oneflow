@@ -47,7 +47,6 @@ class CudaInstrStatusQuerier {
   bool event_completed() const;
 
   volatile bool launched_;
-  bool completed_;
   int64_t device_id_;
   cudaEvent_t event_;
 };

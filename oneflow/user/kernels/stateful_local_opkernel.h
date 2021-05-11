@@ -296,10 +296,6 @@ class StatefulLocalOpKernel final {
     return op_infer_ctx_for_thread_b_.get();
   }
 
-  LocalUserOpInferContext* user_op_infer_context_1() const { return op_infer_ctx_1_.get(); }
-
-  LocalUserOpInferContext* user_op_infer_context_2() const { return op_infer_ctx_2_.get(); }
-
  private:
   friend struct vm::LocalCallOpKernelUtil;
   StatefulLocalOpKernel() = default;
