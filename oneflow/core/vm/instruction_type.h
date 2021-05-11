@@ -32,6 +32,7 @@ class InstructionType {
   virtual ~InstructionType() = default;
 
   bool IsSequential() const { return IsFrontSequential(); }
+  virtual bool DisableInferInstruction() const { return false; }
   virtual bool IsFrontSequential() const { return false; }
   virtual bool ResettingIdToObjectMap() const { return false; }
   virtual void Compute(Instruction* instruction) const = 0;

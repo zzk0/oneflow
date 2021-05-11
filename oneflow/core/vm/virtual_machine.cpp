@@ -576,7 +576,9 @@ void VirtualMachine::Receive(InstructionMsgList* compute_instr_msg_list) {
   InstructionMsgList new_instr_msg_list;
   OBJECT_MSG_LIST_FOR_EACH_PTR(compute_instr_msg_list, compute_instr_msg) {
     OF_PROFILER_RANGE_PUSH("PhysicalRun -- Build");
-    new_instr_msg_list.EmplaceBack(compute_instr_msg->MakeInferInstrMsg());
+    if (!compute_instr_msg->instr_type_id().instruction_type().DisableInferInstruction()) {
+      new_instr_msg_list.EmplaceBack(compute_instr_msg->MakeInferInstrMsg());
+    }
     OF_PROFILER_RANGE_POP();
     compute_instr_msg_list->MoveToDstBack(compute_instr_msg, &new_instr_msg_list);
   }

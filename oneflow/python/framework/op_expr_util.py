@@ -24,16 +24,22 @@ import atexit
 
 try:
     import config
+
+    has_config = True
 except:
-    pass
+    has_config = False
 
 
 def push(name):
+    if not has_config:
+        return
     if not config.warming:
         flow.profiler.range_push(name)
 
 
 def pop():
+    if not has_config:
+        return
     if not config.warming:
         flow.profiler.range_pop()
 

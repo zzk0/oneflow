@@ -58,8 +58,8 @@ if __name__ == "__main__":
     # times = 8000
 
     shape = (16, 3, 224, 224)
-    # times = 50
-    times = 300
+    times = 50
+    # times = 300
 
     def gf(*args, **kwargs):
         if config.consistent:

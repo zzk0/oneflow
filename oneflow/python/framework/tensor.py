@@ -100,11 +100,15 @@ class Tensor:
         determining_initializer=None,
     ):
         assert len(args) > 0
-        import config
+        try:
+            import config
 
-        if config.consistent:
-            is_consistent = True
-            placement = flow.placement("gpu", ["0:0"], None)
+            if config.consistent:
+                is_consistent = True
+                placement = flow.placement("gpu", ["0:0"], None)
+        except:
+            pass
+
         dtype = dtype if dtype is not None else oneflow._oneflow_internal.float32
         if placement is None:
             device = (

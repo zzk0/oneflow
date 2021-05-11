@@ -443,7 +443,7 @@ Maybe<T*> GetSharedOpKernel(vm::Instruction* instruction, DeviceType device_type
 
 struct LocalCallOpKernelUtil final {
   static inline Maybe<void> Infer(vm::Instruction* instruction) {
-    // OF_PROFILER_RANGE_GUARD_2("opkernel util infer");
+    OF_PROFILER_RANGE_GUARD_2("opkernel util infer");
     auto* operand = JUST(GetLocalCallOpKernelPhyInstrOperand(instruction));
     operand->set_user_opkernel(
         JUST(operand->mut_opkernel()->ChooseOpKernel(operand->inputs(), operand->outputs())));
@@ -457,16 +457,16 @@ struct LocalCallOpKernelUtil final {
   }
 
   static inline Maybe<void> Compute(vm::Instruction* instruction) {
-    // OF_PROFILER_RANGE_GUARD_2("opkernel util compute");
+    OF_PROFILER_RANGE_GUARD_2("opkernel util compute");
     auto* operand = JUST(GetLocalCallOpKernelPhyInstrOperand(instruction));
     DeviceCtx* device_ctx = instruction->stream().device_ctx().get();
     JUST(AllocateOutputBlobsMemory(operand, device_ctx));
     JUST(TryAllocateTempStorageBlobMemory(operand, device_ctx));
     user_op::OpKernelState* state;
     TryInitOpKernelState(operand, device_ctx, &state);
-    // OF_PROFILER_RANGE_PUSH("opkernel compute");
+    OF_PROFILER_RANGE_PUSH("opkernel compute");
     JUST(OpKernelCompute(operand, device_ctx, state));
-    // OF_PROFILER_RANGE_POP();
+    OF_PROFILER_RANGE_POP();
     JUST(DeallocateTempStorageBlobMemory(operand, device_ctx));
     operand->set_user_opkernel(nullptr);
     return Maybe<void>::Ok();
