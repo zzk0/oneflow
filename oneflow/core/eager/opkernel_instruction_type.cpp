@@ -449,7 +449,6 @@ struct LocalCallOpKernelUtil final {
         JUST(operand->mut_opkernel()->ChooseOpKernel(operand->inputs(), operand->outputs())));
     operand->mut_opkernel()->ResetDynamicOpAttrs(operand->attrs());
     JUST(CheckOutputBlobObjectsMemCase(operand, instruction->stream()));
-    // JUST(InferOutputTensorDescs(operand));
     JUST(InitOutputBlobs(operand));
     JUST(InferTempStorageBlobDesc(operand));
     JUST(ResetTempStorageBlob(operand));
@@ -528,7 +527,7 @@ struct LocalCallOpKernelUtil final {
     const auto& InferTmpSizeFn = operand->opkernel().GetInferTmpSizeFn(operand->user_opkernel());
     auto* temp_blob_desc = operand->mut_opkernel()->mut_temp_blob_object()->mut_blob_desc();
     CHECK_OR_RETURN(temp_blob_desc->data_type() == DataType::kChar);
-    one::LocalUserOpInferContext* op_infer_ctx = operand->opkernel().user_op_infer_context_1();
+    one::LocalUserOpInferContext* op_infer_ctx = operand->opkernel().op_infer_ctx_for_thread_a();
     op_infer_ctx->Update(operand->inputs(), operand->outputs());
     size_t temp_size = InferTmpSizeFn(op_infer_ctx);
     temp_blob_desc->mut_shape() = Shape({static_cast<int64_t>(temp_size)});
@@ -548,7 +547,7 @@ struct LocalCallOpKernelUtil final {
     auto* opkernel = operand->mut_opkernel();
     JUST(Callback(
         opkernel->UpdateComputeContext(operand->inputs(), operand->outputs(), device_ctx)));
-    // tensor tuples are not allowed to be hold by StatefulOpKernel
+    // tensor tuples are not allowed to be hold by StatefulLocalOpKernel
     opkernel->UpdateComputeContext(nullptr, nullptr, nullptr);
     return Maybe<void>::Ok();
   }

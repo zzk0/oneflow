@@ -17,8 +17,7 @@ import unittest
 
 import numpy as np
 import math
-import oneflow as flow
-from test_util import Args, GenArgDict, GenArgList
+import oneflow.experimental as flow
 
 
 class MaxPool2dNumpy:

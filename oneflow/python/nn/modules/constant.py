@@ -15,23 +15,26 @@ limitations under the License.
 """
 import oneflow as flow
 from oneflow.python.nn.module import Module
-from oneflow.python.oneflow_export import oneflow_export
-from oneflow.python.framework.tensor import register_tensor_op
+from oneflow.python.oneflow_export import oneflow_export, experimental_api
 from oneflow.python.nn.common_types import _size_any_t
+from oneflow.python.nn.modules.utils import _single
 
 from typing import Optional, Union
 
 
 class _ConstantBase(Module):
     def __init__(
-        self, size: _size_any_t, value: Union[float, int], dtype: Optional[flow.dtype]
+        self,
+        size: Union[_size_any_t, flow.Size],
+        value: Union[float, int],
+        dtype: Optional[flow.dtype],
     ) -> None:
         super().__init__()
         assert size is not None, "shape must not be None!"
-        assert isinstance(size, (int, tuple)), "shape should be int or tuple int!"
-
-        if isinstance(size, int):
-            size = [size]
+        assert isinstance(
+            size, (int, tuple, flow.Size)
+        ), "shape should be int or tuple int!"
+        size = _single(size)
         if dtype is None:
             dtype = flow.float32
 
@@ -77,59 +80,108 @@ class _ConstantBase(Module):
 
 
 class Ones(_ConstantBase):
-    r"""
-    Returns a tensor filled with the scalar value 1, 
-    with the shape defined by the variable argument `size`.
-
-    Args:
-        size(an integer or tuple of integer values) defining the shape of the output tensor. 
-        Can be a variable number of arguments or a collection like a list or tuple.
-
-    For example:
-
-    .. code-block:: python
-
-        import oneflow as flow
-
-        y = flow.ones(10)
-        # [1 1 1 1 1 1 1 1 1 1]
-        
-    """
-
     def __init__(self, size, dtype=None):
         super().__init__(size, 1, dtype)
 
 
-@oneflow_export("tmp.ones")
+@oneflow_export("ones")
+@experimental_api
 def ones_op(size, dtype=None):
-    return Ones(size, dtype)()
-
-
-class Zeros(_ConstantBase):
     r"""
-    Returns a tensor filled with the scalar value 0, 
+    Returns a tensor filled with the scalar value 1,
     with the shape defined by the variable argument `size`.
 
     Args:
-        size(an integer or tuple of integer values) defining the shape of the output tensor. 
+        size(an integer or tuple of integer values): defining the shape of the output tensor.
         Can be a variable number of arguments or a collection like a list or tuple.
 
     For example:
 
     .. code-block:: python
 
-        import oneflow as flow
-        import numpy as np
+        import oneflow.experimental as flow
+
+        y = flow.ones(5)
+        # [1. 1. 1. 1. 1. ]
+
+    """
+    return Ones(size, dtype)()
+
+
+class Zeros(_ConstantBase):
+    def __init__(self, size, dtype=None):
+        super().__init__(size, 0, dtype)
+
+
+@oneflow_export("zeros")
+@experimental_api
+def zeros_op(size, dtype=None):
+    r"""
+    Returns a tensor filled with the scalar value 0,
+    with the shape defined by the variable argument `size`.
+
+    Args:
+        size(an integer or tuple of integer values): defining the shape of the output tensor.
+        Can be a variable number of arguments or a collection like a list or tuple.
+
+    For example:
+
+    .. code-block:: python
+
+        import oneflow.experimental as flow
 
         y = flow.zeros(5)
         # [0. 0. 0. 0. 0. ]
 
     """
-
-    def __init__(self, size, dtype=None):
-        super().__init__(size, 0, dtype)
-
-
-@oneflow_export("tmp.zeros")
-def zeros_op(size, dtype=None):
     return Zeros(size, dtype)()
+
+
+@oneflow_export("zeros_like")
+@experimental_api
+def zeros_like_op(other):
+    r"""
+    Returns a tensor filled with the scalar value 0, with the same size as input.
+    flow.tmp.zeros_like(input) is equivalent to flow.tmp.zeros(input.shape, dtype=input.dtype)
+
+    Args:
+        other(Tensor): The size of input will determine size of the output tensor.
+
+    For example:
+
+    .. code-block:: python
+
+        import oneflow.experimental as flow
+        import numpy as np
+
+        x = flow.Tensor(np.random.rand([5]))
+        y = flow.tmp.zeros_like(x)
+        # [0. 0. 0. 0. 0. ]
+
+    """
+    return zeros_op(other.shape, other.dtype)
+
+
+@oneflow_export("ones_like")
+@experimental_api
+def ones_like_op(other):
+    r"""
+    Returns a tensor filled with the scalar value 1, with the same size as input.
+    flow.tmp.ones_like(input) is equivalent to flow.tmp.ones(input.shape, dtype=input.dtype)
+
+    Args:
+        other(Tensor): The size of input will determine size of the output tensor.
+
+    For example:
+
+    .. code-block:: python
+
+        import oneflow.experimental as flow
+        import numpy as np
+
+        x = flow.Tensor(np.random.rand([5]))
+        y = flow.tmp.ones_like(x)
+        # [1. 1. 1. 1. 1. ]
+
+    """
+    return ones_op(other.shape, other.dtype)

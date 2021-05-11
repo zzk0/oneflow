@@ -15,7 +15,7 @@ limitations under the License.
 """
 import oneflow as flow
 
-from oneflow.python.oneflow_export import oneflow_export
+from oneflow.python.oneflow_export import oneflow_export, experimental_api
 from oneflow.python.nn.module import Module
 import oneflow._oneflow_internal as oneflow_api
 
@@ -133,10 +133,6 @@ class _BatchNorm(_NormBase):
         )
 
     def forward(self, x):
-        res = self._testing_op(
-            x, self.running_mean, self.running_var, self.weight, self.bias
-        )[0]
-        return res
         self._check_input_dim(x)
         if self.training:
             res = self._training_op(
@@ -150,6 +146,7 @@ class _BatchNorm(_NormBase):
 
 
 @oneflow_export("nn.BatchNorm1d")
+@experimental_api
 class BatchNorm1d(_BatchNorm):
     r"""Applies Batch Normalization over a 2D or 3D input (a mini-batch of 1D
     inputs with optional additional channel dimension) as described in the paper
@@ -207,11 +204,11 @@ class BatchNorm1d(_BatchNorm):
         - Input: :math:`(N, C)` or :math:`(N, C, L)`
         - Output: :math:`(N, C)` or :math:`(N, C, L)` (same shape as input)
 
-    For example: 
-    
-    .. code-block:: python 
+    For example:
 
-        import oneflow as flow
+    .. code-block:: python
+
+        import oneflow.experimental as flow
         import numpy as np
 
         x = flow.Tensor(np.random.randn(20, 100))
@@ -228,6 +225,7 @@ class BatchNorm1d(_BatchNorm):
 
 
 @oneflow_export("nn.BatchNorm2d")
+@experimental_api
 class BatchNorm2d(_BatchNorm):
     r"""Applies Batch Normalization over a 4D input (a mini-batch of 2D inputs
     with additional channel dimension) as described in the paper
@@ -285,11 +283,11 @@ class BatchNorm2d(_BatchNorm):
         - Input: :math:`(N, C, H, W)`
         - Output: :math:`(N, C, H, W)` (same shape as input)
 
-    For example: 
-    
-    .. code-block:: python 
+    For example:
 
-        import oneflow as flow
+    .. code-block:: python
+
+        import oneflow.experimental as flow
         import numpy as np
 
         x = flow.Tensor(np.random.randn(4, 2, 8, 3))
