@@ -56,6 +56,7 @@ def _local_tensor_numpy(tensor):
     return ndarray
 
 
+@register_local_tensor_op("copy_")
 def _copy_from_numpy_to_eager_local_tensor(eager_local_tensor, np_arr):
     method_name = eager_local_tensor._get_copy_mirrored_tensor_from_numpy_func_name()
     copy_from_numpy = getattr(eager_local_tensor, method_name)
@@ -66,6 +67,7 @@ def _copy_from_numpy_to_eager_local_tensor(eager_local_tensor, np_arr):
     copy_from_numpy(np_arr)
 
 
+@register_local_tensor_op("_init_by_initializer_conf")
 def _init_eager_local_tensor_by_initializer_conf(
     eager_local_tensor, initializer_conf, random_seed=0
 ):
@@ -438,12 +440,14 @@ class Tensor:
         else:
             return self._undetermined_tensor.sbp
 
+    @register_local_tensor_op()
     def uniform_(self, a=0, b=1):
         initializer_conf = flow.random_uniform_initializer(
             minval=a, maxval=b, dtype=self.dtype
         )
         return self._init_by_initializer_conf(initializer_conf)
 
+    @register_local_tensor_op()
     def kaiming_uniform_(
         self, a=0, mode="fan_in", nonlinearity="leaky_relu", *, data_format="NCHW"
     ):
@@ -457,6 +461,7 @@ class Tensor:
         )
         return self._init_by_initializer_conf(initializer_conf)
 
+    @register_local_tensor_op()
     def kaiming_normal_(
         self, a=0, mode="fan_in", nonlinearity="leaky_relu", *, data_format="NCHW"
     ):
@@ -470,20 +475,24 @@ class Tensor:
         )
         return self._init_by_initializer_conf(initializer_conf)
 
+    @register_local_tensor_op()
     def xavier_normal_(self, gain=1.0, *, data_format="NCHW"):
         assert gain == 1.0, "Only gain == 1.0 is supported now"
         initializer_conf = flow.xavier_normal_initializer(data_format=data_format)
         return self._init_by_initializer_conf(initializer_conf)
 
+    @register_local_tensor_op()
     def xavier_uniform_(self, gain=1.0, *, data_format="NCHW"):
         assert gain == 1.0, "Only gain == 1.0 is supported now"
         initializer_conf = flow.xavier_uniform_initializer(data_format=data_format)
         return self._init_by_initializer_conf(initializer_conf)
 
+    @register_local_tensor_op()
     def normal_(self, mean=0, std=1):
         initializer_conf = flow.random_normal_initializer(mean=mean, stddev=std)
         return self._init_by_initializer_conf(initializer_conf)
 
+    @register_local_tensor_op()
     def fill_(self, value):
         initializer_conf = flow.constant_initializer(value=value, dtype=self.dtype)
         return self._init_by_initializer_conf(initializer_conf)

@@ -67,6 +67,13 @@ def user_op_expr_call(self, *args, **kwargs):
 
     push("user_op_expr_call -- op expr python apply")
     results = self.apply(args, attrs)
+    # results = list(self.apply(args, attrs))
+    # for i, out in enumerate(results):
+    #     tensor = flow.Tensor(*out.shape)
+    #     tensor._local_or_consistent_tensor = out
+    #     tensor._undetermined_tensor = None
+    #     results[i] = tensor
+
     pop()
 
     pop()
