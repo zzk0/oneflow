@@ -225,12 +225,14 @@ void ForEachConstMirroredObject4ConstPhyInstrOperand(InterpretType interpret_typ
   if (interpret_type == InterpretType::kCompute) {
     phy_instr_operand.ForEachConstMirroredObject(
         [&](MirroredObject* infer, MirroredObject* compute) {
-          Callback(infer);
+          if (infer != nullptr) { Callback(infer); }
           if (compute != nullptr) { Callback(compute); }
         });
   } else if (interpret_type == InterpretType::kInfer) {
     phy_instr_operand.ForEachConstMirroredObject(
-        [&](MirroredObject* infer, MirroredObject* compute) { Callback(infer); });
+        [&](MirroredObject* infer, MirroredObject* compute) {
+          if (infer != nullptr) { Callback(infer); }
+        });
   } else {
     UNIMPLEMENTED();
   }
@@ -260,8 +262,9 @@ void ForEachConstMirroredObject4MutPhyInstrOperand(InterpretType interpret_type,
                                                    const PhyInstrOperand& phy_instr_operand,
                                                    const CallbackT& Callback) {
   if (interpret_type == InterpretType::kCompute) {
-    phy_instr_operand.ForEachMutMirroredObject(
-        [&](MirroredObject* infer, MirroredObject* compute) { Callback(infer); });
+    phy_instr_operand.ForEachMutMirroredObject([&](MirroredObject* infer, MirroredObject* compute) {
+      if (infer != nullptr) { Callback(infer); }
+    });
   } else if (interpret_type == InterpretType::kInfer) {
     // Do nothing
   } else {
@@ -297,8 +300,9 @@ void ForEachMutMirroredObject4MutPhyInstrOperand(InterpretType interpret_type,
     phy_instr_operand.ForEachMutMirroredObject(
         [&](MirroredObject* infer, MirroredObject* compute) { Callback(compute); });
   } else if (interpret_type == InterpretType::kInfer) {
-    phy_instr_operand.ForEachMutMirroredObject(
-        [&](MirroredObject* infer, MirroredObject* compute) { Callback(infer); });
+    phy_instr_operand.ForEachMutMirroredObject([&](MirroredObject* infer, MirroredObject* compute) {
+      if (infer != nullptr) { Callback(infer); }
+    });
   } else {
     UNIMPLEMENTED();
   }
@@ -332,12 +336,14 @@ void ForEachMutMirroredObject4Mut2PhyInstrOperand(InterpretType interpret_type,
   if (interpret_type == InterpretType::kCompute) {
     phy_instr_operand.ForEachMut2MirroredObject(
         [&](MirroredObject* infer, MirroredObject* compute) {
-          Callback(infer);
+          if (infer != nullptr) { Callback(infer); }
           Callback(compute);
         });
   } else if (interpret_type == InterpretType::kInfer) {
     phy_instr_operand.ForEachMut2MirroredObject(
-        [&](MirroredObject* infer, MirroredObject* compute) { Callback(infer); });
+        [&](MirroredObject* infer, MirroredObject* compute) {
+          if (infer != nullptr) { Callback(infer); }
+        });
   } else {
     UNIMPLEMENTED();
   }
@@ -576,7 +582,7 @@ void VirtualMachine::Receive(InstructionMsgList* compute_instr_msg_list) {
   InstructionMsgList new_instr_msg_list;
   OBJECT_MSG_LIST_FOR_EACH_PTR(compute_instr_msg_list, compute_instr_msg) {
     OF_PROFILER_RANGE_PUSH("PhysicalRun -- Build");
-    if (!compute_instr_msg->instr_type_id().instruction_type().DisableInferInstruction()) {
+    if (!compute_instr_msg->phy_instr_operand()) {
       new_instr_msg_list.EmplaceBack(compute_instr_msg->MakeInferInstrMsg());
     }
     OF_PROFILER_RANGE_POP();

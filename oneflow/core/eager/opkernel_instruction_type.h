@@ -26,7 +26,6 @@ namespace vm {
 
 class LocalCallOpKernelInstructionType : public vm::InstructionType {
  public:
-  bool DisableInferInstruction() const override { return false; }
   void Infer(vm::Instruction* instruction) const override;
   void Compute(vm::Instruction* instruction) const override;
 
