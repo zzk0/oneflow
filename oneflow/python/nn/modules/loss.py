@@ -103,6 +103,13 @@ class CrossEntropyLoss(Module):
             .Output("out")
             .Build()
         )
+        self._transpose_op = (
+            flow.builtin_op("transpose")
+            .Input("input")
+            .Output("output")
+            .Attr("perm", [])
+            .Build()
+        )
 
     def forward(self, input, target):
         assert len(input.shape) <= 4
@@ -115,7 +122,7 @@ class CrossEntropyLoss(Module):
             target = target.flatten()
         elif input_shape_len == 4:
             b, c, h, w = input.shape[0], input.shape[1], input.shape[2], input.shape[3]
-            input = input.transpose((0, 2, 3, 1))
+            input = self._transpose_op(input, perm=(0, 2, 3, 1))[0]
             input = input.reshape(shape=[-1, input.shape[3]])
             target = target.flatten()
         elif input_shape_len >= 5:
@@ -231,6 +238,13 @@ class NLLLoss(Module):
             .Attr("dim", 1)
             .Build()
         )
+        self._transpose_op = (
+            flow.builtin_op("transpose")
+            .Input("input")
+            .Output("output")
+            .Attr("perm", [])
+            .Build()
+        )
 
     def nllloss_1d(self, input, target):
         target = flow.experimental.reshape(target, (target.shape[0], 1))
@@ -253,7 +267,7 @@ class NLLLoss(Module):
             res = res.reshape((b, h))
         elif len(input.shape) == 4:
             b, c, h, w = input.shape[0], input.shape[1], input.shape[2], input.shape[3]
-            input = input.transpose((0, 2, 3, 1))
+            input = self._transpose_op(input, perm=(0, 2, 3, 1))[0]
             input = input.reshape(shape=[-1, input.shape[3]])
             target = target.flatten()
             res = self.nllloss_1d(input, target)
