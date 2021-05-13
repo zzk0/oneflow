@@ -117,7 +117,7 @@ class CrossEntropyLoss(Module):
         input_shape_len = len(input.shape)
         if input_shape_len == 3:
             b, c, h = input.shape[0], input.shape[1], input.shape[2]
-            input = input.transpose((0, 2, 1))
+            input = input.transpose(2, 1)
             input = input.reshape(shape=[-1, input.shape[2]])
             target = target.flatten()
         elif input_shape_len == 4:
@@ -260,7 +260,7 @@ class NLLLoss(Module):
             res = self.nllloss_1d(input, target)
         elif len(input.shape) == 3:
             b, c, h = input.shape[0], input.shape[1], input.shape[2]
-            input = input.transpose((0, 2, 1))
+            input = input.transpose(2, 1)
             input = input.reshape(shape=[-1, input.shape[2]])
             target = target.flatten()
             res = self.nllloss_1d(input, target)
