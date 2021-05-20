@@ -1160,7 +1160,7 @@ class TestOptimizers(flow.unittest.TestCase):
         arg_dict["train_iters"] = [100]
         for arg in GenArgList(arg_dict):
             compare_with_mxnet_lars(*arg)
-            # compare_with_torch_lars(*arg);
+            # compare_with_torch_lars(*arg)
             # compare_with_numpy_lars(*arg)
 
     def test_sgd(test_case):
