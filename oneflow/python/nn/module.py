@@ -24,6 +24,7 @@ import numpy as np
 import oneflow as flow
 from oneflow.python.oneflow_export import oneflow_export
 from oneflow.python.framework.check_point_v2 import FeedValueToVariable
+from oneflow.python.framework.function_util import global_function_or_identity
 from oneflow.python.framework.tensor import Tensor
 from oneflow.python.nn.parameter import Parameter
 
@@ -82,7 +83,9 @@ class Module(object):
                     result = (result,)
                 args = result
 
-        return self.forward(*args)
+        res = self.forward(*args)
+
+        return res
 
     def add_module(self, name: str, module: Optional["Module"]) -> None:
         r"""Adds a child module to the current module.
@@ -377,11 +380,12 @@ class Module(object):
                     )
                     continue
                 try:
-                    # TODO(jianhao): uncomment these lines when autograd is ready
+                    # TODO(jianhao): uncomment this line when autograd is ready
                     # with torch.no_grad():
-                    # param.copy_(input_param)
-                    with param._placement_scope():
-                        FeedValueToVariable(param, input_param, None)
+                    param.copy_(input_param)
+                    # TODO(jianhao): uncomment these lines when consistent <-> local conversion is ready
+                    # with param._placement_scope():
+                    # FeedValueToVariable(param, input_param, None)
                 except Exception as ex:
                     error_msgs.append(
                         'While copying the parameter named "{}", '
@@ -493,10 +497,14 @@ class Module(object):
             if param is not None:
                 assert isinstance(param, Parameter)
                 assert param.is_leaf
+                with flow.no_grad():
+                    param_applied = fn(param)
                 self._parameters[key] = Parameter(param_applied, param.requires_grad)
 
                 if param.grad is not None:
                     assert param.grad.is_leaf
+                    with flow.no_grad():
+                        grad_applied = fn(param.grad)
                     self._parameters[key].grad = grad_applied.requires_grad_(
                         param.grad.requires_grad
                     )
@@ -512,3 +520,9 @@ class Module(object):
             module.apply(fn)
         fn(self)
         return self
+
+    def to(self, device: Optional[Union[str, flow.device]] = None):
+        def convert(t):
+            return t.to(device)
+
+        return self._apply(convert)

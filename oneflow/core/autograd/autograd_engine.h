@@ -27,17 +27,18 @@ namespace oneflow {
 
 namespace one {
 
-class TensorArg;
 class Tensor;
 class TensorTuple;
+class AutogradMeta;
+class TensorInfo;
 
 // Calculates one backward op
 class FunctionNode {
  public:
   virtual ~FunctionNode() = default;
 
-  virtual Maybe<void> Apply(bool create_graph) = 0;
-  virtual Maybe<void> AccGrad4LeafTensor() = 0;
+  virtual Maybe<bool> Apply(bool create_graph) = 0;
+  virtual Maybe<void> AccGrad4LeafTensor(bool create_graph) = 0;
   virtual Maybe<void> AccGrad4RetainGradTensor() = 0;
   virtual void ReleaseOutTensorArgs() = 0;
   // Releases the eventual c++ std::function for backward if retain_graph=False to avoid calling
@@ -52,7 +53,7 @@ class FunctionNode {
   const std::string& GetOpName() const { return op_name_; }
 
  protected:
-  FunctionNode() = default;
+  FunctionNode() : next_functions_(new std::vector<std::shared_ptr<const FunctionNode>>{}) {}
 
   const std::string op_name_;
   std::shared_ptr<std::vector<std::shared_ptr<const FunctionNode>>> next_functions_;
@@ -72,9 +73,9 @@ class AutogradEngine {
                                                                   bool create_graph) = 0;
   virtual void ClearEngine() = 0;
   // Builds FunctionNode, binding to all `outputs_` tensors and saving in AutogradEngine
-  // TODO: add parameters for `backward_fn`
   virtual std::shared_ptr<FunctionNode> AddBackwardFuncPtr(
-      const std::shared_ptr<const std::function<Maybe<void>()>>& backward_fn,
+      const std::shared_ptr<
+          const std::function<Maybe<void>(const TensorTuple&, TensorTuple*, bool)>>& backward_fn,
       const TensorTuple& inputs, TensorTuple* outputs) = 0;
 
  protected:
@@ -85,28 +86,29 @@ class AutogradEngine {
 class StackFunctionNode final : public FunctionNode {
  public:
   OF_DISALLOW_COPY_AND_MOVE(StackFunctionNode);
-  // TODO: update constructor according to op_builder interface
-  StackFunctionNode(const std::shared_ptr<const std::function<Maybe<void>()>>& backward_fn,
-                    const TensorTuple& inputs, const TensorTuple& outputs);
+  StackFunctionNode(
+      const std::shared_ptr<
+          const std::function<Maybe<void>(const TensorTuple&, TensorTuple*, bool)>>& backward_fn,
+      const TensorTuple& inputs, const TensorTuple& outputs);
   StackFunctionNode() = delete;
   ~StackFunctionNode() override = default;
 
-  Maybe<void> AccGrad4LeafTensor() override;
+  Maybe<void> AccGrad4LeafTensor(bool create_graph) override;
   Maybe<void> AccGrad4RetainGradTensor() override;
   void ReleaseOutTensorArgs() override;
   void ReleaseData() override;
-  Maybe<void> Apply(bool create_graph) override;
+  Maybe<bool> Apply(bool create_graph) override;
+  bool is_in_stack() const { return is_in_stack_; }
+  void set_is_in_stack(bool in_stack) { is_in_stack_ = in_stack; }
 
  private:
-  // FunctionNode shares Tensor with `inputs_`, and only shares TensorImpl with `outputs_`.
-  // The reference link is `output tensors -> node -> inputs_/input tensors`.
-  std::shared_ptr<TensorTuple> inputs_;
-  std::shared_ptr<TensorTuple> outputs_;
-  std::vector<std::shared_ptr<TensorArg>> in_grads_;
-  std::vector<std::shared_ptr<TensorArg>> out_grads_;
+  std::vector<std::shared_ptr<AutogradMeta>> input_meta_datas_;
+  std::vector<std::shared_ptr<AutogradMeta>> output_meta_datas_;
+  std::vector<TensorInfo> output_tensor_infos_;
   // Actual backward function builds in `AutogradInterpreter` to calculate one backward op
-  // TODO: add parameters
-  std::shared_ptr<const std::function<Maybe<void>()>> backward_fn_;
+  std::shared_ptr<const std::function<Maybe<void>(const TensorTuple&, TensorTuple*, bool)>>
+      backward_fn_;
+  bool is_in_stack_;
 };
 
 class StackAutogradEngine final : public AutogradEngine {
@@ -125,16 +127,20 @@ class StackAutogradEngine final : public AutogradEngine {
                                                           bool create_graph) override;
   void ClearEngine() override;
   std::shared_ptr<FunctionNode> AddBackwardFuncPtr(
-      const std::shared_ptr<const std::function<Maybe<void>()>>& backward_fn,
+      const std::shared_ptr<
+          const std::function<Maybe<void>(const TensorTuple&, TensorTuple*, bool)>>& backward_fn,
       const TensorTuple& inputs, TensorTuple* outputs) override;
 
- protected:
+ private:
   // StackFunctionNode must be saved in engine, because any node in list may be released at any
   // moment.
   std::list<std::weak_ptr<FunctionNode>> node_list_;
+  void ClearReleasedFunctionNodes();
 };
 
 AutogradEngine* GetThreadLocalAutogradEngine();
+
+Maybe<void> AddAccumulateFunctionNode(const std::shared_ptr<Tensor>& tensor);
 
 }  // namespace one
 

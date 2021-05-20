@@ -25,8 +25,7 @@ class PyForeignBoxingUtil : public ForeignBoxingUtil {
   using ForeignBoxingUtil::ForeignBoxingUtil;
 
   std::shared_ptr<compatible_py::BlobObject> BoxingTo(
-      const std::shared_ptr<InstructionsBuilder>& builder,
-      const std::shared_ptr<compatible_py::BlobObject>& blob_object,
+      InstructionsBuilder* builder, const std::shared_ptr<compatible_py::BlobObject>& blob_object,
       const std::shared_ptr<compatible_py::OpArgParallelAttribute>& op_arg_parallel_attr)
       const override {
     PYBIND11_OVERRIDE(std::shared_ptr<compatible_py::BlobObject>, ForeignBoxingUtil, BoxingTo,
@@ -34,14 +33,13 @@ class PyForeignBoxingUtil : public ForeignBoxingUtil {
   }
 
   std::shared_ptr<ParallelDesc> TryReplaceDeviceTag(
-      const std::shared_ptr<InstructionsBuilder>& builder,
-      const std::shared_ptr<ParallelDesc>& parallel_desc_symbol,
+      InstructionsBuilder* builder, const std::shared_ptr<ParallelDesc>& parallel_desc_symbol,
       const std::string& device_tag) const override {
     PYBIND11_OVERRIDE(std::shared_ptr<ParallelDesc>, ForeignBoxingUtil, TryReplaceDeviceTag,
                       builder, parallel_desc_symbol, device_tag);
   }
 
-  void Assign(const std::shared_ptr<InstructionsBuilder>& builder,
+  void Assign(InstructionsBuilder* builder,
               const std::shared_ptr<compatible_py::BlobObject>& target_blob_object,
               const std::shared_ptr<compatible_py::BlobObject>& source_blob_object) const override {
     PYBIND11_OVERRIDE(void, ForeignBoxingUtil, Assign, builder, target_blob_object,
@@ -52,7 +50,10 @@ class PyForeignBoxingUtil : public ForeignBoxingUtil {
 Maybe<void> RegisterBoxingUtilOnlyOnce(const std::shared_ptr<ForeignBoxingUtil>& boxing_util) {
   CHECK_ISNULL_OR_RETURN(Global<std::shared_ptr<ForeignBoxingUtil>>::Get())
       << "Foreign Boxing util has been registered.";
-  Global<std::shared_ptr<ForeignBoxingUtil>>::New(boxing_util);
+  // Global<T>::SetAllocated is preferred since Global<T>::New will output logs but
+  // glog is not constructed yet.
+  Global<std::shared_ptr<ForeignBoxingUtil>>::SetAllocated(
+      new std::shared_ptr<ForeignBoxingUtil>(boxing_util));
   return Maybe<void>::Ok();
 }
 

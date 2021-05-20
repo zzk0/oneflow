@@ -19,6 +19,9 @@ limitations under the License.
 #include "oneflow/core/job/global_for.h"
 #include "oneflow/core/job/id_manager.h"
 #include "oneflow/core/control/global_process_ctx.h"
+#include "oneflow/core/framework/parallel_conf_util.h"
+#include "oneflow/core/framework/instructions_builder.h"
+#include "oneflow/core/vm/vm_util.h"
 
 namespace oneflow {
 
@@ -78,6 +81,18 @@ Maybe<ParallelDesc> ParallelDesc::New(int64_t symbol_id, const ParallelConf& par
   return parallel_desc;
 }
 
+Maybe<ParallelDesc> ParallelDesc::New(const std::string& device_tag,
+                                      const std::vector<std::string>& machine_device_ids,
+                                      const std::shared_ptr<Shape>& hierarchy) {
+  const auto parallel_conf = JUST(MakeParallelConf(device_tag, machine_device_ids, hierarchy));
+  std::shared_ptr<ParallelDesc> parallel_desc;
+  JUST(LogicalRun([&parallel_desc, &parallel_conf](InstructionsBuilder* builder) -> Maybe<void> {
+    parallel_desc = JUST(builder->GetParallelDescSymbol(parallel_conf));
+    return Maybe<void>::Ok();
+  }));
+  return parallel_desc;
+}
+
 Maybe<void> ParallelDesc::MaybeInit(const ParallelConf& user_conf) {
   parallel_conf_ = user_conf;
   device_type_ = DeviceType::kInvalidDevice;
@@ -88,28 +103,38 @@ Maybe<void> ParallelDesc::MaybeInit(const ParallelConf& user_conf) {
   machine_id2sorted_dev_phy_ids_ =
       std::make_shared<HashMap<int64_t, std::shared_ptr<std::vector<int64_t>>>>();
   for (const std::string& device_name : parallel_conf_.device_name()) {
-    int64_t node_id = -1;
-    std::string device_id_str;
-    JUST(ParseDeviceNameConf(device_name, &node_id, &device_id_str));
-    int64_t minus_pos = device_id_str.find("-");
-    if (minus_pos == std::string::npos) {
-      device_id_str = device_id_str + "-" + device_id_str;
-      minus_pos = device_id_str.find("-");
-    }
-    int64_t min_id = oneflow_cast<int64_t>(device_id_str.substr(0, minus_pos));
-    int64_t max_id = oneflow_cast<int64_t>(device_id_str.substr(minus_pos + 1));
-    CHECK_LE_OR_RETURN(min_id, max_id);
-    int64_t num_of_process_per_node = GlobalProcessCtx::NumOfProcessPerNode();
-    for (int64_t dev_phy_id = min_id; dev_phy_id <= max_id; ++dev_phy_id) {
-      int64_t mchn_id = dev_phy_id % num_of_process_per_node + node_id * num_of_process_per_node;
-      if (!(*machine_id2sorted_dev_phy_ids_)[mchn_id]) {
-        (*machine_id2sorted_dev_phy_ids_)[mchn_id] = std::make_shared<std::vector<int64_t>>();
-      }
-      (*machine_id2sorted_dev_phy_ids_)[mchn_id]->push_back(dev_phy_id);
+    if (device_name[0] == '@') {
+      JUST(SetMachineIdAndDeviceIdsByParsingDeviceName(device_name.substr(1), 1));
+    } else {
+      JUST(SetMachineIdAndDeviceIdsByParsingDeviceName(device_name,
+                                                       GlobalProcessCtx::NumOfProcessPerNode()));
     }
   }
   ClearUp();
   JUST(SanityCheck());
+  return Maybe<void>::Ok();
+}
+
+Maybe<void> ParallelDesc::SetMachineIdAndDeviceIdsByParsingDeviceName(
+    const std::string& device_name, size_t cols) {
+  int64_t node_id = -1;
+  std::string device_id_str;
+  JUST(ParseDeviceNameConf(device_name, &node_id, &device_id_str));
+  int64_t minus_pos = device_id_str.find("-");
+  if (minus_pos == std::string::npos) {
+    device_id_str = device_id_str + "-" + device_id_str;
+    minus_pos = device_id_str.find("-");
+  }
+  int64_t min_id = oneflow_cast<int64_t>(device_id_str.substr(0, minus_pos));
+  int64_t max_id = oneflow_cast<int64_t>(device_id_str.substr(minus_pos + 1));
+  CHECK_LE_OR_RETURN(min_id, max_id);
+  for (int64_t dev_phy_id = min_id; dev_phy_id <= max_id; ++dev_phy_id) {
+    int64_t mchn_id = dev_phy_id % cols + node_id * cols;
+    if (!(*machine_id2sorted_dev_phy_ids_)[mchn_id]) {
+      (*machine_id2sorted_dev_phy_ids_)[mchn_id] = std::make_shared<std::vector<int64_t>>();
+    }
+    (*machine_id2sorted_dev_phy_ids_)[mchn_id]->push_back(dev_phy_id);
+  }
   return Maybe<void>::Ok();
 }
 
@@ -138,6 +163,18 @@ bool ParallelDesc::Equals(const ParallelDesc& rhs) const {
 bool ParallelDesc::EqualsIgnoringDeviceType(const ParallelDesc& rhs) const {
   return sorted_machine_ids_ == rhs.sorted_machine_ids_ && EqualsMachineId2SortedDevPhyIds(rhs)
          && *hierarchy_ == *rhs.hierarchy_;
+}
+
+bool ParallelDesc::EqualsIgnoringHierarchy(const ParallelDesc& rhs) const {
+  return (this == &rhs)
+         || (device_type_ == rhs.device_type_ && sorted_machine_ids_ == rhs.sorted_machine_ids_
+             && EqualsMachineId2SortedDevPhyIds(rhs));
+}
+
+bool ParallelDesc::EqualsOnlyForMachineAndDeviceIds(const ParallelDesc& rhs) const {
+  return (this == &rhs)
+         || (sorted_machine_ids_ == rhs.sorted_machine_ids_
+             && EqualsMachineId2SortedDevPhyIds(rhs));
 }
 
 bool ParallelDesc::EqualsMachineId2SortedDevPhyIds(const ParallelDesc& rhs) const {
@@ -215,10 +252,10 @@ Maybe<void> ParallelDesc::CheckWithResourceDesc(const ResourceDesc& resource_des
 
 ParallelConf ParallelDesc::GetParallelIdOnlyParallelConf(int64_t parallel_id) const {
   ParallelConf parallel_conf;
-  std::string machine_id = std::to_string(CHECK_JUST(MachineId4ParallelId(parallel_id)));
+  std::string rank = std::to_string(CHECK_JUST(MachineId4ParallelId(parallel_id)));
   std::string device_id = std::to_string(CHECK_JUST(DeviceId4ParallelId(parallel_id)));
   parallel_conf.set_device_tag(*CHECK_JUST(DeviceTag4DeviceType(device_type())));
-  parallel_conf.add_device_name(machine_id + ":" + device_id);
+  parallel_conf.add_device_name(std::string("@") + rank + ":" + device_id);
   return parallel_conf;
 }
 
@@ -270,8 +307,8 @@ ParallelConf GenParallelConfOfCpuZeroOnMaster() {
 ParallelConf GenParallelConfOfCpuZeroOnAllMachines() {
   ParallelConf parallel_conf;
   parallel_conf.set_device_tag("cpu");
-  FOR_RANGE(int64_t, i, 0, (Global<ResourceDesc, ForSession>::Get()->TotalMachineNum())) {
-    parallel_conf.add_device_name(std::to_string(i) + ":0");
+  for (int64_t i : Global<ResourceDesc, ForSession>::Get()->process_ranks()) {
+    parallel_conf.add_device_name(std::string("@") + std::to_string(i) + ":0");
   }
   return parallel_conf;
 }

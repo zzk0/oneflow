@@ -19,6 +19,7 @@ limitations under the License.
 #include "oneflow/core/framework/to_string.h"
 #include "oneflow/core/operator/user_op.h"
 #include "oneflow/core/framework/infer_output_blob_time_shape_fn_context.h"
+#include "oneflow/core/framework/infer_parallel_distribution_fn_context.h"
 
 namespace oneflow {
 
@@ -34,8 +35,8 @@ BlobDesc* FindValidBlobDescOfBnsInOp(
   return nullptr;
 }
 
-user_op::TensorDesc GenTensorDescFromBlobDesc(const BlobDesc* blob_desc) {
-  user_op::TensorDesc tensor_desc;
+user_op::NaiveTensorDesc GenTensorDescFromBlobDesc(const BlobDesc* blob_desc) {
+  user_op::NaiveTensorDesc tensor_desc;
   *tensor_desc.mut_shape() = blob_desc->shape();
   *tensor_desc.mut_data_type() = blob_desc->data_type();
   *tensor_desc.mut_is_dynamic() = blob_desc->is_dynamic();
@@ -51,7 +52,7 @@ class UserOpKernelRegContext final : public user_op::KernelRegContext {
   explicit UserOpKernelRegContext(const UserOp* user_op,
                                   std::function<BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
                                   const ParallelContext* parallel_ctx)
-      : user_op::KernelRegContext(user_op::UserOpConfWrapper(user_op->op_conf())) {
+      : user_op_conf_(user_op->op_conf()) {
     const auto& op_conf = user_op->op_conf();
     CHECK(op_conf.has_user_conf());
 
@@ -99,23 +100,31 @@ class UserOpKernelRegContext final : public user_op::KernelRegContext {
   const ArgVec& inputs() const override { return inputs_; }
   const ArgVec& outputs() const override { return outputs_; }
 
+  const user_op::UserOpConfWrapper& user_op_conf() const override { return user_op_conf_; }
+
+  const std::shared_ptr<const user_op::AttrVal>& Attr4Name(
+      const std::string& attr_name) const override {
+    return user_op_conf().Attr4Name(attr_name);
+  }
+
  private:
+  const user_op::UserOpConfWrapper user_op_conf_;
   ArgVec inputs_;
   ArgVec outputs_;
   DeviceType device_type_;
   std::string device_tag_;
   const ParallelContext* parallel_ctx_;
-  HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc> arg2tensor_desc_;
+  HashMap<std::pair<std::string, int32_t>, user_op::NaiveTensorDesc> arg2tensor_desc_;
 };
 
-class UserOpInferContext : public user_op::InferContext {
+class UserOpInferContext final : public user_op::InferContext {
  public:
   using ArgVec = std::vector<std::pair<std::string, int32_t>>;
 
   UserOpInferContext(const UserOp* op, const ParallelContext* parallel_ctx, const JobDesc* job_desc,
                      const std::function<BlobDesc*(const std::string&)>& GetBlobDesc4BnInOp)
       : op_(op), parallel_ctx_(parallel_ctx), job_desc_(job_desc) {
-    bn2logical_tensor_desc_.reset(new HashMap<std::string, user_op::TensorDesc>());
+    bn2logical_tensor_desc_.reset(new HashMap<std::string, user_op::NaiveTensorDesc>());
     auto InitTensorDesc = [&](const ArgVec& arg_vec, const PbRpf<std::string>& bns) {
       CHECK_EQ(arg_vec.size(), bns.size());
       for (int32_t i = 0; i < arg_vec.size(); ++i) {
@@ -199,14 +208,18 @@ class UserOpInferContext : public user_op::InferContext {
     return CHECK_JUST(op_->GetOpParallelDesc())->parallel_num();
   }
 
-  const user_op::UserOpConfWrapper& user_op_conf() const override { return op_->user_op_conf(); }
-
  private:
+  const user_op::UserOpConfWrapper& user_op_conf() const override { return op_->user_op_conf(); }
+  const std::shared_ptr<const user_op::AttrVal>& Attr4Name(
+      const std::string& attr_name) const override {
+    return user_op_conf().Attr4Name(attr_name);
+  }
+
   const UserOp* op_;
   const ParallelContext* parallel_ctx_;
   const JobDesc* job_desc_;
-  HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc> arg2tensor_desc_;
-  std::unique_ptr<HashMap<std::string, user_op::TensorDesc>> bn2logical_tensor_desc_;
+  HashMap<std::pair<std::string, int32_t>, user_op::NaiveTensorDesc> arg2tensor_desc_;
+  std::unique_ptr<HashMap<std::string, user_op::NaiveTensorDesc>> bn2logical_tensor_desc_;
 };
 
 class UserOpSbpContext : public user_op::SbpContext {
@@ -229,7 +242,10 @@ class UserOpSbpContext : public user_op::SbpContext {
 
   const user_op::TensorDesc& LogicalTensorDesc4InputArgNameAndIndex(
       const std::string& input_arg_name, int32_t index) const override {
-    return arg2tensor_desc_.at(std::make_pair(input_arg_name, index));
+    auto it = arg2tensor_desc_.find(std::make_pair(input_arg_name, index));
+    CHECK(it != arg2tensor_desc_.end())
+        << "Cannot find input_arg_name : " << input_arg_name << " input_arg_index : " << index;
+    return it->second;
   }
   const ArgVec& inputs() const override { return op_->inputs(); }
   const ArgVec& outputs() const override { return op_->outputs(); }
@@ -248,7 +264,7 @@ class UserOpSbpContext : public user_op::SbpContext {
  private:
   const UserOp* op_;
   SbpSignatureList* sbp_sig_list_;
-  HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc> arg2tensor_desc_;
+  HashMap<std::pair<std::string, int32_t>, user_op::NaiveTensorDesc> arg2tensor_desc_;
 };
 
 class UserOpInferSbpSignatureFnContext : public user_op::InferSbpSignatureFnContext {
@@ -277,7 +293,10 @@ class UserOpInferSbpSignatureFnContext : public user_op::InferSbpSignatureFnCont
 
   const user_op::TensorDesc& LogicalTensorDesc4InputArgNameAndIndex(
       const std::string& input_arg_name, int32_t index) const override {
-    return arg2tensor_desc_.at(std::make_pair(input_arg_name, index));
+    auto it = arg2tensor_desc_.find(std::make_pair(input_arg_name, index));
+    CHECK(it != arg2tensor_desc_.end())
+        << "Cannot find input_arg_name : " << input_arg_name << " input_arg_index : " << index;
+    return it->second;
   }
   const ArgVec& inputs() const override { return op_->inputs(); }
   const ArgVec& outputs() const override { return op_->outputs(); }
@@ -286,7 +305,10 @@ class UserOpInferSbpSignatureFnContext : public user_op::InferSbpSignatureFnCont
 
   const SbpParallel& SbpParallelHint4InputArgNameAndIndex(const std::string& input_arg_name,
                                                           int32_t index) const override {
-    return arg2sbp_parallel_hint_.at(std::make_pair(input_arg_name, index));
+    auto it = arg2sbp_parallel_hint_.find(std::make_pair(input_arg_name, index));
+    CHECK(it != arg2sbp_parallel_hint_.end())
+        << "Cannot find input_arg_name : " << input_arg_name << " input_arg_index : " << index;
+    return it->second;
   }
 
   const user_op::UserOpConfWrapper& user_op_conf() const override { return op_->user_op_conf(); }
@@ -299,7 +321,7 @@ class UserOpInferSbpSignatureFnContext : public user_op::InferSbpSignatureFnCont
 
  private:
   const UserOp* op_;
-  HashMap<std::pair<std::string, int32_t>, user_op::TensorDesc> arg2tensor_desc_;
+  HashMap<std::pair<std::string, int32_t>, user_op::NaiveTensorDesc> arg2tensor_desc_;
   HashMap<std::pair<std::string, int32_t>, SbpParallel> arg2sbp_parallel_hint_;
   SbpSignature* signature_;
   SbpSignature sbp_signature_conf_;
@@ -335,6 +357,81 @@ class UserOpInferOutputBlobTimeShapeFnContext : public user_op::InferOutputBlobT
   const UserOp* op_;
   HashMap<std::pair<std::string, int32_t>, Shape> arg2time_shape_;
   Shape* output_blob_time_shape_;
+};
+
+class UserOpInferParallelDistributionFnContext
+    : public user_op::InferParallelDistributionFnContext {
+ public:
+  using ArgVec = std::vector<std::pair<std::string, int32_t>>;
+  UserOpInferParallelDistributionFnContext(
+      const UserOp* op, ParallelDistributionSignature* parallel_distribution_signature,
+      const ParallelDistributionSignature& parallel_distribution_constraints,
+      std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
+          ParallelDistributionInferHint4Ibn)
+      : op_(op),
+        parallel_distribution_signature_(parallel_distribution_signature),
+        parallel_distribution_constraints_(parallel_distribution_constraints),
+        parallel_distribution_infer_hint4ibn_fn_(std::move(ParallelDistributionInferHint4Ibn)) {
+    const auto& user_op_conf = op->op_conf().user_conf();
+    for (const auto& it : user_op_conf.input()) {
+      const std::string& arg_name = it.first;
+      for (int32_t i = 0; i < it.second.s_size(); ++i) {
+        auto hint =
+            CHECK_JUST(parallel_distribution_infer_hint4ibn_fn_(GenRepeatedBn(arg_name, i)));
+        CHECK(arg2tensor_desc_
+                  .emplace(std::make_pair(arg_name, i),
+                           GenTensorDescFromBlobDesc(&hint->logical_blob_desc()))
+                  .second);
+      }
+    }
+  }
+  ~UserOpInferParallelDistributionFnContext() override = default;
+
+  const user_op::TensorDesc& LogicalTensorDesc4InputArgNameAndIndex(
+      const std::string& input_arg_name, int32_t index) const override {
+    auto it = arg2tensor_desc_.find(std::make_pair(input_arg_name, index));
+    CHECK(it != arg2tensor_desc_.end())
+        << "Cannot find input_arg_name : " << input_arg_name << " input_arg_index : " << index;
+    return it->second;
+  }
+
+  const ParallelDistributionSignature& parallel_distribution_constraints() const override {
+    return parallel_distribution_constraints_;
+  }
+
+  ParallelDistribution* ParallelDistribution4ArgNameAndIndex(const std::string& arg_name,
+                                                             int32_t index) override {
+    return &(*parallel_distribution_signature_
+                  ->mutable_bn_in_op2parallel_distribution())[GenRepeatedBn(arg_name, index)];
+  }
+
+  const ParallelDistribution& ParallelDistributionHint4InputArgNameAndIndex(
+      const std::string& arg_name, int32_t index) override {
+    auto hint =
+        CHECK_JUST(parallel_distribution_infer_hint4ibn_fn_(GenRepeatedBn(arg_name, index)));
+    return hint->parallel_distribution();
+  }
+
+  const user_op::UserOpConfWrapper& user_op_conf() const override { return op_->user_op_conf(); }
+
+  int64_t parallel_num() const override {
+    return CHECK_JUST(op_->GetOpParallelDesc())->parallel_num();
+  }
+
+  const Shape& parallel_hierarchy() override {
+    return *(CHECK_JUST(op_->GetOpParallelDesc())->hierarchy());
+  }
+
+  const ArgVec& inputs() const override { return op_->inputs(); }
+  const ArgVec& outputs() const override { return op_->outputs(); }
+
+ private:
+  const UserOp* op_;
+  HashMap<std::pair<std::string, int32_t>, user_op::NaiveTensorDesc> arg2tensor_desc_;
+  ParallelDistributionSignature* parallel_distribution_signature_;
+  ParallelDistributionSignature parallel_distribution_constraints_;
+  std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
+      parallel_distribution_infer_hint4ibn_fn_;
 };
 
 void UserOp::InitFromOpConf() {
@@ -420,6 +517,9 @@ Maybe<void> UserOp::InferLogicalOutBlobDescs(
 
   UserOpInferContext infer_ctx(this, nullptr, nullptr, BlobDesc4BnInOp);
 
+  CHECK_OR_RETURN(val_->data_type_infer_fn)
+      << "No InferDataType function for " << val_->op_type_name;
+  JUST(val_->data_type_infer_fn(&infer_ctx));
   JUST(val_->logical_tensor_desc_infer_fn(&infer_ctx));
   for (const auto& pair : infer_ctx.outputs()) {
     BlobDesc* out_blob_desc = BlobDesc4BnInOp(GenRepeatedBn(pair.first, pair.second));
@@ -450,6 +550,9 @@ Maybe<void> UserOp::InferOutBlobDescs(
     }
     UserOpInferContext infer_ctx(this, parallel_ctx, nullptr, GetBlobDesc4BnInOp);
 
+    CHECK_OR_RETURN(val_->data_type_infer_fn)
+        << "No InferDataType function for " << val_->op_type_name;
+    JUST(val_->data_type_infer_fn(&infer_ctx));
     JUST(val_->physical_tensor_desc_infer_fn(&infer_ctx));
     for (const auto& pair : infer_ctx.outputs()) {
       BlobDesc* out_blob_desc = GetBlobDesc4BnInOp(GenRepeatedBn(pair.first, pair.second));
@@ -523,9 +626,9 @@ Maybe<void> UserOp::InferSbpSignature(
     const std::function<int32_t(const SbpSignature&)>& CalcOrderValue4SbpSig,
     std::function<Maybe<const SbpInferHint*>(const std::string&)> SbpInferHint4Ibn,
     const ParallelDesc& parallel_desc) const {
-  if (val_->infer_sbp_signature_fn) {
+  if (val_->sbp_signature_infer_fn) {
     UserOpInferSbpSignatureFnContext ctx(this, sbp_signature, sbp_sig_conf, SbpInferHint4Ibn);
-    return val_->infer_sbp_signature_fn(&ctx);
+    return val_->sbp_signature_infer_fn(&ctx);
   } else {
     return Operator::InferSbpSignature(sbp_signature, sbp_sig_conf, CalcOrderValue4SbpSig,
                                        SbpInferHint4Ibn, parallel_desc);
@@ -579,14 +682,43 @@ Maybe<void> UserOp::GetSbpSignatures(
 Maybe<void> UserOp::InferOpTimeShape(
     const std::function<Maybe<const Shape>(const std::string&)>& GetTimeShape4BnInOp,
     std::shared_ptr<const Shape>* time_shape) const {
-  if (val_->infer_output_blob_time_shape_fn) {
+  if (val_->output_blob_time_shape_infer_fn) {
     std::shared_ptr<Shape> op_time_shape(new Shape());
     UserOpInferOutputBlobTimeShapeFnContext infer_output_blob_time_shape_fn_ctx(
         this, GetTimeShape4BnInOp, op_time_shape.get());
     *time_shape = op_time_shape;
-    return val_->infer_output_blob_time_shape_fn(&infer_output_blob_time_shape_fn_ctx);
+    return val_->output_blob_time_shape_infer_fn(&infer_output_blob_time_shape_fn_ctx);
   } else {
     return Operator::InferOpTimeShape(GetTimeShape4BnInOp, time_shape);
+  }
+}
+
+namespace {
+
+bool IgnoreInferParallelDistributionFnWhenFlatHierarchy(const std::string& op_type_name) {
+  return (op_type_name == "reshape" || op_type_name == "reshape_like");
+}
+
+}  // namespace
+
+Maybe<void> UserOp::InferParallelDistributionSignature(
+    ParallelDistributionSignature* parallel_distribution_signature,
+    const ParallelDistributionSignature& parallel_distribution_constraints,
+    const ParallelDesc& parallel_desc,
+    std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
+        ParallelDistributionInferHint4Ibn) const {
+  if (val_->parallel_distribution_infer_fn
+      && (parallel_desc.hierarchy()->NumAxes() > 1
+          || !IgnoreInferParallelDistributionFnWhenFlatHierarchy(
+              this->user_op_conf().op_type_name()))) {
+    UserOpInferParallelDistributionFnContext ctx(this, parallel_distribution_signature,
+                                                 parallel_distribution_constraints,
+                                                 ParallelDistributionInferHint4Ibn);
+    return val_->parallel_distribution_infer_fn(&ctx);
+  } else {
+    return Operator::InferParallelDistributionSignature(
+        parallel_distribution_signature, parallel_distribution_constraints, parallel_desc,
+        ParallelDistributionInferHint4Ibn);
   }
 }
 

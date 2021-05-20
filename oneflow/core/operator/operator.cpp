@@ -15,14 +15,15 @@ limitations under the License.
 */
 #include "oneflow/core/common/balanced_splitter.h"
 #include "oneflow/core/vm/symbol_storage.h"
+#include "oneflow/core/framework/instructions_builder.h"
 #include "oneflow/core/framework/to_string.h"
 #include "oneflow/core/framework/user_op_registry_manager.h"
-#include "oneflow/core/graph/logical_node.h"
 #include "oneflow/core/job/mirrored_sig_infer_hint.h"
 #include "oneflow/core/job/sbp_signature_builder.h"
 #include "oneflow/core/job/scope.h"
 #include "oneflow/core/operator/operator.h"
 #include "oneflow/core/operator/op_node_signature.pb.h"
+#include "oneflow/core/job/parallel_distribution_infer_hint.h"
 #include "oneflow/core/job/foreign_callback.h"
 
 namespace oneflow {
@@ -63,8 +64,6 @@ void Operator::Init(std::shared_ptr<const OperatorConf> op_conf) {
   for (const auto& bn : input_bns()) { *input_output_bns_.Add() = bn; }
   for (const auto& bn : output_bns()) { *input_output_bns_.Add() = bn; }
 }
-
-LogicalNode* Operator::NewProperLogicalNode() const { return new NormalForwardLogicalNode; }
 
 const LogicalBlobId& Operator::BnInOp2Lbi(const std::string& bn_in_op) const {
   return arg_signature_.bn_in_op2lbi().at(bn_in_op);
@@ -141,7 +140,6 @@ Maybe<void> Operator::FillOpParallelDesc(const ParallelDesc& parallel_desc) {
 }
 
 Maybe<void> Operator::FillOpParallelDesc(std::shared_ptr<const ParallelDesc> parallel_desc) {
-  CHECK_EQ_OR_RETURN(parallel_desc->hierarchy()->NumAxes(), 1);
   CHECK_OR_RETURN(!op_parallel_desc_);
   op_parallel_desc_ = std::move(parallel_desc);
   return Maybe<void>::Ok();
@@ -516,7 +514,7 @@ Maybe<void> Operator::InferSbpSignatureIf(
 
 Maybe<void> Operator::InferSbpSignature(
     SbpSignature* infered_sbp_signature, const SbpSignature& sbp_sig_conf,
-    const HashMap<std::string, SbpInferHint>& ibn2sbp_infer_hint) {
+    const HashMap<std::string, SbpInferHint>& ibn2sbp_infer_hint) const {
   auto SbpInferHint4Ibn = [&](const std::string& ibn) -> Maybe<const SbpInferHint*> {
     auto it = ibn2sbp_infer_hint.find(ibn);
     if (it == ibn2sbp_infer_hint.end()) {
@@ -660,43 +658,110 @@ Maybe<void> Operator::InferSbpSignature(
 }
 
 Maybe<void> Operator::InferParallelDistributionSignatureIf(
-    const ParallelDistributionSignature& parallel_distribution_sig_constraints,
+    const ParallelDistributionSignature& parallel_distribution_constraints,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
         ParallelDistributionInferHint4Ibn) {
-  ParallelDistributionSignature signature;
-  JUST(InferParallelDistributionSignature(&signature, parallel_distribution_sig_constraints,
-                                          parallel_desc, ParallelDistributionInferHint4Ibn));
-  JUST(FillParallelDistributionSignature(signature));
+  ParallelDistributionSignature parallel_distribution_signature;
+  JUST(InferParallelDistributionSignature(&parallel_distribution_signature,
+                                          parallel_distribution_constraints, parallel_desc,
+                                          ParallelDistributionInferHint4Ibn));
+  JUST(FillParallelDistributionSignature(parallel_distribution_signature));
   return Maybe<void>::Ok();
 }
 
 Maybe<void> Operator::InferParallelDistributionSignature(
-    ParallelDistributionSignature* signature,
-    const ParallelDistributionSignature& parallel_distribution_sig_constraints,
+    ParallelDistributionSignature* parallel_distribution_signature,
+    const ParallelDistributionSignature& parallel_distribution_constraints,
     const ParallelDesc& parallel_desc,
     std::function<Maybe<const ParallelDistributionInferHint*>(const std::string&)>
-        ParallelDistributionInferHint4Ibn) {
+        ParallelDistributionInferHint4Ibn) const {
+  const auto IsBroadcast = [](const ParallelDistribution& parallel_distribution,
+                              const ParallelDesc& parallel_desc) -> bool {
+    if (parallel_desc.parallel_num() == 1) { return true; }
+    for (int64_t i = 0; i < parallel_distribution.sbp_parallel_size(); ++i) {
+      if (!parallel_distribution.sbp_parallel(i).has_broadcast_parallel()) { return false; }
+    }
+    return true;
+  };
   const auto& parallel_hierarchy = parallel_desc.hierarchy();
   CHECK_GT(parallel_hierarchy->NumAxes(), 0);
   if (parallel_hierarchy->NumAxes() == 1) {
     HashMap<std::string, SbpInferHint> ibn2sbp_infer_hint;
     for (const auto& ibn : input_bns()) {
       const ParallelDistributionInferHint* hint = JUST(ParallelDistributionInferHint4Ibn(ibn));
-      CHECK_EQ(hint->parallel_distribution().sbp_parallel_size(), 1);
+      if (hint->parallel_distribution().sbp_parallel_size() != 1) {
+        CHECK_OR_RETURN(IsBroadcast(hint->parallel_distribution(), hint->parallel_desc()));
+      }
       ibn2sbp_infer_hint.emplace(ibn,
                                  SbpInferHint(&hint->parallel_desc(), &hint->logical_blob_desc(),
                                               &hint->parallel_distribution().sbp_parallel(0)));
     }
-    SbpSignature sbp_sig_constraints;
-    ParallelDistributionSignatureToSbpSignature(parallel_distribution_sig_constraints,
-                                                &sbp_sig_constraints);
+    SbpSignature sbp_constraints;
+    ParallelDistributionSignatureToSbpSignature(parallel_distribution_constraints,
+                                                &sbp_constraints);
     SbpSignature sbp_signature;
-    CHECK_JUST(InferSbpSignature(&sbp_signature, sbp_sig_constraints, ibn2sbp_infer_hint));
-    SbpSignatureToParallelDistributionSignature(sbp_signature, signature);
+    CHECK_JUST(InferSbpSignature(&sbp_signature, sbp_constraints, ibn2sbp_infer_hint));
+    SbpSignatureToParallelDistributionSignature(sbp_signature, parallel_distribution_signature);
     return Maybe<void>::Ok();
   } else {
-    UNIMPLEMENTED_THEN_RETURN();
+    SbpSignatureList list;
+    const auto LogicalBlobDesc4Ibn = [&](const std::string& ibn) -> Maybe<const BlobDesc&> {
+      return JUST(ParallelDistributionInferHint4Ibn(ibn))->logical_blob_desc();
+    };
+    HashMap<std::string, ParallelDistribution> ibn2parallel_distribution;
+    for (const auto& ibn : input_bns()) {
+      ParallelDistribution distribution =
+          JUST(ParallelDistributionInferHint4Ibn(ibn))->parallel_distribution();
+      if (parallel_distribution_constraints.bn_in_op2parallel_distribution_size() != 0) {
+        const auto parallel_distribution_constraints_it =
+            parallel_distribution_constraints.bn_in_op2parallel_distribution().find(ibn);
+        if (parallel_distribution_constraints_it
+            != parallel_distribution_constraints.bn_in_op2parallel_distribution().end()) {
+          distribution = parallel_distribution_constraints_it->second;
+        }
+      }
+      if (distribution.sbp_parallel_size() != parallel_hierarchy->NumAxes()) {
+        CHECK_OR_RETURN(IsBroadcast(distribution,
+                                    JUST(ParallelDistributionInferHint4Ibn(ibn))->parallel_desc()))
+            << ibn << "'s hierarchy is different from " << op_name()
+            << "'s, it should be broadcast but get " << distribution.DebugString();
+        distribution.clear_sbp_parallel();
+        for (int64_t i = 0; i < parallel_hierarchy->NumAxes(); ++i) {
+          distribution.add_sbp_parallel()->mutable_broadcast_parallel();
+        }
+      }
+      CHECK_EQ_OR_RETURN(distribution.sbp_parallel_size(), parallel_hierarchy->NumAxes());
+      ibn2parallel_distribution[ibn] = std::move(distribution);
+    }
+    CHECK_JUST(GetSbpSignaturesIf(LogicalBlobDesc4Ibn, parallel_desc, &list));
+    for (int64_t i = 0; i < parallel_hierarchy->NumAxes(); ++i) {
+      const SbpSignature* matched_sbp_signature = nullptr;
+      for (const auto& sbp_signature : list.sbp_signature()) {
+        bool all_match = true;
+        for (const auto& ibn : input_bns()) {
+          if (sbp_signature.bn_in_op2sbp_parallel().at(ibn)
+              != ibn2parallel_distribution.at(ibn).sbp_parallel(i)) {
+            all_match = false;
+            break;
+          }
+        }
+        if (all_match) {
+          matched_sbp_signature = &sbp_signature;
+          break;
+        }
+      }
+      CHECK_OR_RETURN(matched_sbp_signature != nullptr) << " op_name " << op_name();
+      for (const auto& bn : input_bns()) {
+        *((*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())[bn]
+              .add_sbp_parallel()) = matched_sbp_signature->bn_in_op2sbp_parallel().at(bn);
+      }
+      for (const auto& bn : output_bns()) {
+        *((*parallel_distribution_signature->mutable_bn_in_op2parallel_distribution())[bn]
+              .add_sbp_parallel()) = matched_sbp_signature->bn_in_op2sbp_parallel().at(bn);
+      }
+    }
+    return Maybe<void>::Ok();
   }
 }
 
@@ -835,16 +900,11 @@ void Operator::GenKernelConf(
     if (blob_desc == nullptr) { continue; }
     (*dtype_signature->mutable_name2dtype())[ibn] = blob_desc->data_type();
   }
+
   CHECK_JUST(ToOpAttribute(kernel_conf->mutable_op_attribute()));
-  if (HasBlobDescWithField(GetBlobDesc4BnInOp, output_bns(), [](const BlobDesc* blob_desc) {
-        return blob_desc->header_is_opaque();
-      })) {
-    kernel_conf->set_need_do_opaque_header(true);
-  } else {
-    if (HasBlobDescWithField(GetBlobDesc4BnInOp, output_bns(),
-                             [](const BlobDesc* blob_desc) { return blob_desc->is_dynamic(); })) {
-      kernel_conf->set_need_do_shape(true);
-    }
+  if (HasBlobDescWithField(GetBlobDesc4BnInOp, output_bns(),
+                           [](const BlobDesc* blob_desc) { return blob_desc->is_dynamic(); })) {
+    kernel_conf->set_need_do_shape(true);
   }
 
   {
@@ -854,6 +914,7 @@ void Operator::GenKernelConf(
     }
     kernel_conf->set_data_type(data_type);
   }
+
   if (parallel_ctx != nullptr) { *(kernel_conf->mutable_parallel_ctx()) = *parallel_ctx; }
 
   VirtualGenKernelConf(GetBlobDesc4BnInOp, parallel_ctx, kernel_conf);
@@ -862,6 +923,10 @@ void Operator::GenKernelConf(
 void Operator::VirtualGenKernelConf(
     std::function<const BlobDesc*(const std::string&)> GetBlobDesc4BnInOp,
     const ParallelContext* parallel_ctx, KernelConf* kernel_conf) const {}
+
+void Operator::AddLbi2OutputIndex(const LogicalBlobId& lbi, int32_t output_index) {
+  CHECK(lbi2output_index_.emplace(lbi, output_index).second);
+}
 
 std::string Operator::Bn2ConfName(const std::string& bn) const {
   return GetStrValInPbFdOrPbRpf(GetCustomizedConf(), bn);
@@ -947,7 +1012,7 @@ OutputBlobModifier* Operator::EnrollOutputBn(const std::string& obn, bool has_di
   const int32_t output_index = output_bns_.size();
   CHECK(bn2index_pair_.emplace(obn, std::make_pair(BlobNameTag::kOutputBlobName, output_index))
             .second);
-  CHECK(lbi2output_index_.emplace(lbi, output_index).second);
+  AddLbi2OutputIndex(lbi, output_index);
   *output_bns_.Add() = obn;
   CHECK(mut_bn_in_op2lbi()->insert({obn, lbi}).second);
   ret->set_requires_grad(has_diff);
@@ -1120,7 +1185,8 @@ Maybe<void> Operator::ToOpAttribute(OpAttribute* op_attribute) const {
   if (bn2parallel_desc_) {
     auto* map = op_attribute->mutable_parallel_conf_signature()->mutable_bn_in_op2parallel_conf();
     for (const auto& pair : *bn2parallel_desc_) {
-      (*map)[pair.first] = pair.second->parallel_conf();
+      const bool has_same_parallel_conf_as_op = *op_parallel_desc_ == *pair.second;
+      if (!has_same_parallel_conf_as_op) { (*map)[pair.first] = pair.second->parallel_conf(); }
     }
   }
   if (op_parallel_desc_ && bn2parallel_desc_) {
@@ -1135,10 +1201,19 @@ Maybe<void> Operator::ToOpAttribute(OpAttribute* op_attribute) const {
         if (*pair.second == *op_parallel_desc_) {
           (*symbol_map)[pair.first] = parallel_desc_symbol_id;
         } else {
-          (*symbol_map)[pair.first] =
-              (*Global<std::shared_ptr<ForeignCallback>>::Get())
-                  ->MakeParallelDescSymbol(
-                      std::make_shared<cfg::ParallelConf>(pair.second->parallel_conf()));
+          const auto parallel_conf =
+              std::make_shared<cfg::ParallelConf>(pair.second->parallel_conf());
+          const auto MakeParallelDescSymbol = [&parallel_conf]() -> int64_t {
+            int64_t symbol_id;
+            const auto BuildInstruction =
+                [&symbol_id, &parallel_conf](InstructionsBuilder* builder) -> Maybe<void> {
+              symbol_id = JUST(JUST(builder->GetParallelDescSymbol(parallel_conf))->symbol_id());
+              return Maybe<void>::Ok();
+            };
+            LogicalRun(BuildInstruction);
+            return symbol_id;
+          };
+          (*symbol_map)[pair.first] = MakeParallelDescSymbol();
         }
       }
       for (const auto& tbn : tmp_bns()) { (*symbol_map)[tbn] = parallel_desc_symbol_id; }

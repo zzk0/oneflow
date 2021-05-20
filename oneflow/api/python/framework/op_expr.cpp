@@ -17,39 +17,84 @@ limitations under the License.
 #include <pybind11/stl.h>
 #include "oneflow/api/python/of_api_registry.h"
 #include "oneflow/core/common/protobuf.h"
+#include "oneflow/core/framework/attr_map.h"
 #include "oneflow/core/framework/op_expr.h"
+#include "oneflow/core/framework/op_interpreter.h"
+#include "oneflow/core/framework/op_interpreter/op_interpreter_util.h"
 #include "oneflow/core/framework/tensor.h"
+#include "oneflow/core/framework/tensor_tuple.h"
+#include "oneflow/core/framework/user_op_conf.cfg.h"
 
 namespace py = pybind11;
 
 namespace oneflow {
 
-Maybe<std::vector<std::shared_ptr<one::Tensor>>> Interpret(
-    const std::shared_ptr<one::OpExpr>& op,
-    const std::vector<std::shared_ptr<one::Tensor>>& inputs) {
-  // TODO(): Execute the op by Autograd.
-  UNIMPLEMENTED();
-  return std::make_shared<std::vector<std::shared_ptr<one::Tensor>>>();
+namespace {
+
+Maybe<one::TensorTuple> Interpret(const one::OpExpr& op, const one::TensorTuple& inputs,
+                                  const AttrMap& attrs) {
+  CHECK_EQ_OR_RETURN(op.input_size(), inputs.size())
+      << "The operation requires " << op.input_size() << " inputs, but " << inputs.size()
+      << " is given.";
+  auto outputs = std::make_shared<one::TensorTuple>(op.output_size());
+  auto interperter = JUST(one::OpInterpUtil::GetInterpreter());
+  JUST(interperter->Apply(op, inputs, outputs.get(), attrs));
+  return outputs;
 }
+
+Maybe<one::TensorTuple> Interpret(const one::OpExpr& op,
+                                  const std::vector<std::shared_ptr<one::Tensor>>& inputs,
+                                  const AttrMap& attrs) {
+  one::TensorTuple input_list(inputs.size());
+  for (int i = 0; i < inputs.size(); ++i) { input_list[i] = inputs[i]; }
+  return JUST(Interpret(op, input_list, attrs));
+}
+
+template<typename OpT, typename ConfT,
+         typename std::enable_if<std::is_base_of<one::BuiltinOpExpr, OpT>::value>::type* = nullptr>
+py::class_<OpT, one::BuiltinOpExpr, std::shared_ptr<OpT>> PybindExportOpExpr(
+    py::module& m, const char* op_type_name) {
+  using ProtoConfT = decltype(std::declval<OpT>().proto());
+  return py::class_<OpT, one::BuiltinOpExpr, std::shared_ptr<OpT>>(m, op_type_name)
+      .def(py::init([](const std::string& op_name, const std::shared_ptr<ConfT>& op_conf,
+                       const std::vector<std::string>& indexed_ibns,
+                       const std::vector<std::string>& indexed_obns) {
+        typename std::decay<ProtoConfT>::type proto_op_conf;
+        op_conf->ToProto(&proto_op_conf);
+        return OpT::New(op_name, std::move(proto_op_conf), indexed_ibns, indexed_obns)
+            .GetPtrOrThrow();
+      }))
+      .def_property_readonly("proto",
+                             [](const OpT& op) { return std::make_shared<ConfT>(op.proto()); });
+}
+
+}  // namespace
 
 ONEFLOW_API_PYBIND11_MODULE("one", m) {
   py::class_<one::OpExpr, std::shared_ptr<one::OpExpr>>(m, "OpExpr")
-      .def("apply", [](const std::shared_ptr<one::OpExpr>& op_expr,
-                       const std::vector<std::shared_ptr<one::Tensor>>& inputs) {
-        return Interpret(op_expr, inputs).GetOrThrow();
+      .def_property_readonly("type_name", &one::OpExpr::type_name)
+      .def_property_readonly("input_size", &one::OpExpr::input_size)
+      .def_property_readonly("output_size", &one::OpExpr::output_size)
+      .def("apply",
+           [](const one::OpExpr& op_expr, const std::vector<std::shared_ptr<one::Tensor>>& inputs,
+              const MutableCfgAttrMap& attrs) {
+             return Interpret(op_expr, inputs, attrs).GetPtrOrThrow();
+           })
+      .def("apply", [](const one::OpExpr& op_expr, const one::TensorTuple& inputs,
+                       const MutableCfgAttrMap& attrs) {
+        return Interpret(op_expr, inputs, attrs).GetPtrOrThrow();
       });
 
   py::class_<one::BuiltinOpExpr, one::OpExpr, std::shared_ptr<one::BuiltinOpExpr>>(m,
                                                                                    "BuiltinOpExpr")
-      .def_property_readonly("name", &one::BuiltinOpExpr::op_name);
+      .def_property_readonly("name", &one::BuiltinOpExpr::op_name)
+      .def_property_readonly("indexed_ibns", &one::BuiltinOpExpr::indexed_ibns)
+      .def_property_readonly("indexed_obns", &one::BuiltinOpExpr::indexed_obns);
 
-  py::class_<one::UserOpExpr, one::BuiltinOpExpr, std::shared_ptr<one::UserOpExpr>>(m, "UserOpExpr")
-      .def(py::init<>())
-      .def_property_readonly("type", &one::UserOpExpr::type)
-      .def_property_readonly(
-          "proto", [](const one::UserOpExpr& op) { return PbMessage2TxtString(op.proto()); })
-      .def_property_readonly("indexed_ibns", &one::UserOpExpr::indexed_ibns)
-      .def_property_readonly("indexed_obns", &one::UserOpExpr::indexed_obns);
+  auto py_user_op_class = PybindExportOpExpr<one::UserOpExpr, cfg::UserOpConf>(m, "UserOpExpr");
+  py_user_op_class.def_property_readonly(
+      "op_type_name", [](const one::UserOpExpr& op) { return op.proto().op_type_name(); });
+  PybindExportOpExpr<one::VariableOpExpr, cfg::VariableOpConf>(m, "VariableOpExpr");
 }
 
 }  // namespace oneflow
