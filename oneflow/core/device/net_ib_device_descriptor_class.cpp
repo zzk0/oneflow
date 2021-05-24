@@ -41,6 +41,27 @@ class NetIBDeviceDescriptorClass : public DeviceDescriptorClass {
 
   std::shared_ptr<const DeviceDescriptorList> QueryDeviceDescriptorList() const override {
     std::vector<std::shared_ptr<const DeviceDescriptor>> devices;
+    int num_devices;
+    if (!ibv::IsAvailable()) { return std::make_shared<const BasicDeviceDescriptorList>(devices); }
+    ibv_device** device_list = ibv::wrapper.ibv_get_device_list(&num_devices);
+    if (device_list == nullptr) {
+      return std::make_shared<const BasicDeviceDescriptorList>(devices);
+    }
+    for (int i = 0; i < num_devices; ++i) {
+      ibv_device* device = device_list[i];
+      ibv_context* context = ibv::wrapper.ibv_open_device(device);
+      if (context == nullptr) { continue; }
+      ibv_device_attr device_attr{};
+      if (ibv::wrapper.ibv_query_device(context, &device_attr) != 0) {
+        CHECK_EQ(ibv::wrapper.ibv_close_device(context), 0);
+      }
+      for (int port = 1; port < device_attr.phys_port_cnt; ++port) {
+        auto device_desc =
+            NetIBDeviceDescriptor::Query(static_cast<int32_t>(devices.size()), context, port);
+        if (device_desc) { devices.push_back(device_desc); }
+      }
+    }
+    ibv::wrapper.ibv_free_device_list(device_list);
     return std::make_shared<const BasicDeviceDescriptorList>(devices);
   }
 

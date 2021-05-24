@@ -22,18 +22,26 @@ limitations under the License.
 
 #ifdef WITH_RDMA
 
+#include "oneflow/core/dl/include/ibv.h"
+
 namespace oneflow {
 
 namespace device {
 
 constexpr char kNetIBDeviceDescriptorClassName[] = "net_ib";
 
+enum NetIBDeviceDescriptorLinkLayer {
+  kNetIBDeviceDescriptorLinkLayerInvalid = 0,
+  kNetIBDeviceDescriptorLinkLayerInfiniBand = 1,
+};
+
 class NetIBDeviceDescriptor : public DeviceDescriptor {
  public:
   ~NetIBDeviceDescriptor() override;
 
   void Serialize(std::string* serialized) const;
-  static std::shared_ptr<const NetIBDeviceDescriptor> Query(int32_t ordinal);
+  static std::shared_ptr<const NetIBDeviceDescriptor> Query(int32_t ordinal, ibv_context* context,
+                                                            uint8_t port);
   static std::shared_ptr<const NetIBDeviceDescriptor> Deserialize(const std::string& serialized);
 
  private:
