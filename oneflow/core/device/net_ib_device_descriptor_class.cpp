@@ -55,7 +55,7 @@ class NetIBDeviceDescriptorClass : public DeviceDescriptorClass {
       if (ibv::wrapper.ibv_query_device(context, &device_attr) != 0) {
         CHECK_EQ(ibv::wrapper.ibv_close_device(context), 0);
       }
-      for (int port = 1; port < device_attr.phys_port_cnt; ++port) {
+      for (int port = 1; port <= device_attr.phys_port_cnt; ++port) {
         auto device_desc =
             NetIBDeviceDescriptor::Query(static_cast<int32_t>(devices.size()), context, port);
         if (device_desc) { devices.push_back(device_desc); }
@@ -75,10 +75,10 @@ class NetIBDeviceDescriptorClass : public DeviceDescriptorClass {
     std::vector<std::string> serialized_devices;
     serialized_devices.reserve(list->DeviceCount());
     for (size_t i = 0; i < list->DeviceCount(); ++i) {
-      auto cuda_device = std::dynamic_pointer_cast<const NetIBDeviceDescriptor>(list->GetDevice(i));
-      CHECK(cuda_device);
+      auto ib_device = std::dynamic_pointer_cast<const NetIBDeviceDescriptor>(list->GetDevice(i));
+      CHECK(ib_device);
       std::string serialized_device;
-      cuda_device->Serialize(&serialized_device);
+      ib_device->Serialize(&serialized_device);
       serialized_devices.push_back(std::move(serialized_device));
     }
     nlohmann::json json_object;
@@ -100,11 +100,11 @@ class NetIBDeviceDescriptorClass : public DeviceDescriptorClass {
   void DumpDeviceDescriptorListSummary(const std::shared_ptr<const DeviceDescriptorList>& list,
                                        const std::string& path) const override {
     for (size_t i = 0; i < list->DeviceCount(); ++i) {
-      auto cuda_device = std::dynamic_pointer_cast<const NetIBDeviceDescriptor>(list->GetDevice(i));
-      CHECK(cuda_device);
+      auto ib_device = std::dynamic_pointer_cast<const NetIBDeviceDescriptor>(list->GetDevice(i));
+      CHECK(ib_device);
       auto stream = TeePersistentLogStream::Create(JoinPath(path, std::to_string(i) + ".json"));
       std::string serialized;
-      cuda_device->Serialize(&serialized);
+      ib_device->Serialize(&serialized);
       stream << serialized;
     }
   }
