@@ -31,7 +31,7 @@ def compare_with_mxnet_lars(
                 name="x",
                 shape=x_shape,
                 dtype=flow.float32,
-                initializer=flow.random_uniform_initializer(0, 100),
+                initializer=flow.random_normal_initializer(0, 0.001),
                 trainable=True,
             )
             loss = flow.math.reduce_mean(x * random_mask)
@@ -56,8 +56,8 @@ def compare_with_mxnet_lars(
         if i == 0:
             init_value = np.copy(x)
 
-    # PyTorch
-    mx_var = mx.nd.array(init_value)
+    # MxNet
+    mx_var = mx.nd.array(init_value).astype("float16")
     mx_var.attach_grad()
     optimizer_params = {
         'learning_rate': learning_rate,
@@ -70,27 +70,27 @@ def compare_with_mxnet_lars(
     state = mx_opt.create_state([0], [mx_var])
     for i in range(train_iters):
         with mx.autograd.record():
-            random_mask = mx.nd.array(random_masks_seq[i])
+            random_mask = mx.nd.array(random_masks_seq[i]).astype("float16")
             loss = mx.nd.mean(mx_var * random_mask)
             loss.backward(retain_graph=True)
         mx_opt.update([0], [mx_var], [mx_var.grad], [state])
 
     y = mx_var.asnumpy()
-    print(x - y)
-    assert np.allclose(x, y, rtol=1e-4, atol=1e-4, )
+    assert np.allclose(x, y, rtol=1e-4, atol=1e-4)
+
 
 @flow.unittest.skip_unless_1n1d()
 class TestOptimizers(flow.unittest.TestCase):
     def test_lars(test_case):
         arg_dict = OrderedDict()
-        arg_dict["device_type"] = ["cpu", "gpu"]
-        arg_dict["x_shape"] = [(100, 100)]
+        arg_dict["device_type"] = ["gpu"]
+        arg_dict["x_shape"] = [(1000, 1000)]
         arg_dict["momentum_beta"] = [0.0]
         arg_dict["epsilon"] = [1e-9]
         arg_dict["lars_coefficient"] = [0.001]
         arg_dict["learning_rate"] = [1]
         arg_dict["weight_decay"] = [0.0]
-        arg_dict["train_iters"] = [100]
+        arg_dict["train_iters"] = [1]
         for arg in GenArgList(arg_dict):
             compare_with_mxnet_lars(*arg)
 
