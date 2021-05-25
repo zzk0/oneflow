@@ -27,10 +27,7 @@ class ActorMsgMR final {
  public:
   OF_DISALLOW_COPY_AND_MOVE(ActorMsgMR);
   ActorMsgMR() = delete;
-  ActorMsgMR(ibv_pd* pd) {
-    mem_desc_.reset(new IBVerbsMemDesc(pd, &msg_, sizeof(msg_)));
-    CHECK_EQ(mem_desc_->sge_vec().size(), 1);
-  }
+  ActorMsgMR(ibv_pd* pd) { mem_desc_.reset(new IBVerbsMemDesc(pd, &msg_, sizeof(msg_))); }
   ~ActorMsgMR() { mem_desc_.reset(); }
 
   const ActorMsg& msg() const { return msg_; }
