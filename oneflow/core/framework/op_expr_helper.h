@@ -171,6 +171,12 @@ Maybe<one::UserOpExpr> ConvNdFilterGradOp(const std::vector<int32_t>& kernel_siz
                                           const int& groups, const std::string& data_format,
                                           const std::string& name);
 
+Maybe<one::UserOpExpr> PoolGradOp(const std::string data_format, const std::string padding, const std::vector<int32_t> padding_before, const std::vector<int32_t> padding_after,
+                                const std::string pool_size, const std::string strides, const bool ceil_mode);
+Maybe<one::UserOpExpr> PoolGradOp(const std::string data_format, const std::string padding, const std::vector<int32_t> padding_before, const std::vector<int32_t> padding_after,
+                                const std::string pool_size, const std::string strides, const bool ceil_mode
+                                          const std::string& name);
+
 Maybe<one::UserOpExpr> SparseSoftmaxCrossEntropyGradOp(const int64_t& depth);
 Maybe<one::UserOpExpr> SparseSoftmaxCrossEntropyGradOp(const int64_t& depth,
                                                        const std::string& name);
