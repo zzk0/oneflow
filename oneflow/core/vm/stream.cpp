@@ -44,6 +44,8 @@ const StreamTypeId& Stream::stream_type_id() const {
 
 ObjectMsgPtr<Instruction> Stream::NewInstruction(
     InstructionMsg* instr_msg, const std::shared_ptr<const ParallelDesc>& parallel_desc) {
+  return ObjectMsgPtr<Instruction>::NewFrom(mut_allocator(), instr_msg, this, parallel_desc);
+
   if (free_instruction_list().empty()) {
     return ObjectMsgPtr<Instruction>::NewFrom(mut_allocator(), instr_msg, this, parallel_desc);
   }
@@ -83,6 +85,8 @@ void Stream::MoveFromZombieListToFreeList() {
 }
 
 void Stream::DeleteInstruction(ObjectMsgPtr<Instruction>&& instruction) {
+  return;
+
   CHECK(instruction->is_pending_instruction_link_empty());
   CHECK(instruction->is_instruction_link_empty());
   // the value of instruction->ref_cnt() may be updated by a worker thread
