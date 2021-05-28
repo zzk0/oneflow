@@ -445,7 +445,10 @@ struct LocalCallOpKernelUtil final {
     auto* operand = JUST(GetLocalCallOpKernelPhyInstrOperand(instruction));
     operand->set_user_opkernel(
         JUST(operand->mut_opkernel()->ChooseOpKernel(operand->inputs(), operand->outputs())));
+    return Maybe<void>::Ok();
+    // segfault
     operand->mut_opkernel()->ResetDynamicOpAttrs(operand->attrs());
+    // segfault
     JUST(CheckOutputBlobObjectsMemCase(operand, instruction->stream()));
     JUST(InitOutputBlobs(operand));
     JUST(InferTempStorageBlobDesc(operand));
@@ -454,7 +457,6 @@ struct LocalCallOpKernelUtil final {
   }
 
   static inline Maybe<void> Compute(vm::Instruction* instruction) {
-    return Maybe<void>::Ok();
     auto* operand = JUST(GetLocalCallOpKernelPhyInstrOperand(instruction));
     DeviceCtx* device_ctx = instruction->stream().device_ctx().get();
     JUST(AllocateOutputBlobsMemory(operand, device_ctx));
@@ -592,6 +594,7 @@ void LocalCallOpKernelInstructionType::Infer(vm::Instruction* instruction) const
 
 void LocalCallOpKernelInstructionType::Compute(vm::Instruction* instruction) const {
   CHECK_OK(LocalCallOpKernelUtil::Infer(instruction));
+  return;
   CHECK_OK(LocalCallOpKernelUtil::Compute(instruction));
 }
 
