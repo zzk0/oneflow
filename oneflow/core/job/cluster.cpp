@@ -80,12 +80,12 @@ Maybe<void> Cluster::WorkerLoop() {
         wait_session_init_list.push_back(wait_session_init);
         AsyncRunLazyJobSet(&lazy_runtime_thread, wait_session_init);
       } else if (mut_cluster_instruction->has_eager_instruction()) {
-        auto* ptr = Global<ResourceDesc, ForSession>::Get();
-        CHECK(ptr != nullptr) << mut_cluster_instruction->DebugString();
         while (!wait_session_init_list.empty()) {
           wait_session_init_list.front()->WaitUntilCntEqualZero();
           wait_session_init_list.pop_front();
         }
+        auto* ptr = Global<ResourceDesc, ForSession>::Get();
+        CHECK(ptr != nullptr) << mut_cluster_instruction->DebugString();
         Global<vm::EagerOneflow>::Get()->RunPhysicalInstruction(
             std::const_pointer_cast<const ClusterInstructionProto>(mut_cluster_instruction));
       } else {
