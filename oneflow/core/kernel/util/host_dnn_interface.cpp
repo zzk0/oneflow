@@ -22,9 +22,7 @@ namespace {
 template<typename T>
 static void ReluImpl(DeviceCtx* ctx, const int64_t n, const T* x, T* y) {
   T zero = GetZeroVal<T>();
-  for (int64_t i = 0; i != n; ++i) {
-    y[i] = std::max(x[i], zero);
-  }
+  for (int64_t i = 0; i != n; ++i) { y[i] = std::max(x[i], zero); }
 }
 
 template<typename T>

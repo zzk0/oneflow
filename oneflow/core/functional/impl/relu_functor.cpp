@@ -50,7 +50,7 @@ class ReLUInplaceFunctor {
     std::shared_ptr<TensorTuple> outputs = std::make_shared<TensorTuple>(1);
     outputs->at(0) = x;
     JUST(JUST(OpInterpUtil::GetInterpreter())->Apply(*relu_op_, {x}, outputs.get(), {}));
-    return x;
+    return outputs->at(0);
   }
 
  private:

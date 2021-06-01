@@ -97,20 +97,14 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr, const TensorTuple& in
   kernel->set_need_check_mem_case(need_check_mem_case);
 
   for (int64_t index : kernel->output_tuple_indexes4mut2_obns()) {
-    if (!is_inplace) {
-      output_eager_blob_objects->at(index)->set_is_shape_synced(false);
-    } else {
-      output_eager_blob_objects->at(index)->set_is_shape_synced(true);
-    }
+    output_eager_blob_objects->at(index)->set_is_shape_synced(false);
   }
 
   kernel->composed_attrs_for_thread_b()->ResetPrior(attrs);
-  if (!is_inplace) {
-    JUST(kernel->InferDataType(input_eager_blob_objects, output_eager_blob_objects,
+  JUST(kernel->InferDataType(input_eager_blob_objects, output_eager_blob_objects,
+                             kernel->op_infer_ctx_for_thread_b()));
+  JUST(kernel->InferTensorDesc(input_eager_blob_objects, output_eager_blob_objects,
                                kernel->op_infer_ctx_for_thread_b()));
-    JUST(kernel->InferTensorDesc(input_eager_blob_objects, output_eager_blob_objects,
-                                 kernel->op_infer_ctx_for_thread_b()));
-  }
 
   const auto& instr_type_name = JUST(op_device->local_call_instruction_name());
   JUST(PhysicalRun([&](InstructionsBuilder* builder) -> Maybe<void> {
@@ -125,7 +119,7 @@ Maybe<void> NaiveInterpret(const UserOpExpr& user_op_expr, const TensorTuple& in
       }
     }
     return builder->LocalCallOpKernel(kernel, input_eager_blob_objects, output_eager_blob_objects,
-                                      attrs, op_parallel_desc, instr_type_name);
+                                      attrs, op_parallel_desc, instr_type_name, is_inplace);
   }));
   return Maybe<void>::Ok();
 }
