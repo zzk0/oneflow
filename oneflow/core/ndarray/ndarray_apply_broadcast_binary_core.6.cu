@@ -13,14 +13,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-#include "oneflow/core/graph/stream_index_getter_registry.h"
-#include "oneflow/core/graph/stream_index_getter_registry_manager.h"
+#include "oneflow/core/ndarray/ndarray_apply_broadcast_binary_core.cuh"
 
 namespace oneflow {
 
-StreamIndexGetterRegistry& StreamIndexGetterRegistry::SetFn(StreamIndexGetterFn func) {
-  StreamIndexGetterRegistryManager::Get().StreamIndexGetterFuncs()[dev_task_type_] = func;
-  return *this;
-}
+INSTANTIATE_BROADCAST_BINARY_FUNCS_DIM(6);
 
 }  // namespace oneflow
