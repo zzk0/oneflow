@@ -231,7 +231,9 @@ endif()
 # cc obj lib
 include_directories(${PROJECT_SOURCE_DIR})  # TO FIND: third_party/eigen3/..
 include_directories(${PROJECT_BINARY_DIR})
+set(CUDA_NVCC_EXECUTABLE /usr/bin/time -v ${CUDA_NVCC_EXECUTABLE})
 oneflow_add_library(of_ccobj ${of_all_obj_cc})
+set_property(TARGET of_ccobj PROPERTY RULE_LAUNCH_COMPILE "${CMAKE_COMMAND} -E time")
 add_dependencies(of_ccobj prepare_oneflow_third_party)
 target_link_libraries(of_ccobj ${oneflow_third_party_libs})
 add_dependencies(of_ccobj of_protoobj)

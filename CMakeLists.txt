@@ -1,6 +1,6 @@
 # Minimum CMake required
 cmake_minimum_required(VERSION 3.14.0)
-
+set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CMAKE_COMMAND} -E time")
 string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
 if(NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL)$")
     set(CMAKE_BUILD_TYPE "Release")
