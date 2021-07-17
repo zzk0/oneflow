@@ -401,5 +401,21 @@ list(APPEND OF_CORE_HDRS "${PROJECT_SOURCE_DIR}/oneflow/core/common/symbol.h")
 list(APPEND OF_CORE_HDRS "${PROJECT_SOURCE_DIR}/oneflow/core/job/parallel_desc.h")
 list(APPEND OF_CORE_HDRS "${PROJECT_SOURCE_DIR}/oneflow/core/autograd/autograd_meta.h")
 copy_files("${OF_CORE_HDRS}" "${PROJECT_SOURCE_DIR}" "${ONEFLOW_INCLUDE_DIR}" of_include_copy)
+
 add_custom_target(oneflow_py ALL)
 add_dependencies(oneflow_py of_include_copy)
+
+add_dependencies(pip_install of_include_copy)
+
+
+if (BUILD_JNI)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/oneflow/api/java)
+
+  target_link_libraries(oneflow 
+    ${of_libs}
+    "${oneflow_exe_third_party_libs}"
+    "${oneflow_third_party_libs}"
+    "${CUDA_CUBLAS_LIBRARIES}"
+  )
+endif()
+
